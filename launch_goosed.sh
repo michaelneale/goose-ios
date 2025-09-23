@@ -45,3 +45,7 @@ else
     echo "❌ goosed failed to start"
     exit 1
 fi
+
+# Enable built-in extensions
+echo ""
+./enable_extensions.sh
