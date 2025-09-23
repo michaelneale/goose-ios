@@ -1,5 +1,25 @@
 #!/bin/bash
 
+# Function to clean up processes
+cleanup() {
+    echo ""
+    echo "Shutting down services..."
+    if [ ! -z "$GOOSED_PID" ]; then
+        kill $GOOSED_PID 2>/dev/null
+    fi
+    if [ ! -z "$LT_PID" ]; then
+        kill $LT_PID 2>/dev/null
+    fi
+    killall goosed 2>/dev/null
+    pkill -f "lt --port 62996" 2>/dev/null
+    rm -f tunnel_url.txt 2>/dev/null
+    echo "Cleanup complete"
+    exit 0
+}
+
+# Set up trap for script exit (including Ctrl+C)
+trap cleanup EXIT INT TERM
+
 # Install required tools if not already installed
 if ! command -v lt &> /dev/null; then
     echo "Installing localtunnel..."
@@ -77,14 +97,11 @@ if [ -f tunnel_url.txt ]; then
     echo ""
     echo "Scan the QR code with your camera to configure the app"
     echo ""
+    echo "Press Ctrl+C to stop all services"
 else
     echo "❌ Failed to get tunnel URL"
     exit 1
 fi
 
-echo "To stop all services:"
-echo "kill $GOOSED_PID $LT_PID"
-echo "Or use: killall goosed; pkill -f 'lt --port 62996'"
-
-# Keep script running
+# Wait forever (until Ctrl+C)
 wait
