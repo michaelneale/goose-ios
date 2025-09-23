@@ -62,3 +62,4 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 tunnel_qr.png
 tunnel_url.txt
+build
