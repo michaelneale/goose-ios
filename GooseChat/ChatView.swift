@@ -7,7 +7,9 @@ struct ChatView: View {
     @State private var isLoading = false
     @State private var currentStreamTask: URLSessionDataTask?
     @State private var showingErrorDetails = false
-    @State private var activeToolCalls: [String: ToolCall] = [:]  // Track active tool calls
+    @State private var activeToolCalls: [String: ToolCallWithTiming] = [:]  // Track active tool calls
+    @State private var completedToolCalls: [String: CompletedToolCall] = [:] // Track completed tool calls
+    @State private var toolCallMessageMap: [String: String] = [:] // Map tool call ID to message ID
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,13 +20,19 @@ struct ChatView: View {
                         ForEach(messages) { message in
                             MessageBubbleView(message: message)
                                 .id(message.id)
-                        }
-
-                        // Show active tool calls
-                        ForEach(Array(activeToolCalls.keys), id: \.self) { toolCallId in
-                            if let toolCall = activeToolCalls[toolCallId] {
-                                ToolCallProgressView(toolCall: toolCall)
-                                    .id("tool-\(toolCallId)")
+                            
+                            // Show tool calls that belong to this message
+                            ForEach(getToolCallsForMessage(message.id), id: \.self) { toolCallId in
+                                HStack {
+                                    Spacer()
+                                    if let activeCall = activeToolCalls[toolCallId] {
+                                        ToolCallProgressView(toolCall: activeCall.toolCall)
+                                    } else if let completedCall = completedToolCalls[toolCallId] {
+                                        CompletedToolCallView(completedCall: completedCall)
+                                    }
+                                    Spacer()
+                                }
+                                .id("tool-\(toolCallId)")
                             }
                         }
 
@@ -146,11 +154,24 @@ struct ChatView: View {
             for content in incomingMessage.content {
                 switch content {
                 case .toolRequest(let toolRequest):
-                    // Add tool call to active tracking
-                    activeToolCalls[toolRequest.id] = toolRequest.toolCall
+                    // Add tool call to active tracking with start time and associate with message
+                    activeToolCalls[toolRequest.id] = ToolCallWithTiming(
+                        toolCall: toolRequest.toolCall,
+                        startTime: Date()
+                    )
+                    toolCallMessageMap[toolRequest.id] = incomingMessage.id
                 case .toolResponse(let toolResponse):
-                    // Remove tool call from active tracking when response received
-                    activeToolCalls.removeValue(forKey: toolResponse.id)
+                    // Move from active to completed with result and timing
+                    if let activeCall = activeToolCalls.removeValue(forKey: toolResponse.id) {
+                        let duration = Date().timeIntervalSince(activeCall.startTime)
+                        completedToolCalls[toolResponse.id] = CompletedToolCall(
+                            toolCall: activeCall.toolCall,
+                            result: toolResponse.toolResult,
+                            duration: duration,
+                            completedAt: Date()
+                        )
+                        // Keep the message association
+                    }
                 default:
                     break
                 }
@@ -209,6 +230,16 @@ struct ChatView: View {
         case .finish(let finishEvent):
             print("Stream finished: \(finishEvent.reason)")
             // Clear any remaining active tool calls when stream finishes
+            // Move any remaining active calls to completed with timeout status
+            for (id, activeCall) in activeToolCalls {
+                let duration = Date().timeIntervalSince(activeCall.startTime)
+                completedToolCalls[id] = CompletedToolCall(
+                    toolCall: activeCall.toolCall,
+                    result: ToolResult(status: "timeout", value: nil, error: "Stream finished"),
+                    duration: duration,
+                    completedAt: Date()
+                )
+            }
             activeToolCalls.removeAll()
 
         case .modelChange(let modelEvent):
@@ -228,6 +259,26 @@ struct ChatView: View {
         currentStreamTask = nil
         isLoading = false
     }
+    
+    private func getToolCallsForMessage(_ messageId: String) -> [String] {
+        // Return tool call IDs that belong to this message
+        return toolCallMessageMap.compactMap { (toolCallId, mappedMessageId) in
+            mappedMessageId == messageId ? toolCallId : nil
+        }.sorted() // Sort for consistent ordering
+    }
+}
+
+// MARK: - Tool Call Data Structures
+struct ToolCallWithTiming {
+    let toolCall: ToolCall
+    let startTime: Date
+}
+
+struct CompletedToolCall {
+    let toolCall: ToolCall
+    let result: ToolResult
+    let duration: TimeInterval
+    let completedAt: Date
 }
 
 #Preview {

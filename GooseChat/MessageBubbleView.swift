@@ -404,49 +404,108 @@ struct ToolCallProgressView: View {
     let toolCall: ToolCall
     
     var body: some View {
-        HStack {
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.7)
+        VStack(alignment: .center, spacing: 4) {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.7)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tool call in progress")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
                     
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Tool call in progress")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
-                        
-                        Text(toolCall.name)
+                    Text(toolCall.name)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    if !toolCall.arguments.isEmpty {
+                        let argCount = toolCall.arguments.count
+                        Text("\(argCount) argument\(argCount == 1 ? "" : "s")")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            
+            Text("executing...")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
+    }
+}
+
+// MARK: - Completed Tool Call View
+struct CompletedToolCallView: View {
+    let completedCall: CompletedToolCall
+    
+    var body: some View {
+        VStack(alignment: .center, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: completedCall.result.status == "success" ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                    .font(.caption)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tool call completed")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    Text(completedCall.toolCall.name)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 4) {
+                        Text(String(format: "%.2fs", completedCall.duration))
                             .font(.caption2)
                             .foregroundColor(.secondary)
                         
-                        if !toolCall.arguments.isEmpty {
-                            let argCount = toolCall.arguments.count
-                            Text("\(argCount) argument\(argCount == 1 ? "" : "s")")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Text(completedCall.result.status)
+                            .font(.caption2)
+                            .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                            .fontWeight(.medium)
                     }
-                    
-                    Spacer()
                 }
-                .padding(8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemGray6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                        )
-                )
                 
-                Text("executing...")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                Spacer()
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.6, alignment: .trailing)
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(completedCall.result.status == "success" ? Color.green.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            
+            Text(formatCompletionTime(completedCall.completedAt))
+                .font(.caption2)
+                .foregroundColor(.secondary)
         }
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
+    }
+    
+    private func formatCompletionTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return "completed \(formatter.string(from: date))"
     }
 }
