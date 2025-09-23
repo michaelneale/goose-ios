@@ -164,6 +164,12 @@ struct ToolCall: Codable {
     let name: String
     let arguments: [String: AnyCodable]
     
+    // Simple initializer for creating ToolCall instances
+    init(name: String, arguments: [String: AnyCodable]) {
+        self.name = name
+        self.arguments = arguments
+    }
+    
     // Handle both direct format and wrapped format
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

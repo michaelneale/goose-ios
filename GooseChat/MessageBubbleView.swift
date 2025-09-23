@@ -398,3 +398,55 @@ def hello_world():
         .padding()
     }
 }
+
+// MARK: - Tool Call Progress View
+struct ToolCallProgressView: View {
+    let toolCall: ToolCall
+    
+    var body: some View {
+        HStack {
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Tool call in progress")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        
+                        Text(toolCall.name)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        if !toolCall.arguments.isEmpty {
+                            let argCount = toolCall.arguments.count
+                            Text("\(argCount) argument\(argCount == 1 ? "" : "s")")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemGray6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                
+                Text("executing...")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.6, alignment: .trailing)
+        }
+    }
+}

@@ -7,6 +7,7 @@ struct ChatView: View {
     @State private var isLoading = false
     @State private var currentStreamTask: URLSessionDataTask?
     @State private var showingErrorDetails = false
+    @State private var activeToolCalls: [String: ToolCall] = [:]  // Track active tool calls
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +20,16 @@ struct ChatView: View {
                                 .id(message.id)
                         }
 
-                        if isLoading {
+                        // Show active tool calls
+                        ForEach(Array(activeToolCalls.keys), id: \.self) { toolCallId in
+                            if let toolCall = activeToolCalls[toolCallId] {
+                                ToolCallProgressView(toolCall: toolCall)
+                                    .id("tool-\(toolCallId)")
+                            }
+                        }
+
+                        // Only show "thinking" indicator if no active tool calls
+                        if isLoading && activeToolCalls.isEmpty {
                             HStack {
                                 ProgressView()
                                     .scaleEffect(0.8)
@@ -47,7 +57,7 @@ struct ChatView: View {
 
             // Input Area
             HStack(spacing: 12) {
-                TextField("What shall we build today?", text: $inputText, axis: .vertical)
+                TextField("build, solve, create...", text: $inputText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
                     .onSubmit {
@@ -132,6 +142,20 @@ struct ChatView: View {
         case .message(let messageEvent):
             let incomingMessage = messageEvent.message
 
+            // Track tool calls and responses
+            for content in incomingMessage.content {
+                switch content {
+                case .toolRequest(let toolRequest):
+                    // Add tool call to active tracking
+                    activeToolCalls[toolRequest.id] = toolRequest.toolCall
+                case .toolResponse(let toolResponse):
+                    // Remove tool call from active tracking when response received
+                    activeToolCalls.removeValue(forKey: toolResponse.id)
+                default:
+                    break
+                }
+            }
+
             // Check if this message already exists (by ID)
             print("🚀 ChatView: Received message with ID: '\(incomingMessage.id)'")
             print("🚀 ChatView: Current messages count: \(messages.count)")
@@ -184,6 +208,8 @@ struct ChatView: View {
 
         case .finish(let finishEvent):
             print("Stream finished: \(finishEvent.reason)")
+            // Clear any remaining active tool calls when stream finishes
+            activeToolCalls.removeAll()
 
         case .modelChange(let modelEvent):
             print("Model changed: \(modelEvent.model) (\(modelEvent.mode))")
