@@ -11,6 +11,7 @@ export GOOSE_SERVER__SECRET_KEY="test"
 export GOOSE_PORT=62996
 export GOOSE_PROVIDER="databricks"
 export GOOSE_MODEL="goose-claude-4-sonnet"
+export GOOSE_STANDALONE_MODE="true"
 
 # Set databricks credentials from config if available
 if [ -f "$HOME/.config/goose/config.yaml" ]; then

@@ -16,6 +16,7 @@
 		A1234567890ABCDEF014 /* GooseAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF013 /* GooseAPIService.swift */; };
 		A1234567890ABCDEF016 /* MessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF015 /* MessageBubbleView.swift */; };
 		A1234567890ABCDEF018 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF017 /* SettingsView.swift */; };
+		A1234567890ABCDEF020 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = A1234567890ABCDEF019 /* Markdown */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1234567890ABCDEF020 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,6 +100,9 @@
 			dependencies = (
 			);
 			name = GooseChat;
+			packageProductDependencies = (
+				A1234567890ABCDEF019 /* Markdown */,
+			);
 			productName = GooseChat;
 			productReference = A1234567890ABCDEF999 /* GooseChat.app */;
 			productType = "com.apple.product-type.application";
@@ -126,6 +131,9 @@
 				Base,
 			);
 			mainGroup = A1234567890ABCDEF990;
+			packageReferences = (
+				A1234567890ABCDEF021 /* XCRemoteSwiftPackageReference "swift-markdown" */,
+			);
 			productRefGroup = A1234567890ABCDEF998 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -362,6 +370,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1234567890ABCDEF021 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-markdown";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1234567890ABCDEF019 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1234567890ABCDEF021 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1234567890ABCDEF989 /* Project object */;
 }

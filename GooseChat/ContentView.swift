@@ -2,11 +2,11 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var isSettingsPresented = false
-    
+
     var body: some View {
         NavigationView {
             ChatView()
-                .navigationTitle("Goose Chat")
+                .navigationTitle("goose")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {

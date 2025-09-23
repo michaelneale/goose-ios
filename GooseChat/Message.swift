@@ -163,6 +163,54 @@ struct ToolConfirmationRequestContent: Codable {
 struct ToolCall: Codable {
     let name: String
     let arguments: [String: AnyCodable]
+    
+    // Handle both direct format and wrapped format
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Try direct format first
+        if let name = try? container.decode(String.self, forKey: .name),
+           let arguments = try? container.decode([String: AnyCodable].self, forKey: .arguments) {
+            self.name = name
+            self.arguments = arguments
+        }
+        // Try wrapped format (status/value structure)
+        else if let status = try? container.decode(String.self, forKey: .status),
+                status == "success",
+                let value = try? container.decode(ToolCallValue.self, forKey: .value) {
+            self.name = value.name
+            self.arguments = value.arguments
+        }
+        // Fallback: try to decode value directly
+        else if let value = try? container.decode(ToolCallValue.self, forKey: .value) {
+            self.name = value.name
+            self.arguments = value.arguments
+        }
+        else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Could not decode ToolCall from either direct or wrapped format"
+                )
+            )
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(arguments, forKey: .arguments)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case name, arguments, status, value
+    }
+}
+
+// Helper struct for the wrapped format
+private struct ToolCallValue: Codable {
+    let name: String
+    let arguments: [String: AnyCodable]
 }
 
 struct ToolResult: Codable {
@@ -317,11 +365,40 @@ struct PingEvent: Codable {
 struct NotificationEvent: Codable {
     let type = "Notification"
     let requestId: String
-    let message: String // Simplified for now
+    let message: NotificationMessage
     
     enum CodingKeys: String, CodingKey {
         case type
         case requestId = "request_id"
         case message
+    }
+}
+
+struct NotificationMessage: Codable {
+    let method: String
+    let params: NotificationParams
+}
+
+struct NotificationParams: Codable {
+    let level: String
+    let logger: String
+    let data: NotificationData
+}
+
+struct NotificationData: Codable {
+    let type: String
+    let stream: String?
+    let output: String?
+    
+    // Make fields optional to handle different notification types
+    private enum CodingKeys: String, CodingKey {
+        case type, stream, output
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        stream = try container.decodeIfPresent(String.self, forKey: .stream)
+        output = try container.decodeIfPresent(String.self, forKey: .output)
     }
 }
