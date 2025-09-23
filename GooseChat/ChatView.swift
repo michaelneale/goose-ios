@@ -53,9 +53,65 @@ struct ChatView: View {
                     .padding(.top, 8)
                 }
                 .onChange(of: messages.count) { _ in
+                    // Find the last item to scroll to (either last message or last tool call)
+                    var lastId: String?
+                    
                     if let lastMessage = messages.last {
+                        let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
+                        if !toolCallsForLastMessage.isEmpty {
+                            // Scroll to the last tool call of the last message
+                            lastId = "tool-\(toolCallsForLastMessage.last!)"
+                        } else {
+                            // Scroll to the last message
+                            lastId = lastMessage.id
+                        }
+                    }
+                    
+                    if let scrollId = lastId {
                         withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            proxy.scrollTo(scrollId, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: activeToolCalls.count) { _ in
+                    // Find the last item to scroll to (either last message or last tool call)
+                    var lastId: String?
+                    
+                    if let lastMessage = messages.last {
+                        let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
+                        if !toolCallsForLastMessage.isEmpty {
+                            // Scroll to the last tool call of the last message
+                            lastId = "tool-\(toolCallsForLastMessage.last!)"
+                        } else {
+                            // Scroll to the last message
+                            lastId = lastMessage.id
+                        }
+                    }
+                    
+                    if let scrollId = lastId {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            proxy.scrollTo(scrollId, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: completedToolCalls.count) { _ in
+                    // Find the last item to scroll to (either last message or last tool call)
+                    var lastId: String?
+                    
+                    if let lastMessage = messages.last {
+                        let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
+                        if !toolCallsForLastMessage.isEmpty {
+                            // Scroll to the last tool call of the last message
+                            lastId = "tool-\(toolCallsForLastMessage.last!)"
+                        } else {
+                            // Scroll to the last message
+                            lastId = lastMessage.id
+                        }
+                    }
+                    
+                    if let scrollId = lastId {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            proxy.scrollTo(scrollId, anchor: .bottom)
                         }
                     }
                 }
