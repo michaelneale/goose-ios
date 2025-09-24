@@ -7,150 +7,155 @@ struct ChatView: View {
     @State private var isLoading = false
     @State private var currentStreamTask: URLSessionDataTask?
     @State private var showingErrorDetails = false
-    @State private var activeToolCalls: [String: ToolCallWithTiming] = [:]  // Track active tool calls
-    @State private var completedToolCalls: [String: CompletedToolCall] = [:] // Track completed tool calls
-    @State private var toolCallMessageMap: [String: String] = [:] // Map tool call ID to message ID
+    @State private var activeToolCalls: [String: ToolCallWithTiming] = [:]
+    @State private var completedToolCalls: [String: CompletedToolCall] = [:]
+    @State private var toolCallMessageMap: [String: String] = [:]
+    @State private var showingSidebar = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Messages List
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(messages) { message in
-                            MessageBubbleView(message: message)
-                                .id(message.id)
-                            
-                            // Show tool calls that belong to this message
-                            ForEach(getToolCallsForMessage(message.id), id: \.self) { toolCallId in
-                                HStack {
-                                    Spacer()
-                                    if let activeCall = activeToolCalls[toolCallId] {
-                                        ToolCallProgressView(toolCall: activeCall.toolCall)
-                                    } else if let completedCall = completedToolCalls[toolCallId] {
-                                        CompletedToolCallView(completedCall: completedCall)
+        ZStack {
+            // Main chat view
+            VStack(spacing: 0) {
+                // Header with hamburger menu
+                HStack {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSidebar = true
+                        }
+                    }) {
+                        Image(systemName: "line.horizontal.3")
+                            .font(.title2)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("Goose Chat")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Spacer()
+                    
+                    // Placeholder for balance
+                    Image(systemName: "line.horizontal.3")
+                        .font(.title2)
+                        .opacity(0)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(.systemBackground))
+                
+                // Messages List
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(messages) { message in
+                                MessageBubbleView(message: message)
+                                    .id(message.id)
+                                
+                                // Show tool calls that belong to this message
+                                ForEach(getToolCallsForMessage(message.id), id: \.self) { toolCallId in
+                                    HStack {
+                                        Spacer()
+                                        if let activeCall = activeToolCalls[toolCallId] {
+                                            ToolCallProgressView(toolCall: activeCall.toolCall)
+                                        } else if let completedCall = completedToolCalls[toolCallId] {
+                                            CompletedToolCallView(completedCall: completedCall)
+                                        }
+                                        Spacer()
                                     }
+                                    .id("tool-\(toolCallId)")
+                                }
+                            }
+
+                            // Only show "thinking" indicator if no active tool calls
+                            if isLoading && activeToolCalls.isEmpty {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("goose is thinking...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                     Spacer()
                                 }
-                                .id("tool-\(toolCallId)")
+                                .padding(.horizontal)
                             }
+                            
+                            // Add bottom padding to account for floating input
+                            Spacer()
+                                .frame(height: 80)
                         }
-
-                        // Only show "thinking" indicator if no active tool calls
-                        if isLoading && activeToolCalls.isEmpty {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("goose is thinking...")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                }
-                .onChange(of: messages.count) { _ in
-                    // Find the last item to scroll to (either last message or last tool call)
-                    var lastId: String?
-                    
-                    if let lastMessage = messages.last {
-                        let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
-                        if !toolCallsForLastMessage.isEmpty {
-                            // Scroll to the last tool call of the last message
-                            lastId = "tool-\(toolCallsForLastMessage.last!)"
-                        } else {
-                            // Scroll to the last message
-                            lastId = lastMessage.id
-                        }
-                    }
-                    
-                    if let scrollId = lastId {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo(scrollId, anchor: .bottom)
-                        }
-                    }
-                }
-                .onChange(of: activeToolCalls.count) { _ in
-                    // Find the last item to scroll to (either last message or last tool call)
-                    var lastId: String?
-                    
-                    if let lastMessage = messages.last {
-                        let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
-                        if !toolCallsForLastMessage.isEmpty {
-                            // Scroll to the last tool call of the last message
-                            lastId = "tool-\(toolCallsForLastMessage.last!)"
-                        } else {
-                            // Scroll to the last message
-                            lastId = lastMessage.id
-                        }
-                    }
-                    
-                    if let scrollId = lastId {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo(scrollId, anchor: .bottom)
-                        }
-                    }
-                }
-                .onChange(of: completedToolCalls.count) { _ in
-                    // Find the last item to scroll to (either last message or last tool call)
-                    var lastId: String?
-                    
-                    if let lastMessage = messages.last {
-                        let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
-                        if !toolCallsForLastMessage.isEmpty {
-                            // Scroll to the last tool call of the last message
-                            lastId = "tool-\(toolCallsForLastMessage.last!)"
-                        } else {
-                            // Scroll to the last message
-                            lastId = lastMessage.id
-                        }
-                    }
-                    
-                    if let scrollId = lastId {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo(scrollId, anchor: .bottom)
-                        }
-                    }
+                    .onChange(of: messages.count) { _ in scrollToBottom(proxy) }
+                    .onChange(of: activeToolCalls.count) { _ in scrollToBottom(proxy) }
+                    .onChange(of: completedToolCalls.count) { _ in scrollToBottom(proxy) }
                 }
             }
+            
+            // Floating Input Area
+            VStack {
+                Spacer()
+                HStack(spacing: 12) {
+                    TextField("build, solve, create...", text: $inputText, axis: .vertical)
+                        .padding(12)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(25)
+                        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        .lineLimit(1...4)
+                        .onSubmit {
+                            sendMessage()
+                        }
 
-            Divider()
-
-            // Input Area
-            HStack(spacing: 12) {
-                TextField("build, solve, create...", text: $inputText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...4)
-                    .onSubmit {
-                        sendMessage()
+                    Button(action: {
+                        if isLoading {
+                            stopStreaming()
+                        } else {
+                            sendMessage()
+                        }
+                    }) {
+                        Image(systemName: isLoading ? "stop.circle.fill" : "arrow.up.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(
+                                isLoading
+                                    ? .red
+                                    : (inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                        ? .gray : .blue))
                     }
-
-                Button(action: {
-                    if isLoading {
-                        stopStreaming()
-                    } else {
-                        sendMessage()
-                    }
-                }) {
-                    Image(systemName: isLoading ? "stop.circle.fill" : "arrow.up.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(
-                            isLoading
-                                ? .red
-                                : (inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                    ? .gray : .blue))
+                    .disabled(
+                        !isLoading && inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .disabled(
-                    !isLoading && inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
             }
-            .padding()
+            
+            // Sidebar
+            if showingSidebar {
+                SidebarView(isShowing: $showingSidebar)
+            }
         }
         .onAppear {
             Task {
                 await apiService.testConnection()
+            }
+        }
+    }
+    private func scrollToBottom(_ proxy: Any) {
+        var lastId: String?
+        
+        if let lastMessage = messages.last {
+            let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
+            if !toolCallsForLastMessage.isEmpty {
+                lastId = "tool-\(toolCallsForLastMessage.last!)"
+            } else {
+                lastId = lastMessage.id
+            }
+        }
+        
+        if let scrollId = lastId {
+            withAnimation(.easeOut(duration: 0.3)) {
+                // TODO: Implement scrolling
             }
         }
     }
@@ -159,13 +164,11 @@ struct ChatView: View {
         let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty && !isLoading else { return }
 
-        // Add user message
         let userMessage = Message(role: .user, text: trimmedText)
         messages.append(userMessage)
         inputText = ""
         isLoading = true
 
-        // Start streaming response
         startChatStream()
     }
 
@@ -189,12 +192,9 @@ struct ChatView: View {
 
                 print("🚨 Chat Error: \(error)")
 
-                // Add error message
                 let errorMessage = Message(
                     role: .assistant,
-                    text: """
-                        ❌ Error: \(error.localizedDescription)
-                        """
+                    text: "❌ Error: \(error.localizedDescription)"
                 )
                 messages.append(errorMessage)
             }
@@ -210,14 +210,12 @@ struct ChatView: View {
             for content in incomingMessage.content {
                 switch content {
                 case .toolRequest(let toolRequest):
-                    // Add tool call to active tracking with start time and associate with message
                     activeToolCalls[toolRequest.id] = ToolCallWithTiming(
                         toolCall: toolRequest.toolCall,
                         startTime: Date()
                     )
                     toolCallMessageMap[toolRequest.id] = incomingMessage.id
                 case .toolResponse(let toolResponse):
-                    // Move from active to completed with result and timing
                     if let activeCall = activeToolCalls.removeValue(forKey: toolResponse.id) {
                         let duration = Date().timeIntervalSince(activeCall.startTime)
                         completedToolCalls[toolResponse.id] = CompletedToolCall(
@@ -226,21 +224,15 @@ struct ChatView: View {
                             duration: duration,
                             completedAt: Date()
                         )
-                        // Keep the message association
                     }
                 default:
                     break
                 }
             }
 
-            // Check if this message already exists (by ID)
-            print("🚀 ChatView: Received message with ID: '\(incomingMessage.id)'")
-            print("🚀 ChatView: Current messages count: \(messages.count)")
             if let existingIndex = messages.firstIndex(where: { $0.id == incomingMessage.id }) {
-                // Update existing message by accumulating text content
                 var updatedMessage = messages[existingIndex]
 
-                // Combine text content from existing and incoming message
                 if let existingTextContent = updatedMessage.content.first(where: {
                     if case .text = $0 { return true } else { return false }
                 }),
@@ -248,19 +240,10 @@ struct ChatView: View {
                         if case .text = $0 { return true } else { return false }
                     })
                 {
-
                     if case .text(let existingText) = existingTextContent,
                         case .text(let incomingText) = incomingTextContent
                     {
-
-                        // Create updated message with accumulated text
                         let combinedText = existingText.text + incomingText.text
-                        updatedMessage = Message(
-                            role: incomingMessage.role,
-                            text: combinedText,
-                            created: incomingMessage.created
-                        )
-                        // Preserve the original server ID
                         updatedMessage = Message(
                             id: incomingMessage.id, role: incomingMessage.role,
                             content: [MessageContent.text(TextContent(text: combinedText))],
@@ -268,11 +251,8 @@ struct ChatView: View {
                     }
                 }
 
-                print("🚀 ChatView: Updated existing message at index \(existingIndex)")
                 messages[existingIndex] = updatedMessage
             } else {
-                // New message - add it to the list
-                print("🚀 ChatView: Adding new message with ID: '\(incomingMessage.id)'")
                 messages.append(incomingMessage)
             }
 
@@ -285,8 +265,6 @@ struct ChatView: View {
 
         case .finish(let finishEvent):
             print("Stream finished: \(finishEvent.reason)")
-            // Clear any remaining active tool calls when stream finishes
-            // Move any remaining active calls to completed with timeout status
             for (id, activeCall) in activeToolCalls {
                 let duration = Date().timeIntervalSince(activeCall.startTime)
                 completedToolCalls[id] = CompletedToolCall(
@@ -305,7 +283,6 @@ struct ChatView: View {
             print("Notification: \(notificationEvent.message)")
 
         case .ping:
-            // Ignore ping events - they're just keep-alives
             break
         }
     }
@@ -317,11 +294,148 @@ struct ChatView: View {
     }
     
     private func getToolCallsForMessage(_ messageId: String) -> [String] {
-        // Return tool call IDs that belong to this message
         return toolCallMessageMap.compactMap { (toolCallId, mappedMessageId) in
             mappedMessageId == messageId ? toolCallId : nil
-        }.sorted() // Sort for consistent ordering
+        }.sorted()
     }
+}
+
+// MARK: - Sidebar View
+struct SidebarView: View {
+    @Binding var isShowing: Bool
+    @State private var sessions: [ChatSession] = []
+    
+    var body: some View {
+        ZStack {
+            // Background overlay
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isShowing = false
+                    }
+                }
+            
+            // Sidebar panel
+            HStack {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header
+                    HStack {
+                        Text("Sessions")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isShowing = false
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.title3)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    
+                    Divider()
+                    
+                    // Sessions list
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(sessions) { session in
+                                SessionRowView(session: session)
+                                    .onTapGesture {
+                                        // TODO: Load session
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            isShowing = false
+                                        }
+                                    }
+                                Divider()
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // New session button
+                    Button(action: {
+                        // TODO: Create new session
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isShowing = false
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                            Text("New Session")
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.blue)
+                        .padding()
+                    }
+                    .background(Color(.systemBackground))
+                }
+                .frame(width: 280)
+                .background(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.2), radius: 10, x: 5, y: 0)
+                .offset(x: isShowing ? 0 : -280)
+                
+                Spacer()
+            }
+        }
+        .onAppear {
+            loadSessions()
+        }
+    }
+    
+    private func loadSessions() {
+        // TODO: Load actual sessions from storage
+        sessions = [
+            ChatSession(id: "1", title: "iOS Development Help", lastMessage: "How to implement SwiftUI navigation", timestamp: Date().addingTimeInterval(-3600)),
+            ChatSession(id: "2", title: "Python Script Debug", lastMessage: "Error in data processing", timestamp: Date().addingTimeInterval(-7200)),
+            ChatSession(id: "3", title: "API Integration", lastMessage: "REST API authentication", timestamp: Date().addingTimeInterval(-86400))
+        ]
+    }
+}
+
+// MARK: - Session Row View
+struct SessionRowView: View {
+    let session: ChatSession
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(session.title)
+                .font(.headline)
+                .lineLimit(1)
+            
+            Text(session.lastMessage)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+            
+            Text(formatDate(session.timestamp))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+// MARK: - Chat Session Model
+struct ChatSession: Identifiable {
+    let id: String
+    let title: String
+    let lastMessage: String
+    let timestamp: Date
 }
 
 // MARK: - Tool Call Data Structures

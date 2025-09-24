@@ -3,6 +3,10 @@ import Markdown
 
 struct MessageBubbleView: View {
     let message: Message
+    @State private var showFullText = false
+    @State private var isTruncated = false
+    
+    private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7 // 70% of screen height
     
     var body: some View {
         HStack {
@@ -17,7 +21,12 @@ struct MessageBubbleView: View {
                 if !filteredContent.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
-                            MessageContentView(content: content)
+                            TruncatableMessageContentView(
+                                content: content,
+                                maxHeight: maxHeight,
+                                showFullText: $showFullText,
+                                isTruncated: $isTruncated
+                            )
                         }
                     }
                     .padding(12)
@@ -26,6 +35,11 @@ struct MessageBubbleView: View {
                             .fill(message.role == .user ? Color.blue : Color(.systemGray6))
                     )
                     .foregroundColor(message.role == .user ? .white : .primary)
+                    .onTapGesture {
+                        if isTruncated {
+                            showFullText = true
+                        }
+                    }
                     
                     // Timestamp
                     Text(formatTimestamp(message.created))
@@ -38,6 +52,9 @@ struct MessageBubbleView: View {
             if message.role == .assistant {
                 Spacer()
             }
+        }
+        .sheet(isPresented: $showFullText) {
+            FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
     }
     
@@ -410,20 +427,17 @@ struct ToolCallProgressView: View {
                     .scaleEffect(0.7)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Tool call in progress")
+                    Text(toolCall.name)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
                     
-                    Text(toolCall.name)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    
-                    if !toolCall.arguments.isEmpty {
-                        let argCount = toolCall.arguments.count
-                        Text("\(argCount) argument\(argCount == 1 ? "" : "s")")
+                    if let firstArgument = getFirstArgument() {
+                        Text(firstArgument)
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .monospaced()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
                 }
                 
@@ -445,6 +459,17 @@ struct ToolCallProgressView: View {
         }
         .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
     }
+    
+    private func getFirstArgument() -> String? {
+        guard let firstKey = toolCall.arguments.keys.sorted().first,
+              let firstValue = toolCall.arguments[firstKey] else {
+            return nil
+        }
+        
+        let valueString = String(describing: firstValue.value)
+        // Truncate if too long
+        return valueString.count > 50 ? String(valueString.prefix(50)) + "..." : valueString
+    }
 }
 
 // MARK: - Completed Tool Call View
@@ -459,14 +484,18 @@ struct CompletedToolCallView: View {
                     .font(.caption)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Tool call completed")
+                    Text(completedCall.toolCall.name)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
                     
-                    Text(completedCall.toolCall.name)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    if let firstArgument = getFirstArgument() {
+                        Text(firstArgument)
+                            .font(.caption2)
+                            .monospaced()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                     
                     HStack(spacing: 4) {
                         Text(String(format: "%.2fs", completedCall.duration))
@@ -503,9 +532,242 @@ struct CompletedToolCallView: View {
         .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
     }
     
+    private func getFirstArgument() -> String? {
+        guard let firstKey = completedCall.toolCall.arguments.keys.sorted().first,
+              let firstValue = completedCall.toolCall.arguments[firstKey] else {
+            return nil
+        }
+        
+        let valueString = String(describing: firstValue.value)
+        // Truncate if too long
+        return valueString.count > 50 ? String(valueString.prefix(50)) + "..." : valueString
+    }
+    
     private func formatCompletionTime(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return "completed \(formatter.string(from: date))"
+    }
+}
+
+// MARK: - Truncatable Message Content View
+struct TruncatableMessageContentView: View {
+    let content: MessageContent
+    let maxHeight: CGFloat
+    @Binding var showFullText: Bool
+    @Binding var isTruncated: Bool
+    
+    var body: some View {
+        switch content {
+        case .text(let textContent):
+            TruncatableMarkdownText(
+                text: textContent.text,
+                maxHeight: maxHeight,
+                isTruncated: $isTruncated
+            )
+            .textSelection(.enabled)
+            
+        case .toolRequest(let toolContent):
+            ToolRequestView(toolContent: toolContent)
+            
+        case .toolResponse(let toolContent):
+            // Hide tool responses - user doesn't want to see them
+            EmptyView()
+            
+        case .toolConfirmationRequest(let toolContent):
+            ToolConfirmationView(toolContent: toolContent)
+        }
+    }
+}
+
+// MARK: - Truncatable Markdown Text View
+struct TruncatableMarkdownText: View {
+    let text: String
+    let maxHeight: CGFloat
+    @Binding var isTruncated: Bool
+    @State private var fullHeight: CGFloat = 0
+    
+    var body: some View {
+        Text(parseMarkdown(text))
+            .textSelection(.enabled)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear
+                        .onAppear {
+                            fullHeight = geometry.size.height
+                            isTruncated = fullHeight > maxHeight
+                        }
+                        .onChange(of: geometry.size.height) { newHeight in
+                            fullHeight = newHeight
+                            isTruncated = fullHeight > maxHeight
+                        }
+                }
+            )
+            .frame(maxHeight: isTruncated ? maxHeight : nil)
+            .clipped()
+            .overlay(
+                // Show gradient fade and "tap to expand" if truncated
+                Group {
+                    if isTruncated {
+                        VStack {
+                            Spacer()
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color.clear, Color(.systemGray6)]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 30)
+                            .overlay(
+                                Text("Tap to expand")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .padding(.bottom, 4)
+                            )
+                        }
+                    }
+                }
+            )
+    }
+    
+    private func parseMarkdown(_ text: String) -> AttributedString {
+        // Same markdown parsing logic as before
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let document = Document(parsing: trimmedText)
+        var attributedString = AttributedString()
+        
+        for child in document.children {
+            attributedString.append(processMarkdownElement(child))
+        }
+        
+        if attributedString.characters.isEmpty {
+            return AttributedString(trimmedText)
+        }
+        
+        return attributedString
+    }
+    
+    private func processMarkdownElement(_ element: Markup) -> AttributedString {
+        var result = AttributedString()
+        
+        switch element {
+        case let paragraph as Paragraph:
+            for child in paragraph.children {
+                if let inlineChild = child as? InlineMarkup {
+                    result.append(processInlineMarkup(inlineChild))
+                }
+            }
+            result.append(AttributedString("\n"))
+            
+        case let heading as Heading:
+            var headingText = AttributedString()
+            for child in heading.children {
+                if let inlineChild = child as? InlineMarkup {
+                    headingText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
+            result.append(headingText)
+            result.append(AttributedString("\n"))
+            
+        case let codeBlock as CodeBlock:
+            var codeText = AttributedString(codeBlock.code)
+            codeText.font = .monospaced(.body)()
+            codeText.backgroundColor = .secondary.opacity(0.1)
+            result.append(codeText)
+            result.append(AttributedString("\n"))
+            
+        case let listItem as ListItem:
+            result.append(AttributedString("• "))
+            for child in listItem.children {
+                result.append(processMarkdownElement(child))
+            }
+            
+        default:
+            if let blockElement = element as? BlockMarkup {
+                for child in blockElement.children {
+                    result.append(processMarkdownElement(child))
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    private func processInlineMarkup(_ element: InlineMarkup) -> AttributedString {
+        switch element {
+        case let text as Markdown.Text:
+            return AttributedString(text.plainText)
+            
+        case let strong as Strong:
+            var strongText = AttributedString()
+            for child in strong.children {
+                if let inlineChild = child as? InlineMarkup {
+                    strongText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            strongText.font = .body.bold()
+            return strongText
+            
+        case let emphasis as Emphasis:
+            var emphasisText = AttributedString()
+            for child in emphasis.children {
+                if let inlineChild = child as? InlineMarkup {
+                    emphasisText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            emphasisText.font = .body.italic()
+            return emphasisText
+            
+        case let inlineCode as InlineCode:
+            var codeText = AttributedString(inlineCode.code)
+            codeText.font = .monospaced(.body)()
+            codeText.backgroundColor = .secondary.opacity(0.1)
+            return codeText
+            
+        case let link as Markdown.Link:
+            var linkText = AttributedString()
+            for child in link.children {
+                if let inlineChild = child as? InlineMarkup {
+                    linkText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            linkText.foregroundColor = .blue
+            linkText.underlineStyle = .single
+            if let destination = link.destination {
+                linkText.link = URL(string: destination)
+            }
+            return linkText
+            
+        default:
+            return AttributedString(element.plainText)
+        }
+    }
+}
+
+// MARK: - Full Text Overlay
+struct FullTextOverlay: View {
+    let content: [MessageContent]
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(content.enumerated()), id: \.offset) { index, messageContent in
+                        MessageContentView(content: messageContent)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Full Message")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
