@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var apiService = GooseAPIService.shared
+    @EnvironmentObject var configurationHandler: ConfigurationHandler
 
     @State private var baseURL: String = ""
     @State private var secretKey: String = ""
@@ -13,9 +14,24 @@ struct SettingsView: View {
             Form {
                 Section(header: Text("Server Configuration")) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Base URL")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("Base URL")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                // Open camera app for QR scanning
+                                if let url = URL(string: "goosechat://scan") {
+                                    UIApplication.shared.open(url)
+                                }
+                            }) {
+                                Image(systemName: "qrcode.viewfinder")
+                                    .font(.system(size: 20))
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                        }
                         TextField("http://127.0.0.1:62996", text: $baseURL)
                             .textFieldStyle(.roundedBorder)
                             .autocapitalization(.none)
@@ -29,6 +45,11 @@ struct SettingsView: View {
                         SecureField("Enter secret key", text: $secretKey)
                             .textFieldStyle(.roundedBorder)
                     }
+                    
+                    Text("Tip: Use the camera to scan a QR code from launch_tunnel.sh")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .italic()
                 }
 
                 Section(header: Text("Connection Status")) {
@@ -98,6 +119,12 @@ struct SettingsView: View {
         }
         .onAppear {
             loadSettings()
+        }
+        .onChange(of: configurationHandler.configurationSuccess) { success in
+            if success {
+                // Reload settings when configuration is successful
+                loadSettings()
+            }
         }
     }
 
