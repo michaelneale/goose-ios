@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A1234567890ABCDEF995"
-               BuildableName = "GooseChat.app"
-               BlueprintName = "GooseChat"
-               ReferencedContainer = "container:GooseChat.xcodeproj">
+               BuildableName = "Goose.app"
+               BlueprintName = "Goose"
+               ReferencedContainer = "container:Goose.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1234567890ABCDEF995"
-            BuildableName = "GooseChat.app"
-            BlueprintName = "GooseChat"
-            ReferencedContainer = "container:GooseChat.xcodeproj">
+            BuildableName = "Goose.app"
+            BlueprintName = "Goose"
+            ReferencedContainer = "container:Goose.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1234567890ABCDEF995"
-            BuildableName = "GooseChat.app"
-            BlueprintName = "GooseChat"
-            ReferencedContainer = "container:GooseChat.xcodeproj">
+            BuildableName = "Goose.app"
+            BlueprintName = "Goose"
+            ReferencedContainer = "container:Goose.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

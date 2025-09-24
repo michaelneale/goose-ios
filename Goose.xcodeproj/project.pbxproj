@@ -24,7 +24,7 @@
 		83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationHandler.swift; sourceTree = "<group>"; };
 		83ACD8A92E827DB500379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		83ACD8AC2E827FAE00379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		A1234567890ABCDEF000 /* GooseChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooseChatApp.swift; sourceTree = "<group>"; };
+		A1234567890ABCDEF000 /* GooseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooseApp.swift; sourceTree = "<group>"; };
 		A1234567890ABCDEF002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1234567890ABCDEF004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1234567890ABCDEF007 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -33,7 +33,7 @@
 		A1234567890ABCDEF013 /* GooseAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooseAPIService.swift; sourceTree = "<group>"; };
 		A1234567890ABCDEF015 /* MessageBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubbleView.swift; sourceTree = "<group>"; };
 		A1234567890ABCDEF017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		A1234567890ABCDEF999 /* GooseChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GooseChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1234567890ABCDEF999 /* Goose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Goose.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,13 +64,13 @@
 			);
 			sourceTree = "<group>";
 		};
-		A1234567890ABCDEF991 /* GooseChat */ = {
+		A1234567890ABCDEF991 /* Goose */ = {
 			isa = PBXGroup;
 			children = (
 				83ACD8AC2E827FAE00379D0E /* Info.plist */,
 				83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */,
 				83ACD8A92E827DB500379D0E /* Info.plist */,
-				A1234567890ABCDEF000 /* GooseChatApp.swift */,
+				A1234567890ABCDEF000 /* GooseApp.swift */,
 				A1234567890ABCDEF002 /* ContentView.swift */,
 				A1234567890ABCDEF009 /* ChatView.swift */,
 				A1234567890ABCDEF015 /* MessageBubbleView.swift */,
@@ -80,7 +80,7 @@
 				A1234567890ABCDEF004 /* Assets.xcassets */,
 				A1234567890ABCDEF006 /* Preview Content */,
 			);
-			path = GooseChat;
+			path = Goose;
 			sourceTree = "<group>";
 		};
 		A1234567890ABCDEF998 /* Products */ = {
@@ -106,11 +106,11 @@
 			);
 			dependencies = (
 			);
-			name = GooseChat;
+			name = Goose;
 			packageProductDependencies = (
 				A1234567890ABCDEF019 /* Markdown */,
 			);
-			productName = GooseChat;
+			productName = Goose;
 			productReference = A1234567890ABCDEF999 /* GooseChat.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -174,7 +174,7 @@
 				A1234567890ABCDEF014 /* GooseAPIService.swift in Sources */,
 				A1234567890ABCDEF016 /* MessageBubbleView.swift in Sources */,
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,
-				A1234567890ABCDEF001 /* GooseChatApp.swift in Sources */,
+				A1234567890ABCDEF001 /* GooseApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,12 +188,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"GooseChat/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Goose/Preview Content\"";
 				DEVELOPMENT_TEAM = W2L75AE9HQ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = GooseChat/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Goose Chat Client";
+				INFOPLIST_FILE = Goose/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Goose";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -338,12 +338,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"GooseChat/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Goose/Preview Content\"";
 				DEVELOPMENT_TEAM = W2L75AE9HQ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = GooseChat/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Goose Chat Client";
+				INFOPLIST_FILE = Goose/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Goose";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -365,7 +365,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A1234567890ABCDEF988 /* Build configuration list for PBXProject "GooseChat" */ = {
+		A1234567890ABCDEF988 /* Build configuration list for PBXProject "Goose" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1234567890ABCDEF986 /* Debug */,
@@ -374,7 +374,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1234567890ABCDEF992 /* Build configuration list for PBXNativeTarget "GooseChat" */ = {
+		A1234567890ABCDEF992 /* Build configuration list for PBXNativeTarget "Goose" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1234567890ABCDEF993 /* Debug */,

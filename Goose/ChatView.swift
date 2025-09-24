@@ -30,7 +30,7 @@ struct ChatView: View {
                     
                     Spacer()
                     
-                    Text("Goose Chat")
+                    Text("Goose")
                         .font(.headline)
                         .fontWeight(.semibold)
                     
