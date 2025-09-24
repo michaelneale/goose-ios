@@ -16,6 +16,27 @@ struct ChatView: View {
         ZStack {
             // Main chat view
             VStack(spacing: 0) {
+                // Top bar with hamburger menu
+                HStack {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSidebar = true
+                        }
+                    }) {
+                        VStack(spacing: 4) {
+                            Rectangle()
+                                .frame(width: 20, height: 2)
+                            Rectangle()
+                                .frame(width: 20, height: 2)
+                        }
+                        .foregroundColor(.primary)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                
                 // Messages List
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -69,16 +90,6 @@ struct ChatView: View {
             VStack {
                 Spacer()
                 HStack(spacing: 12) {
-                    // Hamburger menu button
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar = true
-                        }
-                    }) {
-                        Image(systemName: "line.horizontal.3")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                    }
                     
                     // File upload button
                     Button(action: {
