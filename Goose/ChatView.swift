@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ChatView: View {
+    @Binding var showingSidebar: Bool
     @StateObject private var apiService = GooseAPIService.shared
     @State private var messages: [Message] = []
     @State private var inputText = ""
@@ -10,33 +11,11 @@ struct ChatView: View {
     @State private var activeToolCalls: [String: ToolCallWithTiming] = [:]
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
-    @State private var showingSidebar = false
 
     var body: some View {
         ZStack {
             // Main chat view
             VStack(spacing: 0) {
-                // Top bar with hamburger menu
-                HStack {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar = true
-                        }
-                    }) {
-                        VStack(spacing: 4) {
-                            Rectangle()
-                                .frame(width: 20, height: 2)
-                            Rectangle()
-                                .frame(width: 20, height: 2)
-                        }
-                        .foregroundColor(.primary)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-                
                 // Messages List
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -456,5 +435,5 @@ struct CompletedToolCall {
 }
 
 #Preview {
-    ChatView()
+    ChatView(showingSidebar: .constant(false))
 }

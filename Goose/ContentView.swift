@@ -2,14 +2,31 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var isSettingsPresented = false
+    @State private var showingSidebar = false
     @EnvironmentObject var configurationHandler: ConfigurationHandler
 
     var body: some View {
         NavigationView {
-            ChatView()
+            ChatView(showingSidebar: $showingSidebar)
                 .navigationTitle("goose")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSidebar = true
+                            }
+                        }) {
+                            VStack(spacing: 3) {
+                                Rectangle()
+                                    .frame(width: 16, height: 2)
+                                Rectangle()
+                                    .frame(width: 16, height: 2)
+                            }
+                            .foregroundColor(.primary)
+                        }
+                    }
+                    
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: {
                             isSettingsPresented = true
