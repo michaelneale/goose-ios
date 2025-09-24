@@ -16,35 +16,6 @@ struct ChatView: View {
         ZStack {
             // Main chat view
             VStack(spacing: 0) {
-                // Header with hamburger menu
-                HStack {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar = true
-                        }
-                    }) {
-                        Image(systemName: "line.horizontal.3")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("Goose")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                    
-                    Spacer()
-                    
-                    // Placeholder for balance
-                    Image(systemName: "line.horizontal.3")
-                        .font(.title2)
-                        .opacity(0)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color(.systemBackground))
-                
                 // Messages List
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -98,6 +69,27 @@ struct ChatView: View {
             VStack {
                 Spacer()
                 HStack(spacing: 12) {
+                    // Hamburger menu button
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSidebar = true
+                        }
+                    }) {
+                        Image(systemName: "line.horizontal.3")
+                            .font(.title2)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    // File upload button
+                    Button(action: {
+                        // TODO: Implement file upload
+                        print("File upload tapped")
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title2)
+                            .foregroundColor(.primary)
+                    }
+                    
                     TextField("build, solve, create...", text: $inputText, axis: .vertical)
                         .padding(12)
                         .background(Color(.systemBackground))
@@ -379,7 +371,6 @@ struct SidebarView: View {
                 }
                 .frame(width: 280)
                 .background(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.2), radius: 10, x: 5, y: 0)
                 .offset(x: isShowing ? 0 : -280)
                 
                 Spacer()
@@ -391,12 +382,14 @@ struct SidebarView: View {
     }
     
     private func loadSessions() {
-        // TODO: Load actual sessions from storage
-        sessions = [
-            ChatSession(id: "1", title: "iOS Development Help", lastMessage: "How to implement SwiftUI navigation", timestamp: Date().addingTimeInterval(-3600)),
-            ChatSession(id: "2", title: "Python Script Debug", lastMessage: "Error in data processing", timestamp: Date().addingTimeInterval(-7200)),
-            ChatSession(id: "3", title: "API Integration", lastMessage: "REST API authentication", timestamp: Date().addingTimeInterval(-86400))
-        ]
+        // Load actual sessions from storage - for now using mock data
+        DispatchQueue.main.async {
+            sessions = [
+                ChatSession(id: "1", title: "iOS Development Help", lastMessage: "How to implement SwiftUI navigation", timestamp: Date().addingTimeInterval(-3600)),
+                ChatSession(id: "2", title: "Python Script Debug", lastMessage: "Error in data processing", timestamp: Date().addingTimeInterval(-7200)),
+                ChatSession(id: "3", title: "API Integration", lastMessage: "REST API authentication", timestamp: Date().addingTimeInterval(-86400))
+            ]
+        }
     }
 }
 
