@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */; };
-		A1234567890ABCDEF001 /* GooseChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF000 /* GooseChatApp.swift */; };
+		A1234567890ABCDEF001 /* GooseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF000 /* GooseApp.swift */; };
 		A1234567890ABCDEF003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF002 /* ContentView.swift */; };
 		A1234567890ABCDEF005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF004 /* Assets.xcassets */; };
 		A1234567890ABCDEF008 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF007 /* Preview Assets.xcassets */; };
@@ -59,7 +59,7 @@
 		A1234567890ABCDEF990 = {
 			isa = PBXGroup;
 			children = (
-				A1234567890ABCDEF991 /* GooseChat */,
+				A1234567890ABCDEF991 /* Goose */,
 				A1234567890ABCDEF998 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -86,7 +86,7 @@
 		A1234567890ABCDEF998 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1234567890ABCDEF999 /* GooseChat.app */,
+				A1234567890ABCDEF999 /* Goose.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -94,9 +94,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A1234567890ABCDEF995 /* GooseChat */ = {
+		A1234567890ABCDEF995 /* Goose */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A1234567890ABCDEF992 /* Build configuration list for PBXNativeTarget "GooseChat" */;
+			buildConfigurationList = A1234567890ABCDEF992 /* Build configuration list for PBXNativeTarget "Goose" */;
 			buildPhases = (
 				A1234567890ABCDEF994 /* Sources */,
 				A1234567890ABCDEF996 /* Frameworks */,
@@ -111,7 +111,7 @@
 				A1234567890ABCDEF019 /* Markdown */,
 			);
 			productName = Goose;
-			productReference = A1234567890ABCDEF999 /* GooseChat.app */;
+			productReference = A1234567890ABCDEF999 /* Goose.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -129,7 +129,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A1234567890ABCDEF988 /* Build configuration list for PBXProject "GooseChat" */;
+			buildConfigurationList = A1234567890ABCDEF988 /* Build configuration list for PBXProject "Goose" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -145,7 +145,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A1234567890ABCDEF995 /* GooseChat */,
+				A1234567890ABCDEF995 /* Goose */,
 			);
 		};
 /* End PBXProject section */
@@ -193,7 +193,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Goose/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Goose";
+				INFOPLIST_KEY_CFBundleDisplayName = Goose;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -203,7 +203,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.goose.chat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -343,7 +343,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Goose/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Goose";
+				INFOPLIST_KEY_CFBundleDisplayName = Goose;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -353,7 +353,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.goose.chat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
