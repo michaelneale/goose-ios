@@ -457,104 +457,35 @@ struct SessionRowView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
-// MARK: - Chat Session Model
+// MARK: - Chat Session Model (matches goosed API)
 struct ChatSession: Identifiable, Codable {
     let id: String
-    let title: String
-    let lastMessage: String
-    let timestamp: Date
+    let description: String
+    let messageCount: Int
+    let createdAt: String
+    let updatedAt: String
     
-    // Nested metadata structure
-    struct Metadata: Codable {
-        let description: String?
-        let message_count: Int?
-    }
-    
-    // Alternative field names that the API might use
     enum CodingKeys: String, CodingKey {
         case id
-        case title
-        case lastMessage = "last_message"
-        case timestamp
+        case description
+        case messageCount = "message_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
     
-    // Regular initializer for creating instances programmatically
-    init(id: String, title: String, lastMessage: String, timestamp: Date) {
-        self.id = id
-        self.title = title
-        self.lastMessage = lastMessage
-        self.timestamp = timestamp
+    // Computed properties for UI display
+    var title: String {
+        return description.isEmpty ? "Untitled Session" : description
     }
     
-    // Custom encoder for Codable conformance
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(title, forKey: .title)
-        try container.encode(lastMessage, forKey: .lastMessage)
-        try container.encode(timestamp, forKey: .timestamp)
+    var lastMessage: String {
+        return "\(messageCount) message\(messageCount == 1 ? "" : "s")"
     }
     
-    // Custom decoder to handle various field names from API
-    init(from decoder: Decoder) throws {
-        // Use a more flexible approach for decoding
-        let container = try decoder.container(keyedBy: AnyCodingKey.self)
-        
-        id = try container.decode(String.self, forKey: AnyCodingKey("id"))
-        
-        // Try to get title from metadata.description or fallback
-        if let metadata = try container.decodeIfPresent(Metadata.self, forKey: AnyCodingKey("metadata")),
-           let description = metadata.description {
-            title = description
-        } else if let titleValue = try container.decodeIfPresent(String.self, forKey: AnyCodingKey("title")) {
-            title = titleValue
-        } else {
-            title = "Untitled Session"
-        }
-        
-        // For lastMessage, use message count or fallback
-        if let metadata = try container.decodeIfPresent(Metadata.self, forKey: AnyCodingKey("metadata")),
-           let messageCount = metadata.message_count {
-            lastMessage = "\(messageCount) messages"
-        } else if let lastMessageValue = try container.decodeIfPresent(String.self, forKey: AnyCodingKey("last_message")) {
-            lastMessage = lastMessageValue
-        } else {
-            lastMessage = "No messages"
-        }
-        
-        // Try different field names for timestamp (modified field uses different format)
-        if let modifiedString = try container.decodeIfPresent(String.self, forKey: AnyCodingKey("modified")) {
-            // Parse "2025-03-06 23:38:37 UTC" format
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss 'UTC'"
-            formatter.timeZone = TimeZone(abbreviation: "UTC")
-            timestamp = formatter.date(from: modifiedString) ?? Date()
-        } else if let timestampValue = try container.decodeIfPresent(Date.self, forKey: AnyCodingKey("timestamp")) {
-            timestamp = timestampValue
-        } else {
-            timestamp = Date()
-        }
-    }
-}
-
-// Helper for flexible JSON key decoding
-struct AnyCodingKey: CodingKey {
-    var stringValue: String
-    var intValue: Int?
-    
-    init(_ string: String) {
-        self.stringValue = string
-        self.intValue = nil
-    }
-    
-    init(stringValue: String) {
-        self.stringValue = stringValue
-        self.intValue = nil
-    }
-    
-    init(intValue: Int) {
-        self.stringValue = String(intValue)
-        self.intValue = intValue
+    var timestamp: Date {
+        // Parse the ISO 8601 date string
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: updatedAt) ?? Date()
     }
 }
 

@@ -400,70 +400,23 @@ class GooseAPIService: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
 
-            if let httpResponse = response as? HTTPURLResponse {
-                if httpResponse.statusCode == 200 {
-                    // First, let's see what the actual response looks like
-                    if let responseString = String(data: data, encoding: .utf8) {
-                        print("🔍 Sessions API response:")
-                        print(responseString)
-
-                        // Pretty print if it's valid JSON
-                        if let jsonData = responseString.data(using: .utf8),
-                            let jsonObject = try? JSONSerialization.jsonObject(with: jsonData),
-                            let prettyData = try? JSONSerialization.data(
-                                withJSONObject: jsonObject, options: .prettyPrinted),
-                            let prettyString = String(data: prettyData, encoding: .utf8)
-                        {
-                            print("🔍 Pretty JSON:")
-                            print(prettyString)
-                        }
-                    }
-
-                    // Try different response formats
-                    let sessions: [ChatSession]
-                    do {
-                        // Try as wrapped response first
-                        let sessionsResponse = try JSONDecoder().decode(
-                            SessionsResponse.self, from: data)
-                        sessions = sessionsResponse.sessions
-                    } catch {
-                        print(
-                            "🔍 Failed to decode as SessionsResponse, trying as direct array: \(error)"
-                        )
-                        do {
-                            // Try as direct array
-                            sessions = try JSONDecoder().decode([ChatSession].self, from: data)
-                        } catch {
-                            print("🔍 Failed to decode as array too: \(error)")
-                            throw error
-                        }
-                    }
-                    print("✅ Fetched \(sessions.count) sessions")
-                    return sessions
-                } else {
-                    let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                    print("🚨 Sessions fetch failed - HTTP \(httpResponse.statusCode): \(errorBody)")
-                    return []
-                }
-            } else {
+            guard let httpResponse = response as? HTTPURLResponse else {
                 print("🚨 Invalid response when fetching sessions")
+                return []
+            }
+
+            if httpResponse.statusCode == 200 {
+                let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
+                print("✅ Fetched \(sessionsResponse.sessions.count) sessions")
+                return sessionsResponse.sessions
+            } else {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                print("🚨 Sessions fetch failed - HTTP \(httpResponse.statusCode): \(errorBody)")
                 return []
             }
         } catch {
             print("🚨 Error fetching sessions: \(error)")
-            // Return mock data as fallback
-            return [
-                ChatSession(
-                    id: "1", title: "iOS Development Help",
-                    lastMessage: "How to implement SwiftUI navigation",
-                    timestamp: Date().addingTimeInterval(-3600)),
-                ChatSession(
-                    id: "2", title: "Python Script Debug", lastMessage: "Error in data processing",
-                    timestamp: Date().addingTimeInterval(-7200)),
-                ChatSession(
-                    id: "3", title: "API Integration", lastMessage: "REST API authentication",
-                    timestamp: Date().addingTimeInterval(-86400)),
-            ]
+            return []
         }
     }
 }
