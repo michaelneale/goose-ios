@@ -289,7 +289,8 @@ struct ChatView: View {
             print("Model changed: \(modelEvent.model) (\(modelEvent.mode))")
 
         case .notification(let notificationEvent):
-            print("Notification: \(notificationEvent.message)")
+            // Just ignore notifications silently - they're too verbose for shell output
+            break
 
         case .ping:
             break

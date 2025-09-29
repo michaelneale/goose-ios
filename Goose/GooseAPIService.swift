@@ -52,6 +52,8 @@ class GooseAPIService: ObservableObject {
             
             // Debug logging
             print("🚀 Starting SSE stream to: \(url)")
+            print("🚀 Session ID: \(sessionId ?? "nil")")
+            print("🚀 Number of messages: \(messages.count)")
             print("🚀 Headers: \(urlRequest.allHTTPHeaderFields ?? [:])")
             if let bodyString = String(data: requestData, encoding: .utf8) {
                 print("🚀 Request body:")
@@ -307,7 +309,10 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
             return
         }
         
-        print("🚀 SSE Received chunk: \(string)")
+        // Only log if not a notification (to reduce spam)
+        if !string.contains("\"type\":\"Notification\"") {
+            print("🚀 SSE Received chunk: \(string)")
+        }
         
         // Add to buffer
         buffer += string
@@ -342,12 +347,17 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
         for line in lines {
             if line.hasPrefix("data: ") {
                 let eventData = String(line.dropFirst(6))
-                print("🚀 SSE: Processing event data: '\(eventData)'")
                 if !eventData.isEmpty {
-                    print("🚀 Processing SSE event: \(eventData)")
                     do {
                         let jsonData = eventData.data(using: .utf8)!
                         let event = try JSONDecoder().decode(SSEEvent.self, from: jsonData)
+                        
+                        // Only log non-notification events for cleaner output
+                        if case .notification = event {
+                            // Skip verbose logging for notifications
+                        } else {
+                            print("🚀 SSE Event: \(eventData)")
+                        }
                         
                         DispatchQueue.main.async {
                             self.onEvent(event)

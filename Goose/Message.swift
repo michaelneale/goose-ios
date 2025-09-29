@@ -145,12 +145,24 @@ struct ToolRequestContent: Codable {
     let type = "toolRequest"
     let id: String
     let toolCall: ToolCall
+    
+    enum CodingKeys: String, CodingKey {
+        case type
+        case id
+        case toolCall  // Server uses camelCase due to #[serde(rename_all = "camelCase")]
+    }
 }
 
 struct ToolResponseContent: Codable {
     let type = "toolResponse"
     let id: String
     let toolResult: ToolResult
+    
+    enum CodingKeys: String, CodingKey {
+        case type
+        case id
+        case toolResult  // Server uses camelCase due to #[serde(rename_all = "camelCase")]
+    }
 }
 
 struct ToolConfirmationRequestContent: Codable {
@@ -204,8 +216,11 @@ struct ToolCall: Codable {
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(name, forKey: .name)
-        try container.encode(arguments, forKey: .arguments)
+        
+        // Encode in the wrapped format that the server expects
+        try container.encode("success", forKey: .status)
+        let value = ToolCallValue(name: name, arguments: arguments)
+        try container.encode(value, forKey: .value)
     }
     
     private enum CodingKeys: String, CodingKey {
@@ -382,29 +397,8 @@ struct NotificationEvent: Codable {
 
 struct NotificationMessage: Codable {
     let method: String
-    let params: NotificationParams
+    let params: [String: AnyCodable]  // Make params flexible like desktop
 }
 
-struct NotificationParams: Codable {
-    let level: String
-    let logger: String
-    let data: NotificationData
-}
-
-struct NotificationData: Codable {
-    let type: String
-    let stream: String?
-    let output: String?
-    
-    // Make fields optional to handle different notification types
-    private enum CodingKeys: String, CodingKey {
-        case type, stream, output
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        type = try container.decode(String.self, forKey: .type)
-        stream = try container.decodeIfPresent(String.self, forKey: .stream)
-        output = try container.decodeIfPresent(String.self, forKey: .output)
-    }
-}
+// Remove the rigid NotificationParams and NotificationData structs
+// since notifications can have various formats
