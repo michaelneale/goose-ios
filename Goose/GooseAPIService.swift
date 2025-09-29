@@ -164,7 +164,7 @@ class GooseAPIService: ObservableObject {
         }
 
         let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
-        return (agentResponse.id, agentResponse.conversation?.messages ?? [])
+        return (agentResponse.id, agentResponse.conversation ?? [])
     }
     
     // MARK: - Session Resume
@@ -193,7 +193,7 @@ class GooseAPIService: ObservableObject {
         }
 
         let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
-        return (agentResponse.id, agentResponse.conversation?.messages ?? [])
+        return (agentResponse.id, agentResponse.conversation ?? [])
     }
 
     // MARK: - System Prompt Extension
@@ -444,11 +444,7 @@ class GooseAPIService: ObservableObject {
 // MARK: - Response Models
 struct AgentResponse: Codable {
     let id: String
-    let conversation: Conversation?
-}
-
-struct Conversation: Codable {
-    let messages: [Message]
+    let conversation: [Message]?  // conversation is directly an array of messages
 }
 
 struct SessionsResponse: Codable {
