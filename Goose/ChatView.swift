@@ -117,6 +117,8 @@ struct ChatView: View {
             if showingSidebar {
                 SidebarView(isShowing: $showingSidebar, onSessionSelect: { sessionId in
                     loadSession(sessionId)
+                }, onNewSession: {
+                    createNewSession()
                 })
             }
         }
@@ -369,12 +371,26 @@ struct ChatView: View {
             }
         }
     }
+    
+    func createNewSession() {
+        // Clear all state for a fresh session
+        messages.removeAll()
+        activeToolCalls.removeAll()
+        completedToolCalls.removeAll()
+        toolCallMessageMap.removeAll()
+        currentSessionId = nil
+        isLoading = false
+        currentStreamTask = nil
+        
+        print("🆕 Created new session - cleared all state")
+    }
 }
 
 // MARK: - Sidebar View
 struct SidebarView: View {
     @Binding var isShowing: Bool
     let onSessionSelect: (String) -> Void
+    let onNewSession: () -> Void
     @State private var sessions: [ChatSession] = []
     
     var body: some View {
@@ -434,7 +450,8 @@ struct SidebarView: View {
                     
                     // New session button
                     Button(action: {
-                        // TODO: Create new session
+                        // Create new session
+                        onNewSession()
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isShowing = false
                         }
