@@ -163,6 +163,17 @@ struct ChatView: View {
                     let sessionId = try await apiService.startAgent(workingDir: "/tmp")
                     print("✅ SESSION CREATED: \(sessionId)")
                     
+                    // Read provider and model from config
+                    print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
+                    guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
+                          let model = await apiService.readConfigValue(key: "GOOSE_MODEL") else {
+                        throw APIError.noData
+                    }
+                    
+                    print("🔧 UPDATING PROVIDER TO \(provider) WITH MODEL \(model)")
+                    try await apiService.updateProvider(sessionId: sessionId, provider: provider, model: model)
+                    print("✅ PROVIDER UPDATED FOR SESSION: \(sessionId)")
+                    
                     // Extend the system prompt with iOS-specific context
                     print("🔧 EXTENDING PROMPT FOR SESSION: \(sessionId)")
                     try await apiService.extendSystemPrompt(sessionId: sessionId)

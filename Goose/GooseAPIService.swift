@@ -222,6 +222,92 @@ class GooseAPIService: ObservableObject {
         print("✅ System prompt extended for iOS context")
     }
     
+    // MARK: - Config Management
+    func readConfigValue(key: String, isSecret: Bool = false) async -> String? {
+        guard let url = URL(string: "\(baseURL)/config/read") else {
+            print("⚠️ Invalid URL for config read")
+            return nil
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+        
+        let body: [String: Any] = [
+            "key": key,
+            "is_secret": isSecret
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("⚠️ Invalid response reading config")
+                return nil
+            }
+            
+            if httpResponse.statusCode == 200 {
+                // The response is just a string value, not a JSON object
+                let value = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                // Remove quotes if present (JSON string encoding)
+                let cleanValue = value?.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                print("✅ Config '\(key)' = '\(cleanValue ?? "nil")'")
+                return cleanValue
+            } else {
+                print("⚠️ Failed to read config '\(key)': HTTP \(httpResponse.statusCode)")
+                return nil
+            }
+        } catch {
+            print("⚠️ Error reading config '\(key)': \(error)")
+            return nil
+        }
+    }
+    
+    // MARK: - Provider Management
+    func updateProvider(sessionId: String, provider: String, model: String?) async throws {
+        guard let url = URL(string: "\(baseURL)/agent/update_provider") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+        
+        var body: [String: Any] = [
+            "session_id": sessionId,
+            "provider": provider
+        ]
+        
+        // Add model if provided
+        if let model = model {
+            body["model"] = model
+        }
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        // Debug logging
+        if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
+            print("📤 Updating provider to \(provider), model: \(model ?? "default")")
+            print(bodyString)
+        }
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+            throw APIError.httpError(httpResponse.statusCode, errorBody)
+        }
+        
+        print("✅ Provider updated to \(provider) with model \(model ?? "default")")
+    }
+    
     // MARK: - Extension Management
     func loadEnabledExtensions(sessionId: String) async throws {
         // Get extensions from config, just like desktop does
