@@ -11,6 +11,7 @@ struct ChatView: View {
     @State private var activeToolCalls: [String: ToolCallWithTiming] = [:]
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
+    @State private var currentSessionId: String?
 
     var body: some View {
         ZStack {
@@ -155,32 +156,58 @@ struct ChatView: View {
     }
 
     private func startChatStream() {
-        let sessionId = UUID().uuidString
+        Task {
+            do {
+                // Create session if we don't have one
+                if currentSessionId == nil {
+                    print("🚀 Creating new session...")
+                    let sessionId = try await apiService.startAgent(workingDir: "/tmp")
+                    print("✅ Session created: \(sessionId)")
+                    
+                    currentSessionId = sessionId
+                }
+                
+                guard let sessionId = currentSessionId else {
+                    throw APIError.invalidResponse
+                }
 
-        currentStreamTask = apiService.startChatStreamWithSSE(
-            messages: messages,
-            sessionId: sessionId,
-            workingDirectory: "/tmp",
-            onEvent: { event in
-                handleSSEEvent(event)
-            },
-            onComplete: {
-                isLoading = false
-                currentStreamTask = nil
-            },
-            onError: { error in
-                isLoading = false
-                currentStreamTask = nil
+                currentStreamTask = apiService.startChatStreamWithSSE(
+                    messages: messages,
+                    sessionId: sessionId,
+                    workingDirectory: "/tmp",
+                    onEvent: { event in
+                        handleSSEEvent(event)
+                    },
+                    onComplete: {
+                        isLoading = false
+                        currentStreamTask = nil
+                    },
+                    onError: { error in
+                        isLoading = false
+                        currentStreamTask = nil
 
-                print("🚨 Chat Error: \(error)")
+                        print("🚨 Chat Error: \(error)")
 
-                let errorMessage = Message(
-                    role: .assistant,
-                    text: "❌ Error: \(error.localizedDescription)"
+                        let errorMessage = Message(
+                            role: .assistant,
+                            text: "❌ Error: \(error.localizedDescription)"
+                        )
+                        messages.append(errorMessage)
+                    }
                 )
-                messages.append(errorMessage)
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    print("🚨 Session setup error: \(error)")
+                    
+                    let errorMessage = Message(
+                        role: .assistant,
+                        text: "❌ Failed to initialize session: \(error.localizedDescription)"
+                    )
+                    messages.append(errorMessage)
+                }
             }
-        )
+        }
     }
 
     private func handleSSEEvent(_ event: SSEEvent) {

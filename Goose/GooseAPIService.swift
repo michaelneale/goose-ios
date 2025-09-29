@@ -132,6 +132,68 @@ class GooseAPIService: ObservableObject {
         }
     }
     
+    // MARK: - Session Creation
+    func startAgent(workingDir: String = "/tmp") async throws -> String {
+        guard let url = URL(string: "\(baseURL)/agent/start") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+        
+        let body: [String: Any] = ["working_dir": workingDir]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+            throw APIError.httpError(httpResponse.statusCode, errorBody)
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let sessionId = json["id"] as? String else {
+            throw APIError.decodingError(NSError(domain: "GooseAPI", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to get session id from response"]))
+        }
+        
+        return sessionId
+    }
+    
+    func updateProvider(sessionId: String, provider: String = "openai", model: String = "gpt-4o") async throws {
+        guard let url = URL(string: "\(baseURL)/agent/update_provider") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+        
+        let body: [String: Any] = [
+            "session_id": sessionId,
+            "provider": provider,
+            "model": model
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+            throw APIError.httpError(httpResponse.statusCode, errorBody)
+        }
+    }
+    
     // MARK: - Sessions Management
     func fetchSessions() async -> [ChatSession] {
         guard let url = URL(string: "\(baseURL)/sessions") else {
