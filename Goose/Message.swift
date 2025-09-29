@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Message Models
 struct Message: Identifiable, Codable {
-    var id: String
+    var id: String  // Keep as non-optional for Identifiable, but handle nil from server
     let role: MessageRole
     let content: [MessageContent]
     let created: Int64
@@ -18,7 +18,38 @@ struct Message: Identifiable, Codable {
         case metadata
     }
     
-    // Full initializer for server messages
+    // Custom decoder to handle optional id from server
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Handle optional id from server by providing a default UUID if nil
+        if let id = try container.decodeIfPresent(String.self, forKey: .id) {
+            self.id = id
+        } else {
+            self.id = UUID().uuidString  // Generate a unique ID if server sends nil
+        }
+        
+        self.role = try container.decode(MessageRole.self, forKey: .role)
+        self.content = try container.decode([MessageContent].self, forKey: .content)
+        self.created = try container.decode(Int64.self, forKey: .created)
+        self.metadata = try container.decodeIfPresent(MessageMetadata.self, forKey: .metadata)
+        
+        // Default values for display properties
+        self.display = true
+        self.sendToLLM = true
+    }
+    
+    // Encoder remains the same
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(role, forKey: .role)
+        try container.encode(content, forKey: .content)
+        try container.encode(created, forKey: .created)
+        try container.encodeIfPresent(metadata, forKey: .metadata)
+    }
+    
+    // Full initializer for creating messages in the app
     init(id: String, role: MessageRole, content: [MessageContent], created: Int64, metadata: MessageMetadata?, display: Bool = true, sendToLLM: Bool = true) {
         self.id = id
         self.role = role
@@ -29,6 +60,7 @@ struct Message: Identifiable, Codable {
         self.sendToLLM = sendToLLM
     }
     
+    // Initializer without ID (generates UUID)
     init(role: MessageRole, content: [MessageContent], created: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
         self.role = role
         self.content = content
@@ -37,31 +69,6 @@ struct Message: Identifiable, Codable {
         self.metadata = nil
         self.display = true
         self.sendToLLM = true
-    }
-    
-    // Convenience initializer for text messages
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        id = try container.decode(String.self, forKey: .id)
-        role = try container.decode(MessageRole.self, forKey: .role)
-        content = try container.decode([MessageContent].self, forKey: .content)
-        created = try container.decode(Int64.self, forKey: .created)
-        metadata = try container.decodeIfPresent(MessageMetadata.self, forKey: .metadata)
-        
-        // Set default values for fields not in server response
-        display = true
-        sendToLLM = true
-    }
-    
-    // Custom encoder (if needed)
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(role, forKey: .role)
-        try container.encode(content, forKey: .content)
-        try container.encode(created, forKey: .created)
-        try container.encodeIfPresent(metadata, forKey: .metadata)
     }
     
     // Convenience initializer for text messages
