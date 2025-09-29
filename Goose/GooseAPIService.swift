@@ -139,7 +139,7 @@ class GooseAPIService: ObservableObject {
     }
 
     // MARK: - Session Creation
-    func startAgent(workingDir: String = "/tmp") async throws -> String {
+    func startAgent(workingDir: String = "/tmp") async throws -> (sessionId: String, messages: [Message]) {
         guard let url = URL(string: "\(baseURL)/agent/start") else {
             throw APIError.invalidURL
         }
@@ -163,17 +163,37 @@ class GooseAPIService: ObservableObject {
             throw APIError.httpError(httpResponse.statusCode, errorBody)
         }
 
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let sessionId = json["id"] as? String
-        else {
-            throw APIError.decodingError(
-                NSError(
-                    domain: "GooseAPI", code: 0,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to get session id from response"])
-            )
+        let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
+        return (agentResponse.id, agentResponse.conversation?.messages ?? [])
+    }
+    
+    // MARK: - Session Resume
+    func resumeAgent(sessionId: String) async throws -> (sessionId: String, messages: [Message]) {
+        guard let url = URL(string: "\(baseURL)/agent/resume") else {
+            throw APIError.invalidURL
         }
 
-        return sessionId
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+
+        let body: [String: Any] = ["session_id": sessionId]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+            throw APIError.httpError(httpResponse.statusCode, errorBody)
+        }
+
+        let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
+        return (agentResponse.id, agentResponse.conversation?.messages ?? [])
     }
 
     // MARK: - System Prompt Extension
@@ -421,7 +441,16 @@ class GooseAPIService: ObservableObject {
     }
 }
 
-// MARK: - Sessions Response Model
+// MARK: - Response Models
+struct AgentResponse: Codable {
+    let id: String
+    let conversation: Conversation?
+}
+
+struct Conversation: Codable {
+    let messages: [Message]
+}
+
 struct SessionsResponse: Codable {
     let sessions: [ChatSession]
 }

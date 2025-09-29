@@ -115,7 +115,9 @@ struct ChatView: View {
             
             // Sidebar
             if showingSidebar {
-                SidebarView(isShowing: $showingSidebar)
+                SidebarView(isShowing: $showingSidebar, onSessionSelect: { sessionId in
+                    loadSession(sessionId)
+                })
             }
         }
         .onAppear {
@@ -160,8 +162,15 @@ struct ChatView: View {
             do {
                 // Create session if we don't have one
                 if currentSessionId == nil {
-                    let sessionId = try await apiService.startAgent(workingDir: "/tmp")
+                    let (sessionId, initialMessages) = try await apiService.startAgent(workingDir: "/tmp")
                     print("✅ SESSION CREATED: \(sessionId)")
+                    
+                    // Load any initial messages from the session
+                    if !initialMessages.isEmpty {
+                        await MainActor.run {
+                            messages = initialMessages
+                        }
+                    }
                     
                     // Read provider and model from config
                     print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
@@ -327,11 +336,45 @@ struct ChatView: View {
             mappedMessageId == messageId ? toolCallId : nil
         }.sorted()
     }
+    
+    func loadSession(_ sessionId: String) {
+        Task {
+            do {
+                // Resume the session
+                let (resumedSessionId, sessionMessages) = try await apiService.resumeAgent(sessionId: sessionId)
+                print("✅ SESSION RESUMED: \(resumedSessionId)")
+                print("📝 Loaded \(sessionMessages.count) messages")
+                
+                // Update all state on main thread at once
+                await MainActor.run {
+                    // Clear old state
+                    activeToolCalls.removeAll()
+                    completedToolCalls.removeAll()
+                    toolCallMessageMap.removeAll()
+                    
+                    // Set new state
+                    currentSessionId = resumedSessionId
+                    messages = sessionMessages
+                    print("📊 Messages array now has \(messages.count) messages")
+                }
+            } catch {
+                print("🚨 Failed to load session: \(error)")
+                await MainActor.run {
+                    let errorMessage = Message(
+                        role: .assistant,
+                        text: "❌ Failed to load session: \(error.localizedDescription)"
+                    )
+                    messages.append(errorMessage)
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Sidebar View
 struct SidebarView: View {
     @Binding var isShowing: Bool
+    let onSessionSelect: (String) -> Void
     @State private var sessions: [ChatSession] = []
     
     var body: some View {
@@ -377,7 +420,7 @@ struct SidebarView: View {
                             ForEach(sessions) { session in
                                 SessionRowView(session: session)
                                     .onTapGesture {
-                                        // TODO: Load session
+                                        onSessionSelect(session.id)
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             isShowing = false
                                         }
