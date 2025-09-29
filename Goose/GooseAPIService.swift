@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 class GooseAPIService: ObservableObject {
     static let shared = GooseAPIService()
@@ -49,7 +49,7 @@ class GooseAPIService: ObservableObject {
         do {
             let requestData = try JSONEncoder().encode(request)
             urlRequest.httpBody = requestData
-            
+
             // Debug logging
             print("🚀 Starting SSE stream to: \(url)")
             print("🚀 Session ID: \(sessionId ?? "nil")")
@@ -57,10 +57,12 @@ class GooseAPIService: ObservableObject {
             print("🚀 Headers: \(urlRequest.allHTTPHeaderFields ?? [:])")
             if let bodyString = String(data: requestData, encoding: .utf8) {
                 print("🚀 Request body:")
-                if let jsonData = bodyString.data(using: .utf8), 
-                   let prettyJson = try? JSONSerialization.jsonObject(with: jsonData), 
-                   let prettyData = try? JSONSerialization.data(withJSONObject: prettyJson, options: .prettyPrinted), 
-                   let prettyString = String(data: prettyData, encoding: .utf8) {
+                if let jsonData = bodyString.data(using: .utf8),
+                    let prettyJson = try? JSONSerialization.jsonObject(with: jsonData),
+                    let prettyData = try? JSONSerialization.data(
+                        withJSONObject: prettyJson, options: .prettyPrinted),
+                    let prettyString = String(data: prettyData, encoding: .utf8)
+                {
                     print(prettyString)
                 } else {
                     print(bodyString)
@@ -77,10 +79,10 @@ class GooseAPIService: ObservableObject {
             onComplete: onComplete,
             onError: onError
         )
-        
+
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
         let task = session.dataTask(with: urlRequest)
-        
+
         // Store the delegate reference to prevent deallocation
         objc_setAssociatedObject(task, "delegate", delegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
@@ -113,7 +115,9 @@ class GooseAPIService: ObservableObject {
                     } else {
                         // Get error details for connection test
                         let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                        print("🚨 Connection Test Failed - HTTP \(httpResponse.statusCode): \(errorBody)")
+                        print(
+                            "🚨 Connection Test Failed - HTTP \(httpResponse.statusCode): \(errorBody)"
+                        )
                         self.connectionError = "HTTP \(httpResponse.statusCode): \(errorBody)"
                     }
                 }
@@ -133,104 +137,134 @@ class GooseAPIService: ObservableObject {
             return false
         }
     }
-    
+
     // MARK: - Session Creation
     func startAgent(workingDir: String = "/tmp") async throws -> String {
         guard let url = URL(string: "\(baseURL)/agent/start") else {
             throw APIError.invalidURL
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-        
+
         let body: [String: Any] = ["working_dir": workingDir]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
-        
+
         if httpResponse.statusCode != 200 {
             let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
             throw APIError.httpError(httpResponse.statusCode, errorBody)
         }
-        
+
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let sessionId = json["id"] as? String else {
-            throw APIError.decodingError(NSError(domain: "GooseAPI", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to get session id from response"]))
+            let sessionId = json["id"] as? String
+        else {
+            throw APIError.decodingError(
+                NSError(
+                    domain: "GooseAPI", code: 0,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to get session id from response"])
+            )
         }
-        
+
         return sessionId
     }
-    
-    func updateProvider(sessionId: String, provider: String = "openai", model: String = "gpt-4o") async throws {
-        guard let url = URL(string: "\(baseURL)/agent/update_provider") else {
+
+    // MARK: - System Prompt Extension
+    func extendSystemPrompt(sessionId: String) async throws {
+        guard let url = URL(string: "\(baseURL)/agent/prompt") else {
             throw APIError.invalidURL
         }
-        
+
+        let iOSPrompt = """
+            You are being accessed through the Goose iOS application from a mobile device.
+
+            Some extensions are builtin, such as Developer and Memory.
+            When asked to code, write files, or run commands, IMMEDIATELY enable the Developer extension using platform__manage_extensions.
+            DO NOT explain what you're going to do first - just enable Developer and start working.
+            """
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-        
+
         let body: [String: Any] = [
             "session_id": sessionId,
-            "provider": provider,
-            "model": model
+            "extension": iOSPrompt,
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
+
+        // Debug logging
+        if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8)
+        {
+            print("📤 Sending to /agent/prompt:")
+            print(bodyString)
+        }
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
-        
+
         if httpResponse.statusCode != 200 {
             let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
             throw APIError.httpError(httpResponse.statusCode, errorBody)
         }
+
+        print("✅ System prompt extended for iOS context")
     }
-    
+
     // MARK: - Sessions Management
     func fetchSessions() async -> [ChatSession] {
         guard let url = URL(string: "\(baseURL)/sessions") else {
             print("🚨 Invalid sessions URL")
             return []
         }
-        
+
         var request = URLRequest(url: url)
         request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-        
+
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 200 {
                     // First, let's see what the actual response looks like
                     if let responseString = String(data: data, encoding: .utf8) {
                         print("🔍 Sessions API response:")
                         print(responseString)
-                        
+
                         // Pretty print if it's valid JSON
-                        if let jsonData = responseString.data(using: .utf8), let jsonObject = try? JSONSerialization.jsonObject(with: jsonData), let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted), let prettyString = String(data: prettyData, encoding: .utf8) {
+                        if let jsonData = responseString.data(using: .utf8),
+                            let jsonObject = try? JSONSerialization.jsonObject(with: jsonData),
+                            let prettyData = try? JSONSerialization.data(
+                                withJSONObject: jsonObject, options: .prettyPrinted),
+                            let prettyString = String(data: prettyData, encoding: .utf8)
+                        {
                             print("🔍 Pretty JSON:")
                             print(prettyString)
                         }
                     }
-                    
+
                     // Try different response formats
                     let sessions: [ChatSession]
                     do {
                         // Try as wrapped response first
-                        let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
+                        let sessionsResponse = try JSONDecoder().decode(
+                            SessionsResponse.self, from: data)
                         sessions = sessionsResponse.sessions
                     } catch {
-                        print("🔍 Failed to decode as SessionsResponse, trying as direct array: \(error)")
+                        print(
+                            "🔍 Failed to decode as SessionsResponse, trying as direct array: \(error)"
+                        )
                         do {
                             // Try as direct array
                             sessions = try JSONDecoder().decode([ChatSession].self, from: data)
@@ -254,9 +288,16 @@ class GooseAPIService: ObservableObject {
             print("🚨 Error fetching sessions: \(error)")
             // Return mock data as fallback
             return [
-                ChatSession(id: "1", title: "iOS Development Help", lastMessage: "How to implement SwiftUI navigation", timestamp: Date().addingTimeInterval(-3600)),
-                ChatSession(id: "2", title: "Python Script Debug", lastMessage: "Error in data processing", timestamp: Date().addingTimeInterval(-7200)),
-                ChatSession(id: "3", title: "API Integration", lastMessage: "REST API authentication", timestamp: Date().addingTimeInterval(-86400))
+                ChatSession(
+                    id: "1", title: "iOS Development Help",
+                    lastMessage: "How to implement SwiftUI navigation",
+                    timestamp: Date().addingTimeInterval(-3600)),
+                ChatSession(
+                    id: "2", title: "Python Script Debug", lastMessage: "Error in data processing",
+                    timestamp: Date().addingTimeInterval(-7200)),
+                ChatSession(
+                    id: "3", title: "API Integration", lastMessage: "REST API authentication",
+                    timestamp: Date().addingTimeInterval(-86400)),
             ]
         }
     }
@@ -273,14 +314,20 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
     private let onComplete: () -> Void
     private let onError: (Error) -> Void
     private var buffer = ""
-    
-    init(onEvent: @escaping (SSEEvent) -> Void, onComplete: @escaping () -> Void, onError: @escaping (Error) -> Void) {
+
+    init(
+        onEvent: @escaping (SSEEvent) -> Void, onComplete: @escaping () -> Void,
+        onError: @escaping (Error) -> Void
+    ) {
         self.onEvent = onEvent
         self.onComplete = onComplete
         self.onError = onError
     }
-    
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+
+    func urlSession(
+        _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
         guard let httpResponse = response as? HTTPURLResponse else {
             DispatchQueue.main.async {
                 self.onError(APIError.invalidResponse)
@@ -288,38 +335,39 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
             completionHandler(.cancel)
             return
         }
-        
+
         print("🚀 SSE Response Status: \(httpResponse.statusCode)")
         print("🚀 SSE Response Headers: \(httpResponse.allHeaderFields)")
-        
+
         guard httpResponse.statusCode == 200 else {
             DispatchQueue.main.async {
-                self.onError(APIError.httpError(httpResponse.statusCode, "HTTP \(httpResponse.statusCode)"))
+                self.onError(
+                    APIError.httpError(httpResponse.statusCode, "HTTP \(httpResponse.statusCode)"))
             }
             completionHandler(.cancel)
             return
         }
-        
+
         completionHandler(.allow)
     }
-    
+
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         guard let string = String(data: data, encoding: .utf8) else {
             print("🚨 SSE: Failed to decode data as UTF-8")
             return
         }
-        
+
         // Only log if not a notification (to reduce spam)
         if !string.contains("\"type\":\"Notification\"") {
             print("🚀 SSE Received chunk: \(string)")
         }
-        
+
         // Add to buffer
         buffer += string
-        
+
         // Process complete lines
         let lines = buffer.components(separatedBy: .newlines)
-        
+
         // Keep the last incomplete line in buffer
         if !buffer.hasSuffix("\n") && !buffer.hasSuffix("\r\n") {
             buffer = lines.last ?? ""
@@ -330,8 +378,10 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
             processSSELines(lines)
         }
     }
-    
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didCompleteWithError error: Error?) {
+
+    func urlSession(
+        _ session: URLSession, dataTask: URLSessionDataTask, didCompleteWithError error: Error?
+    ) {
         if let error = error {
             DispatchQueue.main.async {
                 self.onError(error)
@@ -342,7 +392,7 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
             }
         }
     }
-    
+
     private func processSSELines(_ lines: [String]) {
         for line in lines {
             if line.hasPrefix("data: ") {
@@ -351,18 +401,18 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
                     do {
                         let jsonData = eventData.data(using: .utf8)!
                         let event = try JSONDecoder().decode(SSEEvent.self, from: jsonData)
-                        
+
                         // Only log non-notification events for cleaner output
                         if case .notification = event {
                             // Skip verbose logging for notifications
                         } else {
                             print("🚀 SSE Event: \(eventData)")
                         }
-                        
+
                         DispatchQueue.main.async {
                             self.onEvent(event)
                         }
-                        
+
                         // Check if this is a finish event
                         if case .finish = event {
                             DispatchQueue.main.async {

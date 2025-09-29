@@ -160,9 +160,13 @@ struct ChatView: View {
             do {
                 // Create session if we don't have one
                 if currentSessionId == nil {
-                    print("🚀 Creating new session...")
                     let sessionId = try await apiService.startAgent(workingDir: "/tmp")
-                    print("✅ Session created: \(sessionId)")
+                    print("✅ SESSION CREATED: \(sessionId)")
+                    
+                    // Extend the system prompt with iOS-specific context
+                    print("🔧 EXTENDING PROMPT FOR SESSION: \(sessionId)")
+                    try await apiService.extendSystemPrompt(sessionId: sessionId)
+                    print("✅ PROMPT EXTENDED FOR SESSION: \(sessionId)")
                     
                     currentSessionId = sessionId
                 }
