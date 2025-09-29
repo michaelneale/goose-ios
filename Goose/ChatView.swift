@@ -168,6 +168,10 @@ struct ChatView: View {
                     try await apiService.extendSystemPrompt(sessionId: sessionId)
                     print("✅ PROMPT EXTENDED FOR SESSION: \(sessionId)")
                     
+                    // Load enabled extensions just like desktop does
+                    print("🔧 LOADING ENABLED EXTENSIONS FOR SESSION: \(sessionId)")
+                    try await apiService.loadEnabledExtensions(sessionId: sessionId)
+                    
                     currentSessionId = sessionId
                 }
                 

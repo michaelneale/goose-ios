@@ -221,6 +221,85 @@ class GooseAPIService: ObservableObject {
 
         print("✅ System prompt extended for iOS context")
     }
+    
+    // MARK: - Extension Management
+    func loadEnabledExtensions(sessionId: String) async throws {
+        // Get extensions from config, just like desktop does
+        guard let url = URL(string: "\(baseURL)/config/extensions") else {
+            print("⚠️ Invalid URL for getting extensions config")
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("⚠️ Invalid response getting extensions config")
+            return
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+            print("⚠️ Failed to get extensions config: \(errorBody)")
+            return
+        }
+        
+        // Parse the extensions config
+        guard let extensionsConfig = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let extensions = extensionsConfig["extensions"] as? [[String: Any]] else {
+            print("⚠️ Failed to parse extensions config")
+            return
+        }
+        
+        // Load only the enabled extensions
+        for extensionConfig in extensions {
+            if let enabled = extensionConfig["enabled"] as? Bool, enabled {
+                await loadExtension(sessionId: sessionId, extensionConfig: extensionConfig)
+            }
+        }
+    }
+    
+    private func loadExtension(sessionId: String, extensionConfig: [String: Any]) async {
+        guard let url = URL(string: "\(baseURL)/extensions/add") else {
+            print("⚠️ Invalid URL for extension loading")
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+        
+        var body = extensionConfig
+        body["session_id"] = sessionId
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("⚠️ Invalid response loading extension")
+                return
+            }
+            
+            if httpResponse.statusCode == 200 {
+                if let name = extensionConfig["name"] as? String {
+                    print("✅ Extension '\(name)' loaded")
+                }
+            } else {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                if let name = extensionConfig["name"] as? String {
+                    print("⚠️ Failed to load extension '\(name)': \(errorBody)")
+                }
+            }
+        } catch {
+            print("⚠️ Error loading extension: \(error)")
+        }
+    }
 
     // MARK: - Sessions Management
     func fetchSessions() async -> [ChatSession] {
