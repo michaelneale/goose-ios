@@ -11,6 +11,7 @@ struct ChatView: View {
     @State private var activeToolCalls: [String: ToolCallWithTiming] = [:]
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
+    @State private var currentSessionId: String?
 
     var body: some View {
         ZStack {
@@ -114,7 +115,11 @@ struct ChatView: View {
             
             // Sidebar
             if showingSidebar {
-                SidebarView(isShowing: $showingSidebar)
+                SidebarView(isShowing: $showingSidebar, onSessionSelect: { sessionId in
+                    loadSession(sessionId)
+                }, onNewSession: {
+                    createNewSession()
+                })
             }
         }
         .onAppear {
@@ -155,32 +160,84 @@ struct ChatView: View {
     }
 
     private func startChatStream() {
-        let sessionId = UUID().uuidString
+        Task {
+            do {
+                // Create session if we don't have one
+                if currentSessionId == nil {
+                    let (sessionId, initialMessages) = try await apiService.startAgent(workingDir: "/tmp")
+                    print("✅ SESSION CREATED: \(sessionId)")
+                    
+                    // Load any initial messages from the session
+                    if !initialMessages.isEmpty {
+                        await MainActor.run {
+                            messages = initialMessages
+                        }
+                    }
+                    
+                    // Read provider and model from config
+                    print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
+                    guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
+                          let model = await apiService.readConfigValue(key: "GOOSE_MODEL") else {
+                        throw APIError.noData
+                    }
+                    
+                    print("🔧 UPDATING PROVIDER TO \(provider) WITH MODEL \(model)")
+                    try await apiService.updateProvider(sessionId: sessionId, provider: provider, model: model)
+                    print("✅ PROVIDER UPDATED FOR SESSION: \(sessionId)")
+                    
+                    // Extend the system prompt with iOS-specific context
+                    print("🔧 EXTENDING PROMPT FOR SESSION: \(sessionId)")
+                    try await apiService.extendSystemPrompt(sessionId: sessionId)
+                    print("✅ PROMPT EXTENDED FOR SESSION: \(sessionId)")
+                    
+                    // Load enabled extensions just like desktop does
+                    print("🔧 LOADING ENABLED EXTENSIONS FOR SESSION: \(sessionId)")
+                    try await apiService.loadEnabledExtensions(sessionId: sessionId)
+                    
+                    currentSessionId = sessionId
+                }
+                
+                guard let sessionId = currentSessionId else {
+                    throw APIError.invalidResponse
+                }
 
-        currentStreamTask = apiService.startChatStreamWithSSE(
-            messages: messages,
-            sessionId: sessionId,
-            workingDirectory: "/tmp",
-            onEvent: { event in
-                handleSSEEvent(event)
-            },
-            onComplete: {
-                isLoading = false
-                currentStreamTask = nil
-            },
-            onError: { error in
-                isLoading = false
-                currentStreamTask = nil
+                currentStreamTask = apiService.startChatStreamWithSSE(
+                    messages: messages,
+                    sessionId: sessionId,
+                    workingDirectory: "/tmp",
+                    onEvent: { event in
+                        handleSSEEvent(event)
+                    },
+                    onComplete: {
+                        isLoading = false
+                        currentStreamTask = nil
+                    },
+                    onError: { error in
+                        isLoading = false
+                        currentStreamTask = nil
 
-                print("🚨 Chat Error: \(error)")
+                        print("🚨 Chat Error: \(error)")
 
-                let errorMessage = Message(
-                    role: .assistant,
-                    text: "❌ Error: \(error.localizedDescription)"
+                        let errorMessage = Message(
+                            role: .assistant,
+                            text: "❌ Error: \(error.localizedDescription)"
+                        )
+                        messages.append(errorMessage)
+                    }
                 )
-                messages.append(errorMessage)
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    print("🚨 Session setup error: \(error)")
+                    
+                    let errorMessage = Message(
+                        role: .assistant,
+                        text: "❌ Failed to initialize session: \(error.localizedDescription)"
+                    )
+                    messages.append(errorMessage)
+                }
             }
-        )
+        }
     }
 
     private func handleSSEEvent(_ event: SSEEvent) {
@@ -262,7 +319,8 @@ struct ChatView: View {
             print("Model changed: \(modelEvent.model) (\(modelEvent.mode))")
 
         case .notification(let notificationEvent):
-            print("Notification: \(notificationEvent.message)")
+            // Just ignore notifications silently - they're too verbose for shell output
+            break
 
         case .ping:
             break
@@ -280,11 +338,59 @@ struct ChatView: View {
             mappedMessageId == messageId ? toolCallId : nil
         }.sorted()
     }
+    
+    func loadSession(_ sessionId: String) {
+        Task {
+            do {
+                // Resume the session
+                let (resumedSessionId, sessionMessages) = try await apiService.resumeAgent(sessionId: sessionId)
+                print("✅ SESSION RESUMED: \(resumedSessionId)")
+                print("📝 Loaded \(sessionMessages.count) messages")
+                
+                // Update all state on main thread at once
+                await MainActor.run {
+                    // Clear old state
+                    activeToolCalls.removeAll()
+                    completedToolCalls.removeAll()
+                    toolCallMessageMap.removeAll()
+                    
+                    // Set new state
+                    currentSessionId = resumedSessionId
+                    messages = sessionMessages
+                    print("📊 Messages array now has \(messages.count) messages")
+                }
+            } catch {
+                print("🚨 Failed to load session: \(error)")
+                await MainActor.run {
+                    let errorMessage = Message(
+                        role: .assistant,
+                        text: "❌ Failed to load session: \(error.localizedDescription)"
+                    )
+                    messages.append(errorMessage)
+                }
+            }
+        }
+    }
+    
+    func createNewSession() {
+        // Clear all state for a fresh session
+        messages.removeAll()
+        activeToolCalls.removeAll()
+        completedToolCalls.removeAll()
+        toolCallMessageMap.removeAll()
+        currentSessionId = nil
+        isLoading = false
+        currentStreamTask = nil
+        
+        print("🆕 Created new session - cleared all state")
+    }
 }
 
 // MARK: - Sidebar View
 struct SidebarView: View {
     @Binding var isShowing: Bool
+    let onSessionSelect: (String) -> Void
+    let onNewSession: () -> Void
     @State private var sessions: [ChatSession] = []
     
     var body: some View {
@@ -330,7 +436,7 @@ struct SidebarView: View {
                             ForEach(sessions) { session in
                                 SessionRowView(session: session)
                                     .onTapGesture {
-                                        // TODO: Load session
+                                        onSessionSelect(session.id)
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             isShowing = false
                                         }
@@ -344,7 +450,8 @@ struct SidebarView: View {
                     
                     // New session button
                     Button(action: {
-                        // TODO: Create new session
+                        // Create new session
+                        onNewSession()
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isShowing = false
                         }
@@ -410,104 +517,35 @@ struct SessionRowView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
-// MARK: - Chat Session Model
+// MARK: - Chat Session Model (matches goosed API)
 struct ChatSession: Identifiable, Codable {
     let id: String
-    let title: String
-    let lastMessage: String
-    let timestamp: Date
+    let description: String
+    let messageCount: Int
+    let createdAt: String
+    let updatedAt: String
     
-    // Nested metadata structure
-    struct Metadata: Codable {
-        let description: String?
-        let message_count: Int?
-    }
-    
-    // Alternative field names that the API might use
     enum CodingKeys: String, CodingKey {
         case id
-        case title
-        case lastMessage = "last_message"
-        case timestamp
+        case description
+        case messageCount = "message_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
     
-    // Regular initializer for creating instances programmatically
-    init(id: String, title: String, lastMessage: String, timestamp: Date) {
-        self.id = id
-        self.title = title
-        self.lastMessage = lastMessage
-        self.timestamp = timestamp
+    // Computed properties for UI display
+    var title: String {
+        return description.isEmpty ? "Untitled Session" : description
     }
     
-    // Custom encoder for Codable conformance
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(title, forKey: .title)
-        try container.encode(lastMessage, forKey: .lastMessage)
-        try container.encode(timestamp, forKey: .timestamp)
+    var lastMessage: String {
+        return "\(messageCount) message\(messageCount == 1 ? "" : "s")"
     }
     
-    // Custom decoder to handle various field names from API
-    init(from decoder: Decoder) throws {
-        // Use a more flexible approach for decoding
-        let container = try decoder.container(keyedBy: AnyCodingKey.self)
-        
-        id = try container.decode(String.self, forKey: AnyCodingKey("id"))
-        
-        // Try to get title from metadata.description or fallback
-        if let metadata = try container.decodeIfPresent(Metadata.self, forKey: AnyCodingKey("metadata")),
-           let description = metadata.description {
-            title = description
-        } else if let titleValue = try container.decodeIfPresent(String.self, forKey: AnyCodingKey("title")) {
-            title = titleValue
-        } else {
-            title = "Untitled Session"
-        }
-        
-        // For lastMessage, use message count or fallback
-        if let metadata = try container.decodeIfPresent(Metadata.self, forKey: AnyCodingKey("metadata")),
-           let messageCount = metadata.message_count {
-            lastMessage = "\(messageCount) messages"
-        } else if let lastMessageValue = try container.decodeIfPresent(String.self, forKey: AnyCodingKey("last_message")) {
-            lastMessage = lastMessageValue
-        } else {
-            lastMessage = "No messages"
-        }
-        
-        // Try different field names for timestamp (modified field uses different format)
-        if let modifiedString = try container.decodeIfPresent(String.self, forKey: AnyCodingKey("modified")) {
-            // Parse "2025-03-06 23:38:37 UTC" format
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss 'UTC'"
-            formatter.timeZone = TimeZone(abbreviation: "UTC")
-            timestamp = formatter.date(from: modifiedString) ?? Date()
-        } else if let timestampValue = try container.decodeIfPresent(Date.self, forKey: AnyCodingKey("timestamp")) {
-            timestamp = timestampValue
-        } else {
-            timestamp = Date()
-        }
-    }
-}
-
-// Helper for flexible JSON key decoding
-struct AnyCodingKey: CodingKey {
-    var stringValue: String
-    var intValue: Int?
-    
-    init(_ string: String) {
-        self.stringValue = string
-        self.intValue = nil
-    }
-    
-    init(stringValue: String) {
-        self.stringValue = stringValue
-        self.intValue = nil
-    }
-    
-    init(intValue: Int) {
-        self.stringValue = String(intValue)
-        self.intValue = intValue
+    var timestamp: Date {
+        // Parse the ISO 8601 date string
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: updatedAt) ?? Date()
     }
 }
 
