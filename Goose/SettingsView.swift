@@ -14,24 +14,9 @@ struct SettingsView: View {
             Form {
                 Section(header: Text("Server Configuration")) {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Base URL")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Button(action: {
-                                // Open camera app for QR scanning
-                                if let url = URL(string: "camera://") {
-                                    UIApplication.shared.open(url)
-                                }
-                            }) {
-                                Image(systemName: "qrcode.viewfinder")
-                                    .font(.system(size: 20))
-                            }
-                            .buttonStyle(BorderlessButtonStyle())
-                        }
+                        Text("Base URL")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         TextField("http://127.0.0.1:62996", text: $baseURL)
                             .textFieldStyle(.roundedBorder)
                             .autocapitalization(.none)
@@ -45,11 +30,6 @@ struct SettingsView: View {
                         SecureField("Enter secret key", text: $secretKey)
                             .textFieldStyle(.roundedBorder)
                     }
-                    
-                    Text("Tip: Use the camera to scan a QR code from launch_tunnel.sh")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .italic()
                 }
 
                 Section(header: Text("Connection Status")) {
