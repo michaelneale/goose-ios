@@ -55,7 +55,7 @@ struct ChatView: View {
                             
                             // Add bottom padding to account for floating input
                             Spacer()
-                                .frame(height: 80)
+                                .frame(height: 120)
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
