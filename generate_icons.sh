@@ -3,8 +3,8 @@
 # Script to generate iOS app icons from a source image
 # Requires ImageMagick (install with: brew install imagemagick)
 
-SOURCE_IMAGE="GooseChat/Assets.xcassets/AppIcon.appiconset/goose.svg"
-ICONSET_DIR="GooseChat/Assets.xcassets/AppIcon.appiconset"
+SOURCE_IMAGE="Goose/Assets.xcassets/AppIcon.appiconset/goose-icon.svg"
+ICONSET_DIR="Goose/Assets.xcassets/AppIcon.appiconset"
 
 # Check if source image exists
 if [ ! -f "$SOURCE_IMAGE" ]; then
@@ -13,7 +13,7 @@ if [ ! -f "$SOURCE_IMAGE" ]; then
 fi
 
 # Check if ImageMagick is installed
-if ! command -v convert &> /dev/null; then
+if ! command -v magick &> /dev/null; then
     echo "ImageMagick is not installed. Installing..."
     brew install imagemagick
 fi
@@ -21,27 +21,27 @@ fi
 echo "Generating iOS app icons..."
 
 # iPhone icons
-convert "$SOURCE_IMAGE" -resize 40x40 "$ICONSET_DIR/Icon-20@2x.png"
-convert "$SOURCE_IMAGE" -resize 60x60 "$ICONSET_DIR/Icon-20@3x.png"
-convert "$SOURCE_IMAGE" -resize 58x58 "$ICONSET_DIR/Icon-29@2x.png"
-convert "$SOURCE_IMAGE" -resize 87x87 "$ICONSET_DIR/Icon-29@3x.png"
-convert "$SOURCE_IMAGE" -resize 80x80 "$ICONSET_DIR/Icon-40@2x.png"
-convert "$SOURCE_IMAGE" -resize 120x120 "$ICONSET_DIR/Icon-40@3x.png"
-convert "$SOURCE_IMAGE" -resize 120x120 "$ICONSET_DIR/Icon-60@2x.png"
-convert "$SOURCE_IMAGE" -resize 180x180 "$ICONSET_DIR/Icon-60@3x.png"
+magick "$SOURCE_IMAGE" -resize 40x40 "$ICONSET_DIR/Icon-20@2x.png"
+magick "$SOURCE_IMAGE" -resize 60x60 "$ICONSET_DIR/Icon-20@3x.png"
+magick "$SOURCE_IMAGE" -resize 58x58 "$ICONSET_DIR/Icon-29@2x.png"
+magick "$SOURCE_IMAGE" -resize 87x87 "$ICONSET_DIR/Icon-29@3x.png"
+magick "$SOURCE_IMAGE" -resize 80x80 "$ICONSET_DIR/Icon-40@2x.png"
+magick "$SOURCE_IMAGE" -resize 120x120 "$ICONSET_DIR/Icon-40@3x.png"
+magick "$SOURCE_IMAGE" -resize 120x120 "$ICONSET_DIR/Icon-60@2x.png"
+magick "$SOURCE_IMAGE" -resize 180x180 "$ICONSET_DIR/Icon-60@3x.png"
 
 # iPad icons
-convert "$SOURCE_IMAGE" -resize 20x20 "$ICONSET_DIR/Icon-20.png"
-convert "$SOURCE_IMAGE" -resize 40x40 "$ICONSET_DIR/Icon-20@2x~ipad.png"
-convert "$SOURCE_IMAGE" -resize 29x29 "$ICONSET_DIR/Icon-29.png"
-convert "$SOURCE_IMAGE" -resize 58x58 "$ICONSET_DIR/Icon-29@2x~ipad.png"
-convert "$SOURCE_IMAGE" -resize 40x40 "$ICONSET_DIR/Icon-40~ipad.png"
-convert "$SOURCE_IMAGE" -resize 80x80 "$ICONSET_DIR/Icon-40@2x~ipad.png"
-convert "$SOURCE_IMAGE" -resize 76x76 "$ICONSET_DIR/Icon-76.png"
-convert "$SOURCE_IMAGE" -resize 152x152 "$ICONSET_DIR/Icon-76@2x.png"
-convert "$SOURCE_IMAGE" -resize 167x167 "$ICONSET_DIR/Icon-83.5@2x.png"
+magick "$SOURCE_IMAGE" -resize 20x20 "$ICONSET_DIR/Icon-20.png"
+magick "$SOURCE_IMAGE" -resize 40x40 "$ICONSET_DIR/Icon-20@2x~ipad.png"
+magick "$SOURCE_IMAGE" -resize 29x29 "$ICONSET_DIR/Icon-29.png"
+magick "$SOURCE_IMAGE" -resize 58x58 "$ICONSET_DIR/Icon-29@2x~ipad.png"
+magick "$SOURCE_IMAGE" -resize 40x40 "$ICONSET_DIR/Icon-40~ipad.png"
+magick "$SOURCE_IMAGE" -resize 80x80 "$ICONSET_DIR/Icon-40@2x~ipad.png"
+magick "$SOURCE_IMAGE" -resize 76x76 "$ICONSET_DIR/Icon-76.png"
+magick "$SOURCE_IMAGE" -resize 152x152 "$ICONSET_DIR/Icon-76@2x.png"
+magick "$SOURCE_IMAGE" -resize 167x167 "$ICONSET_DIR/Icon-83.5@2x.png"
 
 # App Store icon
-convert "$SOURCE_IMAGE" -resize 1024x1024 "$ICONSET_DIR/Icon-1024.png"
+magick "$SOURCE_IMAGE" -resize 1024x1024 "$ICONSET_DIR/Icon-1024.png"
 
 echo "Icon generation complete!"

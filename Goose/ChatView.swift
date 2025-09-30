@@ -55,7 +55,7 @@ struct ChatView: View {
                             
                             // Add bottom padding to account for floating input
                             Spacer()
-                                .frame(height: 80)
+                                .frame(height: 120)
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
@@ -128,7 +128,7 @@ struct ChatView: View {
             }
         }
     }
-    private func scrollToBottom(_ proxy: Any) {
+    private func scrollToBottom(_ proxy: ScrollViewProxy) {
         var lastId: String?
         
         if let lastMessage = messages.last {
@@ -142,7 +142,7 @@ struct ChatView: View {
         
         if let scrollId = lastId {
             withAnimation(.easeOut(duration: 0.3)) {
-                // TODO: Implement scrolling
+                proxy.scrollTo(scrollId, anchor: .bottom)
             }
         }
     }
@@ -346,6 +346,26 @@ struct ChatView: View {
                 let (resumedSessionId, sessionMessages) = try await apiService.resumeAgent(sessionId: sessionId)
                 print("✅ SESSION RESUMED: \(resumedSessionId)")
                 print("📝 Loaded \(sessionMessages.count) messages")
+                
+                // Read provider and model from config (same as new session)
+                print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
+                guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
+                      let model = await apiService.readConfigValue(key: "GOOSE_MODEL") else {
+                    throw APIError.noData
+                }
+                
+                print("🔧 UPDATING PROVIDER TO \(provider) WITH MODEL \(model)")
+                try await apiService.updateProvider(sessionId: resumedSessionId, provider: provider, model: model)
+                print("✅ PROVIDER UPDATED FOR RESUMED SESSION: \(resumedSessionId)")
+                
+                // Extend the system prompt with iOS-specific context (same as new session)
+                print("🔧 EXTENDING PROMPT FOR RESUMED SESSION: \(resumedSessionId)")
+                try await apiService.extendSystemPrompt(sessionId: resumedSessionId)
+                print("✅ PROMPT EXTENDED FOR RESUMED SESSION: \(resumedSessionId)")
+                
+                // Load enabled extensions just like desktop does (same as new session)
+                print("🔧 LOADING ENABLED EXTENSIONS FOR RESUMED SESSION: \(resumedSessionId)")
+                try await apiService.loadEnabledExtensions(sessionId: resumedSessionId)
                 
                 // Update all state on main thread at once
                 await MainActor.run {
