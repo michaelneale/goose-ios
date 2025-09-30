@@ -128,7 +128,7 @@ struct ChatView: View {
             }
         }
     }
-    private func scrollToBottom(_ proxy: Any) {
+    private func scrollToBottom(_ proxy: ScrollViewProxy) {
         var lastId: String?
         
         if let lastMessage = messages.last {
@@ -142,7 +142,7 @@ struct ChatView: View {
         
         if let scrollId = lastId {
             withAnimation(.easeOut(duration: 0.3)) {
-                // TODO: Implement scrolling
+                proxy.scrollTo(scrollId, anchor: .bottom)
             }
         }
     }

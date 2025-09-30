@@ -23,7 +23,7 @@ struct SettingsView: View {
                             
                             Button(action: {
                                 // Open camera app for QR scanning
-                                if let url = URL(string: "goosechat://scan") {
+                                if let url = URL(string: "camera://") {
                                     UIApplication.shared.open(url)
                                 }
                             }) {
