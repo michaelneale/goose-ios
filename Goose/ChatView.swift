@@ -201,7 +201,7 @@ struct ChatView: View {
                     throw APIError.invalidResponse
                 }
 
-                currentStreamTask = apiService.startChatStreamWithSSE(
+                currentStreamTask = await apiService.startChatStreamWithSSE(
                     messages: messages,
                     sessionId: sessionId,
                     workingDirectory: "/tmp",
