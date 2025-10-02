@@ -16,6 +16,8 @@ class ConfigurationHandler: ObservableObject {
         let secret: String
     }
     
+
+    
     /// Handles incoming URL from QR code scan or deep link
     /// Expected format: goosechat://configure?data=<url-encoded-json>
     func handleURL(_ url: URL) -> Bool {
@@ -69,9 +71,12 @@ class ConfigurationHandler: ObservableObject {
         configurationError = nil
         configurationSuccess = false
         
-        // The URL might come in different formats:
-        // - "example.loca.lt:443" (old format from launch_tunnel.sh)
-        // - "https://example.loca.lt:443" (new format)
+        print("📋 Applying configuration:")
+        print("   URL: '\(config.url)'")
+        print("   Is ntfy pattern: \(config.url.contains("ntfy.sh"))")
+        
+        // Store URL as-is (ntfy pattern or direct)
+        // GooseAPIService will handle resolution automatically
         let baseURL: String
         if config.url.hasPrefix("http://") || config.url.hasPrefix("https://") {
             // Already has protocol, use as-is but remove :443 if present
@@ -81,7 +86,6 @@ class ConfigurationHandler: ObservableObject {
             baseURL = "https://\(config.url.replacingOccurrences(of: ":443", with: ""))"
         }
         
-        print("✅ Applying configuration:")
         print("   Base URL: \(baseURL)")
         print("   Secret: \(String(repeating: "*", count: config.secret.count))")
         
@@ -90,7 +94,7 @@ class ConfigurationHandler: ObservableObject {
         UserDefaults.standard.set(config.secret, forKey: "goose_secret_key")
         UserDefaults.standard.synchronize()
         
-        // Test the connection
+        // Test the connection (will auto-resolve ntfy if needed)
         Task {
             let success = await GooseAPIService.shared.testConnection()
             
@@ -113,7 +117,7 @@ class ConfigurationHandler: ObservableObject {
             }
         }
     }
-    
+
     /// Clear any configuration errors
     func clearError() {
         configurationError = nil

@@ -12,6 +12,7 @@ struct ChatView: View {
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
     @State private var currentSessionId: String?
+    @State private var scrollTrigger = UUID() // Used to trigger scroll on message updates
 
     var body: some View {
         ZStack {
@@ -63,6 +64,7 @@ struct ChatView: View {
                     .onChange(of: messages.count) { _ in scrollToBottom(proxy) }
                     .onChange(of: activeToolCalls.count) { _ in scrollToBottom(proxy) }
                     .onChange(of: completedToolCalls.count) { _ in scrollToBottom(proxy) }
+                    .onChange(of: scrollTrigger) { _ in scrollToBottom(proxy) }
                 }
             }
             
@@ -201,7 +203,7 @@ struct ChatView: View {
                     throw APIError.invalidResponse
                 }
 
-                currentStreamTask = apiService.startChatStreamWithSSE(
+                currentStreamTask = await apiService.startChatStreamWithSSE(
                     messages: messages,
                     sessionId: sessionId,
                     workingDirectory: "/tmp",
@@ -291,6 +293,8 @@ struct ChatView: View {
                 }
 
                 messages[existingIndex] = updatedMessage
+                // Trigger scroll on message update (not just count change)
+                scrollTrigger = UUID()
             } else {
                 messages.append(incomingMessage)
             }
