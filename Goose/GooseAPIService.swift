@@ -7,12 +7,33 @@ class GooseAPIService: ObservableObject {
     @Published var isConnected = false
     @Published var connectionError: String?
     
-    private var cachedResolvedURL: String?
-    private var cacheTimestamp: Date?
-    private let cacheValidityDuration: TimeInterval = 60 // Cache for 60 seconds
-
-    private var configuredURL: String {
+    // The configured URL (unchanging) - either direct URL or ntfy pattern
+    private var baseURL: String {
         UserDefaults.standard.string(forKey: "goose_base_url") ?? "http://127.0.0.1:62996"
+    }
+    
+    // Is the configured URL an ntfy pattern?
+    private var isNtfyPattern: Bool {
+        baseURL.contains("ntfy.sh")
+    }
+    
+    // The resolved URL - cached and refreshable for ntfy patterns
+    private var cachedResolvedURL: String?
+    
+    private var resolvedURL: String {
+        // If we have a cached resolved URL, use it
+        if let cached = cachedResolvedURL {
+            return cached
+        }
+        
+        // For non-ntfy URLs, resolved == base (and cache it)
+        if !isNtfyPattern {
+            cachedResolvedURL = baseURL
+        }
+        
+        // For ntfy patterns, return base URL as initial value
+        // (will be resolved on first failure and then cached)
+        return baseURL
     }
     
     private var secretKey: String {
@@ -21,61 +42,24 @@ class GooseAPIService: ObservableObject {
 
     private init() {}
     
-    /// Get the actual base URL, resolving ntfy.sh URLs dynamically
-    private func getBaseURL() async -> String {
-        // First check if we have a dedicated ntfy.sh URL stored
-        var ntfyURL = UserDefaults.standard.string(forKey: "goose_ntfy_url")
-        
-        // Fallback: if goose_base_url contains ntfy.sh, use it as the ntfy URL
-        if ntfyURL == nil && configuredURL.contains("ntfy.sh") {
-            print("⚠️ Found ntfy.sh URL in goose_base_url, treating it as ntfy URL")
-            ntfyURL = configuredURL
-        }
-        
-        // If no ntfy.sh URL, use the configured URL directly
-        guard let ntfyURLToResolve = ntfyURL else {
-            print("ℹ️ No ntfy.sh URL configured, using direct URL: \(configuredURL)")
-            return configuredURL
-        }
-        
-        // Check if we have a valid cached URL
-        if let cached = cachedResolvedURL,
-           let timestamp = cacheTimestamp,
-           Date().timeIntervalSince(timestamp) < cacheValidityDuration {
-            print("📦 Using cached tunnel URL: \(cached)")
-            return cached
-        }
-        
-        // Resolve the ntfy.sh URL
-        print("🔄 Resolving ntfy.sh URL: \(ntfyURLToResolve)")
+    // MARK: - Request Helper with Auto-Refresh
+    
+    /// Executes a request, and if it fails, refreshes from ntfy and retries once
+    private func performRequest<T>(_ operation: () async throws -> T) async throws -> T {
         do {
-            let resolvedURL = try await ConfigurationHandler.shared.fetchTunnelURLFromNtfy(ntfyURL: ntfyURLToResolve)
-            let cleanURL = resolvedURL.replacingOccurrences(of: ":443", with: "")
-            
-            // Cache the resolved URL
-            cachedResolvedURL = cleanURL
-            cacheTimestamp = Date()
-            
-            print("✅ Resolved to: \(cleanURL)")
-            return cleanURL
+            return try await operation()
         } catch {
-            print("❌ Failed to resolve ntfy.sh URL: \(error)")
-            // Fall back to cached URL if available
-            if let cached = cachedResolvedURL {
-                print("⚠️ Using stale cached URL: \(cached)")
-                return cached
+            // Try to refresh and retry
+            print("🔄 Request failed, attempting to refresh from ntfy.sh...")
+            if await refreshFromNtfy() {
+                print("✅ Refreshed, retrying request...")
+                return try await operation()
             }
-            // Last resort: if configuredURL is not ntfy.sh, use it
-            if !configuredURL.contains("ntfy.sh") {
-                print("⚠️ Falling back to direct URL: \(configuredURL)")
-                return configuredURL
-            }
-            // Otherwise we're stuck - return the ntfy URL and let it fail (better than crashing)
-            print("❌ Cannot resolve and no fallback available, returning ntfy URL")
-            return ntfyURLToResolve
+            // If refresh failed or not ntfy pattern, throw original error
+            throw error
         }
     }
-
+    
     // MARK: - Proper SSE Streaming Implementation
     func startChatStreamWithSSE(
         messages: [Message],
@@ -83,11 +67,11 @@ class GooseAPIService: ObservableObject {
         workingDirectory: String = "/tmp",
         onEvent: @escaping (SSEEvent) -> Void,
         onComplete: @escaping () -> Void,
-        onError: @escaping (Error) -> Void
+        onError: @escaping (Error) -> Void,
+        isRetry: Bool = false
     ) async -> URLSessionDataTask? {
 
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/reply") else {
+        guard let url = URL(string: "\(resolvedURL)/reply") else {
             onError(APIError.invalidURL)
             return nil
         }
@@ -111,7 +95,7 @@ class GooseAPIService: ObservableObject {
             urlRequest.httpBody = requestData
 
             // Debug logging
-            print("🚀 Starting SSE stream to: \(url)")
+            print("🚀 Starting SSE stream to: \(url)\(isRetry ? " (RETRY)" : "")")
             print("🚀 Session ID: \(sessionId ?? "nil")")
             print("🚀 Number of messages: \(messages.count)")
             print("🚀 Headers: \(urlRequest.allHTTPHeaderFields ?? [:])")
@@ -133,11 +117,40 @@ class GooseAPIService: ObservableObject {
             return nil
         }
 
+        // Create a retry handler that refreshes from ntfy and retries
+        let retryHandler: (Error) -> Void = { [weak self] error in
+            guard let self = self, !isRetry else {
+                // Already retried once, don't retry again
+                onError(error)
+                return
+            }
+            
+            // If this is a potential connection error and we're using ntfy, try to refresh
+            Task {
+                print("🔄 SSE request failed, attempting to refresh from ntfy.sh...")
+                if await self.refreshFromNtfy() {
+                    print("✅ Refreshed, retrying SSE stream...")
+                    _ = await self.startChatStreamWithSSE(
+                        messages: messages,
+                        sessionId: sessionId,
+                        workingDirectory: workingDirectory,
+                        onEvent: onEvent,
+                        onComplete: onComplete,
+                        onError: onError,
+                        isRetry: true  // Mark as retry to prevent infinite loops
+                    )
+                } else {
+                    // Refresh failed, pass error back to caller
+                    onError(error)
+                }
+            }
+        }
+
         // Create a custom URLSessionDataDelegate to handle streaming
         let delegate = SSEDelegate(
             onEvent: onEvent,
             onComplete: onComplete,
-            onError: onError
+            onError: retryHandler
         )
 
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
@@ -152,10 +165,10 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Connection Test
     func testConnection() async -> Bool {
-        let baseURL = await getBaseURL()
-        let fullURL = "\(baseURL)/status"
+        let fullURL = "\(resolvedURL)/status"
         print("🔍 Testing connection to: '\(fullURL)'")
         print("   Base URL: '\(baseURL)'")
+        print("   Resolved URL: '\(resolvedURL)'")
         print("   Secret key length: \(secretKey.count)")
         
         guard let url = URL(string: fullURL) else {
@@ -214,24 +227,24 @@ class GooseAPIService: ObservableObject {
     }
     
     // MARK: - ntfy.sh URL Refresh
-    /// Refresh the tunnel URL from ntfy.sh when connection fails
+    /// Refresh the resolved URL from ntfy.sh pattern when connection fails
     private func refreshFromNtfy() async -> Bool {
-        guard let ntfyURL = UserDefaults.standard.string(forKey: "goose_ntfy_url") else {
-            print("ℹ️ No ntfy.sh URL configured, cannot refresh")
+        // Only refresh if baseURL is an ntfy pattern
+        guard isNtfyPattern else {
+            print("ℹ️ Base URL is not an ntfy pattern, cannot refresh")
             return false
         }
         
-        print("📡 Refreshing tunnel URL from ntfy.sh: \(ntfyURL)")
+        print("📡 Refreshing tunnel URL from ntfy.sh pattern: \(baseURL)")
         
         do {
-            let tunnelURL = try await ConfigurationHandler.shared.fetchTunnelURLFromNtfy(ntfyURL: ntfyURL)
-            let baseURL = tunnelURL.replacingOccurrences(of: ":443", with: "")
+            let tunnelURL = try await fetchTunnelURLFromNtfy(ntfyURL: baseURL)
+            let newResolvedURL = tunnelURL.replacingOccurrences(of: ":443", with: "")
             
-            print("✅ Refreshed tunnel URL: \(baseURL)")
+            print("✅ Refreshed resolved URL: \(newResolvedURL)")
             
-            // Update UserDefaults with new URL
-            UserDefaults.standard.set(baseURL, forKey: "goose_base_url")
-            UserDefaults.standard.synchronize()
+            // Update the cached resolved URL
+            cachedResolvedURL = newResolvedURL
             
             return true
         } catch {
@@ -239,118 +252,168 @@ class GooseAPIService: ObservableObject {
             return false
         }
     }
-
-    // MARK: - Session Creation
-    func startAgent(workingDir: String = "/tmp") async throws -> (sessionId: String, messages: [Message]) {
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/agent/start") else {
+    
+    /// Fetch the tunnel URL from ntfy.sh
+    private func fetchTunnelURLFromNtfy(ntfyURL: String) async throws -> String {
+        // Convert ntfy.sh URL to raw polling URL
+        // Example: https://ntfy.sh/mytopic -> https://ntfy.sh/mytopic/raw?poll=1
+        let rawURL = ntfyURL.appending("/raw?poll=1")
+        
+        guard let url = URL(string: rawURL) else {
             throw APIError.invalidURL
         }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-
-        let body: [String: Any] = ["working_dir": workingDir]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
+        
+        print("🔍 Fetching tunnel URL from: \(rawURL)")
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
-
-        if httpResponse.statusCode != 200 {
+        
+        print("📡 ntfy.sh response status: \(httpResponse.statusCode)")
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+            print("❌ ntfy.sh returned \(httpResponse.statusCode): \(errorBody)")
             throw APIError.httpError(httpResponse.statusCode, errorBody)
         }
+        
+        // Parse the raw response and get the last line (latest tunnel URL)
+        guard let responseText = String(data: data, encoding: .utf8) else {
+            throw APIError.noData
+        }
+        
+        print("📦 ntfy.sh raw response: '\(responseText)'")
+        
+        let lines = responseText.components(separatedBy: .newlines).filter { !$0.isEmpty }
+        print("📋 Found \(lines.count) lines in response")
+        
+        guard let lastLine = lines.last else {
+            throw APIError.noData
+        }
+        
+        // Trim any whitespace/newlines
+        let cleanedURL = lastLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        print("📬 Received tunnel URL from ntfy.sh: \(cleanedURL)")
+        
+        return cleanedURL
+    }
 
-        let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
-        return (agentResponse.id, agentResponse.conversation ?? [])
+    // MARK: - Session Creation
+    func startAgent(workingDir: String = "/tmp") async throws -> (sessionId: String, messages: [Message]) {
+        return try await performRequest {
+            guard let url = URL(string: "\(self.resolvedURL)/agent/start") else {
+                throw APIError.invalidURL
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
+
+            let body: [String: Any] = ["working_dir": workingDir]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+
+            if httpResponse.statusCode != 200 {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                throw APIError.httpError(httpResponse.statusCode, errorBody)
+            }
+
+            let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
+            return (agentResponse.id, agentResponse.conversation ?? [])
+        }
     }
     
     // MARK: - Session Resume
     func resumeAgent(sessionId: String) async throws -> (sessionId: String, messages: [Message]) {
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/agent/resume") else {
-            throw APIError.invalidURL
+        return try await performRequest {
+            guard let url = URL(string: "\(self.resolvedURL)/agent/resume") else {
+                throw APIError.invalidURL
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
+
+            let body: [String: Any] = ["session_id": sessionId]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+
+            if httpResponse.statusCode != 200 {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                throw APIError.httpError(httpResponse.statusCode, errorBody)
+            }
+
+            let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
+            return (agentResponse.id, agentResponse.conversation ?? [])
         }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-
-        let body: [String: Any] = ["session_id": sessionId]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-
-        if httpResponse.statusCode != 200 {
-            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-            throw APIError.httpError(httpResponse.statusCode, errorBody)
-        }
-
-        let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
-        return (agentResponse.id, agentResponse.conversation ?? [])
     }
 
     // MARK: - System Prompt Extension
     func extendSystemPrompt(sessionId: String) async throws {
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/agent/prompt") else {
-            throw APIError.invalidURL
+        return try await performRequest {
+            guard let url = URL(string: "\(self.resolvedURL)/agent/prompt") else {
+                throw APIError.invalidURL
+            }
+
+            let iOSPrompt = """
+                You are being accessed through the Goose iOS application from a mobile device.
+
+                Some extensions are builtin, such as Developer and Memory.
+                When asked to code, write files, or run commands, IMMEDIATELY enable the Developer extension using platform__manage_extensions.
+                DO NOT explain what you're going to do first - just enable Developer and start working.
+                """
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
+
+            let body: [String: Any] = [
+                "session_id": sessionId,
+                "extension": iOSPrompt,
+            ]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            // Debug logging
+            if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8)
+            {
+                print("📤 Sending to /agent/prompt:")
+                print(bodyString)
+            }
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+
+            if httpResponse.statusCode != 200 {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                throw APIError.httpError(httpResponse.statusCode, errorBody)
+            }
+
+            print("✅ System prompt extended for iOS context")
         }
-
-        let iOSPrompt = """
-            You are being accessed through the Goose iOS application from a mobile device.
-
-            Some extensions are builtin, such as Developer and Memory.
-            When asked to code, write files, or run commands, IMMEDIATELY enable the Developer extension using platform__manage_extensions.
-            DO NOT explain what you're going to do first - just enable Developer and start working.
-            """
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-
-        let body: [String: Any] = [
-            "session_id": sessionId,
-            "extension": iOSPrompt,
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        // Debug logging
-        if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8)
-        {
-            print("📤 Sending to /agent/prompt:")
-            print(bodyString)
-        }
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-
-        if httpResponse.statusCode != 200 {
-            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-            throw APIError.httpError(httpResponse.statusCode, errorBody)
-        }
-
-        print("✅ System prompt extended for iOS context")
     }
     
     // MARK: - Config Management
     func readConfigValue(key: String, isSecret: Bool = false) async -> String? {
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/config/read") else {
+        guard let url = URL(string: "\(resolvedURL)/config/read") else {
             print("⚠️ Invalid URL for config read")
             return nil
         }
@@ -387,98 +450,104 @@ class GooseAPIService: ObservableObject {
             }
         } catch {
             print("⚠️ Error reading config '\(key)': \(error)")
+            // Try to refresh and retry
+            if await refreshFromNtfy() {
+                print("✅ Refreshed, retrying config read...")
+                return await readConfigValue(key: key, isSecret: isSecret)
+            }
             return nil
         }
     }
     
     // MARK: - Provider Management
     func updateProvider(sessionId: String, provider: String, model: String?) async throws {
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/agent/update_provider") else {
-            throw APIError.invalidURL
+        return try await performRequest {
+            guard let url = URL(string: "\(self.resolvedURL)/agent/update_provider") else {
+                throw APIError.invalidURL
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
+            
+            var body: [String: Any] = [
+                "session_id": sessionId,
+                "provider": provider
+            ]
+            
+            // Add model if provided
+            if let model = model {
+                body["model"] = model
+            }
+            
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            
+            // Debug logging
+            if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
+                print("📤 Updating provider to \(provider), model: \(model ?? "default")")
+                print(bodyString)
+            }
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            
+            if httpResponse.statusCode != 200 {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                throw APIError.httpError(httpResponse.statusCode, errorBody)
+            }
+            
+            print("✅ Provider updated to \(provider) with model \(model ?? "default")")
         }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-        
-        var body: [String: Any] = [
-            "session_id": sessionId,
-            "provider": provider
-        ]
-        
-        // Add model if provided
-        if let model = model {
-            body["model"] = model
-        }
-        
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        // Debug logging
-        if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
-            print("📤 Updating provider to \(provider), model: \(model ?? "default")")
-            print(bodyString)
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        if httpResponse.statusCode != 200 {
-            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-            throw APIError.httpError(httpResponse.statusCode, errorBody)
-        }
-        
-        print("✅ Provider updated to \(provider) with model \(model ?? "default")")
     }
     
     // MARK: - Extension Management
     func loadEnabledExtensions(sessionId: String) async throws {
-        let baseURL = await getBaseURL()
-        // Get extensions from config, just like desktop does
-        guard let url = URL(string: "\(baseURL)/config/extensions") else {
-            print("⚠️ Invalid URL for getting extensions config")
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            print("⚠️ Invalid response getting extensions config")
-            return
-        }
-        
-        if httpResponse.statusCode != 200 {
-            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-            print("⚠️ Failed to get extensions config: \(errorBody)")
-            return
-        }
-        
-        // Parse the extensions config
-        guard let extensionsConfig = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let extensions = extensionsConfig["extensions"] as? [[String: Any]] else {
-            print("⚠️ Failed to parse extensions config")
-            return
-        }
-        
-        // Load only the enabled extensions
-        for extensionConfig in extensions {
-            if let enabled = extensionConfig["enabled"] as? Bool, enabled {
-                await loadExtension(sessionId: sessionId, extensionConfig: extensionConfig)
+        return try await performRequest {
+            // Get extensions from config, just like desktop does
+            guard let url = URL(string: "\(self.resolvedURL)/config/extensions") else {
+                print("⚠️ Invalid URL for getting extensions config")
+                return
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("⚠️ Invalid response getting extensions config")
+                return
+            }
+            
+            if httpResponse.statusCode != 200 {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                print("⚠️ Failed to get extensions config: \(errorBody)")
+                return
+            }
+            
+            // Parse the extensions config
+            guard let extensionsConfig = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let extensions = extensionsConfig["extensions"] as? [[String: Any]] else {
+                print("⚠️ Failed to parse extensions config")
+                return
+            }
+            
+            // Load only the enabled extensions
+            for extensionConfig in extensions {
+                if let enabled = extensionConfig["enabled"] as? Bool, enabled {
+                    await self.loadExtension(sessionId: sessionId, extensionConfig: extensionConfig)
+                }
             }
         }
     }
     
     private func loadExtension(sessionId: String, extensionConfig: [String: Any]) async {
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/extensions/add") else {
+        guard let url = URL(string: "\(resolvedURL)/extensions/add") else {
             print("⚠️ Invalid URL for extension loading")
             return
         }
@@ -518,8 +587,7 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Sessions Management
     func fetchSessions() async -> [ChatSession] {
-        let baseURL = await getBaseURL()
-        guard let url = URL(string: "\(baseURL)/sessions") else {
+        guard let url = URL(string: "\(resolvedURL)/sessions") else {
             print("🚨 Invalid sessions URL")
             return []
         }
@@ -546,6 +614,11 @@ class GooseAPIService: ObservableObject {
             }
         } catch {
             print("🚨 Error fetching sessions: \(error)")
+            // Try to refresh and retry
+            if await refreshFromNtfy() {
+                print("✅ Refreshed, retrying fetch sessions...")
+                return await fetchSessions()
+            }
             return []
         }
     }
