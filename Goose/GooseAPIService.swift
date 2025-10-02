@@ -165,6 +165,12 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Connection Test
     func testConnection() async -> Bool {
+        // If using ntfy pattern and haven't resolved yet, resolve proactively
+        if isNtfyPattern && cachedResolvedURL == nil {
+            print("📡 Proactively resolving ntfy URL before first connection...")
+            _ = await refreshFromNtfy()
+        }
+        
         let fullURL = "\(resolvedURL)/status"
         print("🔍 Testing connection to: '\(fullURL)'")
         print("   Base URL: '\(baseURL)'")
