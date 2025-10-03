@@ -7,33 +7,9 @@ class GooseAPIService: ObservableObject {
     @Published var isConnected = false
     @Published var connectionError: String?
     
-    // The configured URL (unchanging) - either direct URL or ntfy pattern
+    // The configured URL
     private var baseURL: String {
         UserDefaults.standard.string(forKey: "goose_base_url") ?? "http://127.0.0.1:62996"
-    }
-    
-    // Is the configured URL an ntfy pattern?
-    private var isNtfyPattern: Bool {
-        baseURL.contains("ntfy.sh")
-    }
-    
-    // The resolved URL - cached and refreshable for ntfy patterns
-    private var cachedResolvedURL: String?
-    
-    private var resolvedURL: String {
-        // If we have a cached resolved URL, use it
-        if let cached = cachedResolvedURL {
-            return cached
-        }
-        
-        // For non-ntfy URLs, resolved == base (and cache it)
-        if !isNtfyPattern {
-            cachedResolvedURL = baseURL
-        }
-        
-        // For ntfy patterns, return base URL as initial value
-        // (will be resolved on first failure and then cached)
-        return baseURL
     }
     
     private var secretKey: String {
@@ -41,24 +17,6 @@ class GooseAPIService: ObservableObject {
     }
 
     private init() {}
-    
-    // MARK: - Request Helper with Auto-Refresh
-    
-    /// Executes a request, and if it fails, refreshes from ntfy and retries once
-    private func performRequest<T>(_ operation: () async throws -> T) async throws -> T {
-        do {
-            return try await operation()
-        } catch {
-            // Try to refresh and retry
-            print("🔄 Request failed, attempting to refresh from ntfy.sh...")
-            if await refreshFromNtfy() {
-                print("✅ Refreshed, retrying request...")
-                return try await operation()
-            }
-            // If refresh failed or not ntfy pattern, throw original error
-            throw error
-        }
-    }
     
     // MARK: - Proper SSE Streaming Implementation
     func startChatStreamWithSSE(
@@ -71,7 +29,7 @@ class GooseAPIService: ObservableObject {
         isRetry: Bool = false
     ) async -> URLSessionDataTask? {
 
-        guard let url = URL(string: "\(resolvedURL)/reply") else {
+        guard let url = URL(string: "\(baseURL)/reply") else {
             onError(APIError.invalidURL)
             return nil
         }
@@ -117,34 +75,8 @@ class GooseAPIService: ObservableObject {
             return nil
         }
 
-        // Create a retry handler that refreshes from ntfy and retries
-        let retryHandler: (Error) -> Void = { [weak self] error in
-            guard let self = self, !isRetry else {
-                // Already retried once, don't retry again
-                onError(error)
-                return
-            }
-            
-            // If this is a potential connection error and we're using ntfy, try to refresh
-            Task {
-                print("🔄 SSE request failed, attempting to refresh from ntfy.sh...")
-                if await self.refreshFromNtfy() {
-                    print("✅ Refreshed, retrying SSE stream...")
-                    _ = await self.startChatStreamWithSSE(
-                        messages: messages,
-                        sessionId: sessionId,
-                        workingDirectory: workingDirectory,
-                        onEvent: onEvent,
-                        onComplete: onComplete,
-                        onError: onError,
-                        isRetry: true  // Mark as retry to prevent infinite loops
-                    )
-                } else {
-                    // Refresh failed, pass error back to caller
-                    onError(error)
-                }
-            }
-        }
+        // Simple error handler
+        let retryHandler: (Error) -> Void = onError
 
         // Create a custom URLSessionDataDelegate to handle streaming
         let delegate = SSEDelegate(
@@ -165,16 +97,9 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Connection Test
     func testConnection() async -> Bool {
-        // If using ntfy pattern and haven't resolved yet, resolve proactively
-        if isNtfyPattern && cachedResolvedURL == nil {
-            print("📡 Proactively resolving ntfy URL before first connection...")
-            _ = await refreshFromNtfy()
-        }
-        
-        let fullURL = "\(resolvedURL)/status"
+        let fullURL = "\(baseURL)/status"
         print("🔍 Testing connection to: '\(fullURL)'")
         print("   Base URL: '\(baseURL)'")
-        print("   Resolved URL: '\(resolvedURL)'")
         print("   Secret key length: \(secretKey.count)")
         
         guard let url = URL(string: fullURL) else {
@@ -216,14 +141,6 @@ class GooseAPIService: ObservableObject {
                 return false
             }
         } catch {
-            // Connection failed - try to refresh from ntfy.sh if available
-            print("🔄 Connection failed, attempting to refresh from ntfy.sh...")
-            let refreshed = await refreshFromNtfy()
-            if refreshed {
-                // Retry connection after refresh
-                return await testConnection()
-            }
-            
             await MainActor.run {
                 self.isConnected = false
                 self.connectionError = error.localizedDescription
@@ -232,85 +149,10 @@ class GooseAPIService: ObservableObject {
         }
     }
     
-    // MARK: - ntfy.sh URL Refresh
-    /// Refresh the resolved URL from ntfy.sh pattern when connection fails
-    private func refreshFromNtfy() async -> Bool {
-        // Only refresh if baseURL is an ntfy pattern
-        guard isNtfyPattern else {
-            print("ℹ️ Base URL is not an ntfy pattern, cannot refresh")
-            return false
-        }
-        
-        print("📡 Refreshing tunnel URL from ntfy.sh pattern: \(baseURL)")
-        
-        do {
-            let tunnelURL = try await fetchTunnelURLFromNtfy(ntfyURL: baseURL)
-            let newResolvedURL = tunnelURL.replacingOccurrences(of: ":443", with: "")
-            
-            print("✅ Refreshed resolved URL: \(newResolvedURL)")
-            
-            // Update the cached resolved URL
-            cachedResolvedURL = newResolvedURL
-            
-            return true
-        } catch {
-            print("❌ Failed to refresh from ntfy.sh: \(error)")
-            return false
-        }
-    }
-    
-    /// Fetch the tunnel URL from ntfy.sh
-    private func fetchTunnelURLFromNtfy(ntfyURL: String) async throws -> String {
-        // Convert ntfy.sh URL to raw polling URL
-        // Example: https://ntfy.sh/mytopic -> https://ntfy.sh/mytopic/raw?poll=1
-        let rawURL = ntfyURL.appending("/raw?poll=1")
-        
-        guard let url = URL(string: rawURL) else {
-            throw APIError.invalidURL
-        }
-        
-        print("🔍 Fetching tunnel URL from: \(rawURL)")
-        
-        let (data, response) = try await URLSession.shared.data(from: url)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        print("📡 ntfy.sh response status: \(httpResponse.statusCode)")
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-            print("❌ ntfy.sh returned \(httpResponse.statusCode): \(errorBody)")
-            throw APIError.httpError(httpResponse.statusCode, errorBody)
-        }
-        
-        // Parse the raw response and get the last line (latest tunnel URL)
-        guard let responseText = String(data: data, encoding: .utf8) else {
-            throw APIError.noData
-        }
-        
-        print("📦 ntfy.sh raw response: '\(responseText)'")
-        
-        let lines = responseText.components(separatedBy: .newlines).filter { !$0.isEmpty }
-        print("📋 Found \(lines.count) lines in response")
-        
-        guard let lastLine = lines.last else {
-            throw APIError.noData
-        }
-        
-        // Trim any whitespace/newlines
-        let cleanedURL = lastLine.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        print("📬 Received tunnel URL from ntfy.sh: \(cleanedURL)")
-        
-        return cleanedURL
-    }
-
     // MARK: - Session Creation
     func startAgent(workingDir: String = "/tmp") async throws -> (sessionId: String, messages: [Message]) {
-        return try await performRequest {
-            guard let url = URL(string: "\(self.resolvedURL)/agent/start") else {
+        do {
+            guard let url = URL(string: "\(self.baseURL)/agent/start") else {
                 throw APIError.invalidURL
             }
 
@@ -340,8 +182,8 @@ class GooseAPIService: ObservableObject {
     
     // MARK: - Session Resume
     func resumeAgent(sessionId: String) async throws -> (sessionId: String, messages: [Message]) {
-        return try await performRequest {
-            guard let url = URL(string: "\(self.resolvedURL)/agent/resume") else {
+        do {
+            guard let url = URL(string: "\(self.baseURL)/agent/resume") else {
                 throw APIError.invalidURL
             }
 
@@ -371,8 +213,8 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - System Prompt Extension
     func extendSystemPrompt(sessionId: String) async throws {
-        return try await performRequest {
-            guard let url = URL(string: "\(self.resolvedURL)/agent/prompt") else {
+        do {
+            guard let url = URL(string: "\(self.baseURL)/agent/prompt") else {
                 throw APIError.invalidURL
             }
 
@@ -419,7 +261,7 @@ class GooseAPIService: ObservableObject {
     
     // MARK: - Config Management
     func readConfigValue(key: String, isSecret: Bool = false) async -> String? {
-        guard let url = URL(string: "\(resolvedURL)/config/read") else {
+        guard let url = URL(string: "\(baseURL)/config/read") else {
             print("⚠️ Invalid URL for config read")
             return nil
         }
@@ -456,19 +298,15 @@ class GooseAPIService: ObservableObject {
             }
         } catch {
             print("⚠️ Error reading config '\(key)': \(error)")
-            // Try to refresh and retry
-            if await refreshFromNtfy() {
-                print("✅ Refreshed, retrying config read...")
-                return await readConfigValue(key: key, isSecret: isSecret)
-            }
+            
             return nil
         }
     }
     
     // MARK: - Provider Management
     func updateProvider(sessionId: String, provider: String, model: String?) async throws {
-        return try await performRequest {
-            guard let url = URL(string: "\(self.resolvedURL)/agent/update_provider") else {
+        do {
+            guard let url = URL(string: "\(self.baseURL)/agent/update_provider") else {
                 throw APIError.invalidURL
             }
             
@@ -512,9 +350,9 @@ class GooseAPIService: ObservableObject {
     
     // MARK: - Extension Management
     func loadEnabledExtensions(sessionId: String) async throws {
-        return try await performRequest {
+        do {
             // Get extensions from config, just like desktop does
-            guard let url = URL(string: "\(self.resolvedURL)/config/extensions") else {
+            guard let url = URL(string: "\(self.baseURL)/config/extensions") else {
                 print("⚠️ Invalid URL for getting extensions config")
                 return
             }
@@ -553,7 +391,7 @@ class GooseAPIService: ObservableObject {
     }
     
     private func loadExtension(sessionId: String, extensionConfig: [String: Any]) async {
-        guard let url = URL(string: "\(resolvedURL)/extensions/add") else {
+        guard let url = URL(string: "\(baseURL)/extensions/add") else {
             print("⚠️ Invalid URL for extension loading")
             return
         }
@@ -593,7 +431,7 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Sessions Management
     func fetchSessions() async -> [ChatSession] {
-        guard let url = URL(string: "\(resolvedURL)/sessions") else {
+        guard let url = URL(string: "\(baseURL)/sessions") else {
             print("🚨 Invalid sessions URL")
             return []
         }
@@ -620,11 +458,7 @@ class GooseAPIService: ObservableObject {
             }
         } catch {
             print("🚨 Error fetching sessions: \(error)")
-            // Try to refresh and retry
-            if await refreshFromNtfy() {
-                print("✅ Refreshed, retrying fetch sessions...")
-                return await fetchSessions()
-            }
+            
             return []
         }
     }

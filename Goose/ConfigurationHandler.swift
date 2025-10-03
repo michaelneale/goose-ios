@@ -73,10 +73,6 @@ class ConfigurationHandler: ObservableObject {
         
         print("📋 Applying configuration:")
         print("   URL: '\(config.url)'")
-        print("   Is ntfy pattern: \(config.url.contains("ntfy.sh"))")
-        
-        // Store URL as-is (ntfy pattern or direct)
-        // GooseAPIService will handle resolution automatically
         let baseURL: String
         if config.url.hasPrefix("http://") || config.url.hasPrefix("https://") {
             // Already has protocol, use as-is but remove :443 if present
@@ -94,7 +90,7 @@ class ConfigurationHandler: ObservableObject {
         UserDefaults.standard.set(config.secret, forKey: "goose_secret_key")
         UserDefaults.standard.synchronize()
         
-        // Test the connection (will auto-resolve ntfy if needed)
+        // Test the connection
         Task {
             let success = await GooseAPIService.shared.testConnection()
             
