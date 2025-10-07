@@ -1,52 +1,72 @@
 #!/bin/bash
+set -e
 
-# Kill any existing goosed processes
-killall goosed 2>/dev/null
+# Configuration
+PORT=62996
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Wait a moment for processes to terminate
-sleep 1
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Launch goosed with required environment variables
-export GOOSE_SERVER__SECRET_KEY="test"
-export GOOSE_PORT=62996
-export GOOSE_PROVIDER="databricks"
-export GOOSE_MODEL="goose-claude-4-sonnet"
-export GOOSE_STANDALONE_MODE="true"
+# Generate a random secret (32 character alphanumeric)
+SECRET=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-32)
 
-# Set databricks credentials from config if available
-if [ -f "$HOME/.config/goose/config.yaml" ]; then
-    export DATABRICKS_HOST=$(grep "DATABRICKS_HOST:" "$HOME/.config/goose/config.yaml" | cut -d' ' -f2)
-fi
-
-echo "Starting goosed with the following configuration:"
-echo "  Secret Key: $GOOSE_SERVER__SECRET_KEY"
-echo "  Port: $GOOSE_PORT"
-echo "  Provider: $GOOSE_PROVIDER"
-echo "  Model: $GOOSE_MODEL"
-echo "  Databricks Host: $DATABRICKS_HOST"
-echo ""
-
-# Start goosed in the background
-/Users/dhanji/src/goose/target/release/goosed agent &
-
-# Get the process ID
-GOOSED_PID=$!
-
-echo "goosed started with PID: $GOOSED_PID"
-echo "Server should be available at: http://127.0.0.1:$GOOSE_PORT"
-echo ""
-echo "To stop the server, run: kill $GOOSED_PID"
-echo "Or use: killall goosed"
-
-# Wait a moment and check if the process is still running
-sleep 2
-if kill -0 $GOOSED_PID 2>/dev/null; then
-    echo "✅ goosed is running successfully"
-else
-    echo "❌ goosed failed to start"
+# Check if goosed is available in PATH
+if ! command -v goosed &> /dev/null; then
+    echo -e "${RED}Error: goosed not found in PATH${NC}"
+    echo -e "${YELLOW}Please add goose/target/release to your PATH${NC}"
+    echo -e "${YELLOW}Example: export PATH=\$PATH:${SCRIPT_DIR}/../goose/target/release${NC}"
     exit 1
 fi
 
-# Enable built-in extensions
+# Cleanup function
+cleanup() {
+    echo -e "\n${YELLOW}Shutting down...${NC}"
+    if [ ! -z "$GOOSED_PID" ]; then
+        echo "Stopping goosed (PID: $GOOSED_PID)"
+        kill $GOOSED_PID 2>/dev/null || true
+    fi
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM EXIT
+
+# Start goosed in the background
+echo -e "${GREEN}Starting goosed on port ${PORT}...${NC}"
+export GOOSE_PORT=$PORT
+export GOOSE_SERVER__SECRET_KEY="$SECRET"
+goosed agent > /dev/null 2>&1 &
+GOOSED_PID=$!
+
+# Wait for goosed to be ready
+echo "Waiting for goosed to start..."
+for i in {1..30}; do
+    if curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ Goosed is running (PID: $GOOSED_PID)${NC}"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo -e "${RED}Error: goosed failed to start${NC}"
+        exit 1
+    fi
+    sleep 0.5
+done
+
 echo ""
-./enable_extensions.sh
+echo -e "${BLUE}╔════════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║                     Connection Information                         ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "${GREEN}URL:${NC}        http://localhost:${PORT}"
+echo -e "${GREEN}Secret Key:${NC} $SECRET"
+echo ""
+echo -e "${GREEN}✓ Goosed is running!${NC}"
+echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
+echo ""
+
+# Keep the script running
+wait
