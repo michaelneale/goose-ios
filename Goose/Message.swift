@@ -106,6 +106,7 @@ enum MessageContent: Codable {
     case toolRequest(ToolRequestContent)
     case toolResponse(ToolResponseContent)
     case toolConfirmationRequest(ToolConfirmationRequestContent)
+    case summarizationRequested(SummarizationRequestedContent)
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -124,6 +125,8 @@ enum MessageContent: Codable {
             self = .toolResponse(try ToolResponseContent(from: decoder))
         case "toolConfirmationRequest":
             self = .toolConfirmationRequest(try ToolConfirmationRequestContent(from: decoder))
+        case "summarizationRequested":
+            self = .summarizationRequested(try SummarizationRequestedContent(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message content type: \(type)")
         }
@@ -138,6 +141,8 @@ enum MessageContent: Codable {
         case .toolResponse(let content):
             try content.encode(to: encoder)
         case .toolConfirmationRequest(let content):
+            try content.encode(to: encoder)
+        case .summarizationRequested(let content):
             try content.encode(to: encoder)
         }
     }
@@ -177,6 +182,12 @@ struct ToolConfirmationRequestContent: Codable {
     let id: String
     let toolName: String
     let arguments: [String: AnyCodable]
+}
+
+struct SummarizationRequestedContent: Codable {
+    let type = "summarizationRequested"
+    // Add any fields that might be in the summarization request
+    // For now, keeping it minimal since we don't know the exact structure
 }
 
 struct ToolCall: Codable {

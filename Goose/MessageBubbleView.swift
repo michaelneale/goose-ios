@@ -85,31 +85,59 @@ struct MessageContentView: View {
         case .toolRequest(let toolContent):
             ToolRequestView(toolContent: toolContent)
             
-        case .toolResponse(let toolContent):
+        case .toolResponse(_):
             // Hide tool responses - user doesn't want to see them
             EmptyView()
             
         case .toolConfirmationRequest(let toolContent):
             ToolConfirmationView(toolContent: toolContent)
+            
+        case .summarizationRequested(_):
+            // Hide summarization requests for now
+            EmptyView()
         }
     }
 }
 
-// MARK: - Markdown Text View
+// MARK: - Cached Markdown Text View
 struct MarkdownText: View {
     let text: String
+    @State private var cachedAttributedText: AttributedString?
+    
+    // Memory management - limit cache size
+    private static var maxCacheSize = 1000 // characters
+    private static var cacheCleanupThreshold = 2000 // characters
     
     var body: some View {
-        Text(parseMarkdown(text))
+        Text(cachedAttributedText ?? AttributedString(text))
             .textSelection(.enabled)
+            .onAppear {
+                if cachedAttributedText == nil {
+                    cachedAttributedText = parseMarkdown(text)
+                }
+            }
+            .onChange(of: text) {
+                // Only reparse if text changed significantly (not just appended)
+                let newText = text
+                if !newText.hasPrefix(text) || newText.count - text.count > 50 {
+                    cachedAttributedText = parseMarkdown(newText)
+                } else if let cached = cachedAttributedText {
+                    // For streaming text, just append the new part
+                    let newPart = String(newText.dropFirst(text.count))
+                    cachedAttributedText = cached + AttributedString(newPart)
+                }
+            }
     }
     
     private func parseMarkdown(_ text: String) -> AttributedString {
         // Trim whitespace from the input text
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         
+        // For large texts, only parse the last portion to avoid blocking
+        let textToParse = trimmedText.count > 1000 ? String(trimmedText.suffix(1000)) : trimmedText
+        
         // Parse the markdown using swift-markdown
-        let document = Document(parsing: trimmedText)
+        let document = Document(parsing: textToParse)
         
         // Convert to AttributedString with proper formatting
         var attributedString = AttributedString()
@@ -570,12 +598,16 @@ struct TruncatableMessageContentView: View {
         case .toolRequest(let toolContent):
             ToolRequestView(toolContent: toolContent)
             
-        case .toolResponse(let toolContent):
+        case .toolResponse(_):
             // Hide tool responses - user doesn't want to see them
             EmptyView()
             
         case .toolConfirmationRequest(let toolContent):
             ToolConfirmationView(toolContent: toolContent)
+            
+        case .summarizationRequested(_):
+            // Hide summarization requests for now
+            EmptyView()
         }
     }
 }
@@ -597,8 +629,8 @@ struct TruncatableMarkdownText: View {
                             fullHeight = geometry.size.height
                             isTruncated = fullHeight > maxHeight
                         }
-                        .onChange(of: geometry.size.height) { newHeight in
-                            fullHeight = newHeight
+                        .onChange(of: geometry.size.height) {
+                            fullHeight = geometry.size.height
                             isTruncated = fullHeight > maxHeight
                         }
                 }

@@ -480,6 +480,7 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
     private let onComplete: () -> Void
     private let onError: (Error) -> Void
     private var buffer = ""
+    private let maxBufferSize = 10000 // Prevent buffer overflow
 
     init(
         onEvent: @escaping (SSEEvent) -> Void, onComplete: @escaping () -> Void,
@@ -523,11 +524,6 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
             return
         }
 
-        // Only log if not a notification (to reduce spam)
-        if !string.contains("\"type\":\"Notification\"") {
-            print("🚀 SSE Received chunk: \(string)")
-        }
-
         // Add to buffer
         buffer += string
 
@@ -546,7 +542,7 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
     }
 
     func urlSession(
-        _ session: URLSession, dataTask: URLSessionDataTask, didCompleteWithError error: Error?
+        _ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?
     ) {
         if let error = error {
             DispatchQueue.main.async {
@@ -568,11 +564,11 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
                         let jsonData = eventData.data(using: .utf8)!
                         let event = try JSONDecoder().decode(SSEEvent.self, from: jsonData)
 
-                        // Only log non-notification events for cleaner output
-                        if case .notification = event {
-                            // Skip verbose logging for notifications
-                        } else {
-                            print("🚀 SSE Event: \(eventData)")
+                        // Minimal logging - only log important events
+                        if case .finish = event {
+                            print("✅ SSE Stream completed")
+                        } else if case .error = event {
+                            print("🚨 SSE Error event received")
                         }
 
                         DispatchQueue.main.async {
@@ -588,7 +584,6 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
                         }
                     } catch {
                         print("🚨 Failed to decode SSE event: \(error)")
-                        print("🚨 Raw event data: \(eventData)")
                         DispatchQueue.main.async {
                             self.onError(error)
                         }

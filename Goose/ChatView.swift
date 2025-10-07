@@ -12,7 +12,15 @@ struct ChatView: View {
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
     @State private var currentSessionId: String?
-    @State private var scrollTrigger = UUID() // Used to trigger scroll on message updates
+    
+    // Memory management
+    private let maxMessages = 50 // Limit messages to prevent memory issues
+    private let maxToolCalls = 20 // Limit tool calls to prevent memory issues
+    
+    // Efficient scroll management
+    @State private var scrollTimer: Timer?
+    @State private var shouldAutoScroll = true
+    @State private var scrollRefreshTrigger = UUID() // Force scroll refresh
 
     var body: some View {
         ZStack {
@@ -61,10 +69,18 @@ struct ChatView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                     }
-                    .onChange(of: messages.count) { _ in scrollToBottom(proxy) }
-                    .onChange(of: activeToolCalls.count) { _ in scrollToBottom(proxy) }
-                    .onChange(of: completedToolCalls.count) { _ in scrollToBottom(proxy) }
-                    .onChange(of: scrollTrigger) { _ in scrollToBottom(proxy) }
+                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                        // Only scroll when app comes to foreground, not on every update
+                        if shouldAutoScroll {
+                            scrollToBottom(proxy)
+                        }
+                    }
+                    .onChange(of: scrollRefreshTrigger) { _ in
+                        // Force scroll when session is loaded
+                        if shouldAutoScroll && !messages.isEmpty {
+                            scrollToBottom(proxy)
+                        }
+                    }
                 }
             }
             
@@ -243,6 +259,13 @@ struct ChatView: View {
     }
 
     private func handleSSEEvent(_ event: SSEEvent) {
+        // Only block events if we're explicitly switching sessions
+        // Don't block normal streaming operation
+        if currentStreamTask == nil {
+            print("⚠️ Ignoring SSE event - stream was cancelled")
+            return
+        }
+        
         switch event {
         case .message(let messageEvent):
             let incomingMessage = messageEvent.message
@@ -266,37 +289,50 @@ struct ChatView: View {
                             completedAt: Date()
                         )
                     }
+                case .summarizationRequested(_):
+                    // Handle summarization requests - just log for now
+                    print("📝 Summarization requested for message: \(incomingMessage.id)")
                 default:
                     break
                 }
             }
 
-            if let existingIndex = messages.firstIndex(where: { $0.id == incomingMessage.id }) {
-                var updatedMessage = messages[existingIndex]
-
-                if let existingTextContent = updatedMessage.content.first(where: {
-                    if case .text = $0 { return true } else { return false }
-                }),
-                    let incomingTextContent = incomingMessage.content.first(where: {
-                        if case .text = $0 { return true } else { return false }
-                    })
-                {
-                    if case .text(let existingText) = existingTextContent,
-                        case .text(let incomingText) = incomingTextContent
-                    {
-                        let combinedText = existingText.text + incomingText.text
-                        updatedMessage = Message(
-                            id: incomingMessage.id, role: incomingMessage.role,
-                            content: [MessageContent.text(TextContent(text: combinedText))],
-                            created: incomingMessage.created, metadata: incomingMessage.metadata)
-                    }
+            // Batch UI updates to reduce frequency
+            DispatchQueue.main.async {
+                // Double-check we still have an active session before updating UI
+                guard self.currentSessionId != nil else {
+                    print("⚠️ Ignoring UI update - session was cleared")
+                    return
                 }
+                
+                if let existingIndex = self.messages.firstIndex(where: { $0.id == incomingMessage.id }) {
+                    var updatedMessage = self.messages[existingIndex]
 
-                messages[existingIndex] = updatedMessage
-                // Trigger scroll on message update (not just count change)
-                scrollTrigger = UUID()
-            } else {
-                messages.append(incomingMessage)
+                    if let existingTextContent = updatedMessage.content.first(where: {
+                        if case .text = $0 { return true } else { return false }
+                    }),
+                        let incomingTextContent = incomingMessage.content.first(where: {
+                            if case .text = $0 { return true } else { return false }
+                        })
+                    {
+                        if case .text(let existingText) = existingTextContent,
+                            case .text(let incomingText) = incomingTextContent
+                        {
+                            let combinedText = existingText.text + incomingText.text
+                            updatedMessage = Message(
+                                id: incomingMessage.id, role: incomingMessage.role,
+                                content: [MessageContent.text(TextContent(text: combinedText))],
+                                created: incomingMessage.created, metadata: incomingMessage.metadata)
+                        }
+                    }
+
+                    self.messages[existingIndex] = updatedMessage
+                } else {
+                    self.messages.append(incomingMessage)
+                    // Manage memory by limiting messages and tool calls
+                    self.limitMessages()
+                    self.limitToolCalls()
+                }
             }
 
         case .error(let errorEvent):
@@ -343,7 +379,48 @@ struct ChatView: View {
         }.sorted()
     }
     
+    private func limitMessages() {
+        guard messages.count > maxMessages else { return }
+        
+        // Keep only the most recent messages, but always keep the first message (usually system prompt)
+        let messagesToRemove = messages.count - maxMessages
+        let startIndex = messages.count > 1 ? 1 : 0 // Keep first message if exists
+        
+        let removedMessages = Array(messages[startIndex..<startIndex + messagesToRemove])
+        messages.removeSubrange(startIndex..<startIndex + messagesToRemove)
+        
+        // Clean up tool call mappings for removed messages
+        for removedMessage in removedMessages {
+            toolCallMessageMap = toolCallMessageMap.filter { $0.value != removedMessage.id }
+        }
+        
+        print("🧹 Memory cleanup: removed \(messagesToRemove) old messages")
+    }
+    
+    private func limitToolCalls() {
+        // Limit completed tool calls to prevent memory accumulation
+        guard completedToolCalls.count > maxToolCalls else { return }
+        
+        let toolCallsToRemove = completedToolCalls.count - maxToolCalls
+        let sortedCalls = completedToolCalls.sorted { $0.value.completedAt < $1.value.completedAt }
+        
+        for i in 0..<toolCallsToRemove {
+            let toolCallId = sortedCalls[i].key
+            completedToolCalls.removeValue(forKey: toolCallId)
+            toolCallMessageMap.removeValue(forKey: toolCallId)
+        }
+        
+        print("🧹 Tool call cleanup: removed \(toolCallsToRemove) old tool calls")
+    }
+    
     func loadSession(_ sessionId: String) {
+        // CRITICAL: Cancel any existing stream before switching sessions
+        if let currentTask = currentStreamTask {
+            print("🛑 Cancelling existing stream before session switch")
+            currentTask.cancel()
+            currentStreamTask = nil
+        }
+        
         Task {
             do {
                 // Resume the session
@@ -373,15 +450,28 @@ struct ChatView: View {
                 
                 // Update all state on main thread at once
                 await MainActor.run {
-                    // Clear old state
+                    // CRITICAL: Clear ALL old state first to prevent event contamination
+                    self.stopStreaming() // This clears currentStreamTask and isLoading
                     activeToolCalls.removeAll()
                     completedToolCalls.removeAll()
                     toolCallMessageMap.removeAll()
                     
-                    // Set new state
+                    // Set new state with forced UI refresh
                     currentSessionId = resumedSessionId
+                    
+                    // Force UI refresh by clearing and setting messages
+                    messages.removeAll()
                     messages = sessionMessages
+                    
                     print("📊 Messages array now has \(messages.count) messages")
+                    print("📊 First message ID: \(messages.first?.id ?? "none")")
+                    print("📊 Last message ID: \(messages.last?.id ?? "none")")
+                    
+                    // Force scroll to bottom after loading
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        shouldAutoScroll = true
+                        scrollRefreshTrigger = UUID() // Force UI refresh and scroll
+                    }
                 }
             } catch {
                 print("🚨 Failed to load session: \(error)")
@@ -397,6 +487,13 @@ struct ChatView: View {
     }
     
     func createNewSession() {
+        // CRITICAL: Cancel any existing stream before creating new session
+        if let currentTask = currentStreamTask {
+            print("🛑 Cancelling existing stream before creating new session")
+            currentTask.cancel()
+            currentStreamTask = nil
+        }
+        
         // Clear all state for a fresh session
         messages.removeAll()
         activeToolCalls.removeAll()
@@ -404,7 +501,6 @@ struct ChatView: View {
         toolCallMessageMap.removeAll()
         currentSessionId = nil
         isLoading = false
-        currentStreamTask = nil
         
         print("🆕 Created new session - cleared all state")
     }
