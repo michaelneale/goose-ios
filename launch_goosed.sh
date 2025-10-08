@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Generate a random secret (32 character alphanumeric)
-SECRET="temp_cIo0W4vH0EdxMkOC3gD0M1O0vEwcXo"
+SECRET="temp"
 
 # Check if goosed is available in PATH
 if ! command -v goosed &> /dev/null; then

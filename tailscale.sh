@@ -14,53 +14,49 @@ LOG_FILE="/tmp/tailscaled.log"
 
 mkdir -p "$TS_STATE" "$(dirname "$TS_SOCK")"
 
-start_tailscaled() {
-  if pgrep -f "tailscaled --tun=userspace-networking" >/dev/null; then
-    echo "✅ tailscaled already running."
-    return
-  fi
-  echo "▶️ Starting tailscaled in userspace..."
+echo "▶️ Checking userspace tailscaled..."
+if ! pgrep -f "tailscaled --tun=userspace-networking" >/dev/null; then
+  echo "▶️ Starting userspace tailscaled..."
   nohup tailscaled \
     --tun=userspace-networking \
     --statedir "$TS_STATE" \
     --socket "$TS_SOCK" \
     >"$LOG_FILE" 2>&1 &
-  for i in {1..25}; do
-    [ -S "$TS_SOCK" ] && break
-    sleep 0.2
-  done
-}
+else
+  echo "✅ tailscaled already running."
+fi
 
-stop_tailscaled() {
-  echo "🛑 Stopping tailscaled..."
-  pkill -f 'tailscaled --tun=userspace-networking' || true
-}
+# Wait for LocalAPI
+for i in {1..50}; do
+  if curl -sf --unix-socket "$TS_SOCK" \
+      http://local-tailscaled.sock/localapi/v0/status >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.2
+done
 
-serve_local() {
-  echo "🌐 Serving localhost:$PORT over tailnet (HTTP)..."
-  tailscale --socket "$TS_SOCK" serve --http=80 127.0.0.1:$PORT
-}
+echo "🔐 Bringing up Tailscale..."
+tailscale --socket "$TS_SOCK" up >/dev/null || true
 
-show_info() {
-  echo ""
-  echo "🔍 Connection info:"
-  HOST=$(tailscale --socket "$TS_SOCK" status --json 2>/dev/null | jq -r '.Self.HostName // empty')
-  IPV4=$(tailscale --socket "$TS_SOCK" ip -4 2>/dev/null | head -n1)
-  IPV6=$(tailscale --socket "$TS_SOCK" ip -6 2>/dev/null | head -n1)
-  echo "  MagicDNS:   http://$HOST.ts.net/"
-  echo "  IPv4:       http://$IPV4/"
-  echo "  IPv6:       http://[$IPV6]/"
-  echo ""
-}
+echo "🌐 Ensuring Serve mapping on port 80 → localhost:$PORT ..."
+tailscale --socket "$TS_SOCK" serve reset >/dev/null 2>&1 || true
+tailscale --socket "$TS_SOCK" serve --http=80 127.0.0.1:$PORT >/dev/null
 
-trap stop_tailscaled EXIT
+HOST=$(tailscale --socket "$TS_SOCK" status --json 2>/dev/null \
+        | sed -n 's/.*"HostName":"\([^"]*\)".*/\1/p' | head -n1)
+V4=$(tailscale --socket "$TS_SOCK" ip -4 2>/dev/null | head -n1)
+V6=$(tailscale --socket "$TS_SOCK" ip -6 2>/dev/null | head -n1)
 
-start_tailscaled
-tailscale --socket "$TS_SOCK" up >/dev/null
-show_info
-serve_local
+echo ""
+echo "🔎 Connection info:"
+echo "  MagicDNS : http://$HOST.ts.net/"
+[[ -n "$V4" ]] && echo "  IPv4     : http://$V4/"
+[[ -n "$V6" ]] && echo "  IPv6     : http://[$V6]/"
+echo ""
+tailscale --socket "$TS_SOCK" serve status || true
+echo ""
+echo "Press Ctrl+C to exit."
 
+trap 'echo -e "\n🛑 Stopping Serve (daemon left running)"; tailscale --socket "$TS_SOCK" serve reset >/dev/null 2>&1 || true; exit 0' INT
 
-echo "Press Ctrl+C to stop."
-# Keep process alive so Serve remains active
-tail -f /dev/null
+while sleep 3600; do :; done
