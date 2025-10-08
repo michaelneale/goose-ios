@@ -40,7 +40,7 @@ tailscale --socket "$TS_SOCK" up >/dev/null || true
 
 echo "🌐 Ensuring Serve mapping on port 80 → localhost:$PORT ..."
 tailscale --socket "$TS_SOCK" serve reset >/dev/null 2>&1 || true
-tailscale --socket "$TS_SOCK" serve --http=80 127.0.0.1:$PORT >/dev/null
+tailscale --socket "$TS_SOCK" serve --tcp=80 127.0.0.1:$PORT >/dev/null
 
 HOST=$(tailscale --socket "$TS_SOCK" status --json 2>/dev/null \
         | sed -n 's/.*"HostName":"\([^"]*\)".*/\1/p' | head -n1)
