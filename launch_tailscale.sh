@@ -12,8 +12,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Generate a random secret (32 character alphanumeric)
-SECRET=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-32)
+SECRET="temp_cIo0W4vH0EdxMkOC3gD0M1O0vEwcXo"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║                   Goose Tailscale Remote Access                    ║${NC}"

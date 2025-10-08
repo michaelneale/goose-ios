@@ -20,5 +20,9 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Goose needs access to speech recognition to convert your voice to text for chat messages.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Goose needs access to the microphone to enable voice input for chat messages.</string>
 </dict>
 </plist>

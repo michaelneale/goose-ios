@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		5FB46C8A5B96A5D68C7CA66F /* VoiceInputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */; };
-		C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */; };
 		83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */; };
 		A1234567890ABCDEF001 /* GooseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF000 /* GooseApp.swift */; };
 		A1234567890ABCDEF003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF002 /* ContentView.swift */; };
@@ -23,8 +21,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputManager.swift; sourceTree = "<group>"; };
-		A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOutputManager.swift; sourceTree = "<group>"; };
 		83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationHandler.swift; sourceTree = "<group>"; };
 		83ACD8A92E827DB500379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		83ACD8AC2E827FAE00379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -77,8 +73,6 @@
 				A1234567890ABCDEF000 /* GooseApp.swift */,
 				A1234567890ABCDEF002 /* ContentView.swift */,
 				A1234567890ABCDEF009 /* ChatView.swift */,
-				0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */,
-				A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */,
 				A1234567890ABCDEF015 /* MessageBubbleView.swift */,
 				A1234567890ABCDEF017 /* SettingsView.swift */,
 				A1234567890ABCDEF011 /* Message.swift */,
@@ -175,8 +169,6 @@
 			files = (
 				A1234567890ABCDEF003 /* ContentView.swift in Sources */,
 				A1234567890ABCDEF010 /* ChatView.swift in Sources */,
-				5FB46C8A5B96A5D68C7CA66F /* VoiceInputManager.swift in Sources */,
-				C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */,
 				A1234567890ABCDEF012 /* Message.swift in Sources */,
 				83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */,
 				A1234567890ABCDEF014 /* GooseAPIService.swift in Sources */,
