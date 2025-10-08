@@ -36,7 +36,19 @@ for i in {1..50}; do
 done
 
 echo "🔐 Bringing up Tailscale..."
-tailscale --socket "$TS_SOCK" up >/dev/null || true
+# Monitor tailscale output in real-time and open auth URL if needed
+tailscale --socket "$TS_SOCK" up 2>&1 | {
+  AUTH_OPENED=false
+  while read line; do
+    echo "$line"
+    if [[ "$AUTH_OPENED" == false ]] && echo "$line" | grep -q "https://login.tailscale.com/"; then
+      URL=$(echo "$line" | grep -o "https://login.tailscale.com/[^\s]*")
+      echo "🌐 Opening authentication URL in browser..."
+      open "$URL"
+      AUTH_OPENED=true
+    fi
+  done
+} || true
 
 
 HOST=$(tailscale --socket $TS_SOCK status --json | jq -r '.Self.DNSName' | sed 's/\.$//')
