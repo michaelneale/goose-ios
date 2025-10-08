@@ -11,5 +11,8 @@ use that in the simulator app
 
 # Running from test flight on real phone
 
-* run `./launch_tunnel.sh` to launch goosed with a tunnel
+* install goose from testflight
+* run `./launch_tailscale.sh` to launch goosed with a tunnel
+* log in to tailscale if it pops up
+* install and enable tailscale on your phone
 * point your phone at the QR code to configure it
