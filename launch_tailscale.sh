@@ -1,16 +1,56 @@
 #!/bin/bash
 set -e
 
-# Configuration
-PORT=62996
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Color codes for output
+# Color codes for output (moved up for early use)
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Configuration
+PORT=62996
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GOOSED_URL="https://github.com/michaelneale/goose-tunnel/releases/download/test/goosed"
+GOOSED_LOCAL_PATH="${SCRIPT_DIR}/goosed"
+
+# Function to download goosed binary
+download_goosed() {
+    echo -e "${YELLOW}Downloading goosed binary...${NC}"
+    if curl -L -o "$GOOSED_LOCAL_PATH" "$GOOSED_URL"; then
+        chmod +x "$GOOSED_LOCAL_PATH"
+        echo -e "${GREEN}✓ Downloaded goosed to: $GOOSED_LOCAL_PATH${NC}"
+        return 0
+    else
+        echo -e "${RED}Error: Failed to download goosed${NC}"
+        return 1
+    fi
+}
+
+# Parse command line arguments
+GOOSED_PATH=""
+if [ $# -gt 0 ]; then
+    # Path provided as argument
+    GOOSED_PATH="$1"
+    if [ ! -f "$GOOSED_PATH" ]; then
+        echo -e "${RED}Error: goosed not found at: $GOOSED_PATH${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}Using goosed from: $GOOSED_PATH${NC}"
+else
+    # No argument provided, check if we have a local copy
+    if [ -f "$GOOSED_LOCAL_PATH" ]; then
+        echo -e "${GREEN}Using local goosed from: $GOOSED_LOCAL_PATH${NC}"
+        GOOSED_PATH="$GOOSED_LOCAL_PATH"
+    else
+        # Download goosed automatically
+        if download_goosed; then
+            GOOSED_PATH="$GOOSED_LOCAL_PATH"
+        else
+            exit 1
+        fi
+    fi
+fi
 
 SECRET="temp_cIo0W4vH0EdxMkOC3gD0M1O0vEwcXo"
 
@@ -19,10 +59,22 @@ echo -e "${BLUE}║                   Goose Tailscale Remote Access             
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check if goosed is available in PATH
-if ! command -v goosed &> /dev/null; then
-    echo -e "${RED}Error: goosed not found in PATH${NC}"
-    echo -e "${YELLOW}Please add goose/target/release to your PATH${NC}"
+# Check if goosed is available (either from provided path or PATH)
+if [ -n "$GOOSED_PATH" ]; then
+    # Use the provided path
+    if [ ! -f "$GOOSED_PATH" ]; then
+        echo -e "${RED}Error: goosed not found at: $GOOSED_PATH${NC}"
+        exit 1
+    fi
+    GOOSED_CMD="$GOOSED_PATH"
+elif command -v goosed &> /dev/null; then
+    # Use goosed from PATH
+    GOOSED_CMD="goosed"
+else
+    echo -e "${RED}Error: goosed not found${NC}"
+    echo -e "${YELLOW}Either:${NC}"
+    echo -e "${YELLOW}  1. Provide path to goosed as first argument${NC}"
+    echo -e "${YELLOW}  2. Add goose/target/release to your PATH${NC}"
     echo -e "${YELLOW}Example: export PATH=\$PATH:${SCRIPT_DIR}/../goose/target/release${NC}"
     exit 1
 fi
@@ -34,11 +86,22 @@ if ! command -v qrencode &> /dev/null; then
     exit 1
 fi
 
-# Check if tailscale is available
+# Check if tailscale is available, install if not
 if ! command -v tailscale &> /dev/null; then
-    echo -e "${RED}Error: tailscale is not installed${NC}"
-    echo -e "${YELLOW}Install it with: brew install tailscale${NC}"
-    exit 1
+    echo -e "${YELLOW}Tailscale not found, installing via Homebrew...${NC}"
+    if command -v brew &> /dev/null; then
+        brew install tailscale
+        if ! command -v tailscale &> /dev/null; then
+            echo -e "${RED}Error: Failed to install tailscale${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✓ Tailscale installed successfully${NC}"
+    else
+        echo -e "${RED}Error: Homebrew not found and tailscale is not installed${NC}"
+        echo -e "${YELLOW}Please install Homebrew first: https://brew.sh${NC}"
+        echo -e "${YELLOW}Then install tailscale: brew install tailscale${NC}"
+        exit 1
+    fi
 fi
 
 # Cleanup function
@@ -63,7 +126,7 @@ trap cleanup SIGINT SIGTERM EXIT
 echo -e "${GREEN}Starting goosed on port ${PORT}...${NC}"
 export GOOSE_PORT=$PORT
 export GOOSE_SERVER__SECRET_KEY="$SECRET"
-goosed agent > /dev/null 2>&1 &
+$GOOSED_CMD agent > /dev/null 2>&1 &
 GOOSED_PID=$!
 
 # Wait for goosed to be ready
