@@ -9,10 +9,43 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PORT=62996
+PREFERRED_PORT=62996
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GOOSED_URL="https://github.com/michaelneale/goose-tunnel/releases/download/test/goosed"
 GOOSED_LOCAL_PATH="${SCRIPT_DIR}/goosed"
+
+# Function to find an available port starting from the preferred port
+find_available_port() {
+    local start_port=$1
+    local max_attempts=100
+    local port=$start_port
+    
+    for ((i=0; i<max_attempts; i++)); do
+        if lsof -i:$port >/dev/null 2>&1; then
+            echo -e "${YELLOW}Port $port is in use, trying next...${NC}" >&2
+            ((port++))
+        else
+            echo $port
+            return 0
+        fi
+    done
+    
+    echo -e "${RED}Error: Could not find an available port after $max_attempts attempts${NC}" >&2
+    return 1
+}
+
+# Find an available port
+echo -e "${BLUE}Checking for available port starting from $PREFERRED_PORT...${NC}"
+PORT=$(find_available_port $PREFERRED_PORT)
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+if [ $PORT -eq $PREFERRED_PORT ]; then
+    echo -e "${GREEN}✓ Using preferred port $PORT${NC}"
+else
+    echo -e "${YELLOW}✓ Using available port $PORT (preferred $PREFERRED_PORT was in use)${NC}"
+fi
 
 # Function to download goosed binary
 download_goosed() {
