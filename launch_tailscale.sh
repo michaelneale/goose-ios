@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PREFERRED_PORT=62996
+PREFERRED_PORT=62997
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GOOSED_URL="https://github.com/michaelneale/goose-tunnel/releases/download/test/goosed"
 GOOSED_LOCAL_PATH="${SCRIPT_DIR}/goosed"
@@ -19,7 +19,7 @@ find_available_port() {
     local start_port=$1
     local max_attempts=100
     local port=$start_port
-    
+
     for ((i=0; i<max_attempts; i++)); do
         if lsof -i:$port >/dev/null 2>&1; then
             echo -e "${YELLOW}Port $port is in use, trying next...${NC}" >&2
@@ -29,7 +29,7 @@ find_available_port() {
             return 0
         fi
     done
-    
+
     echo -e "${RED}Error: Could not find an available port after $max_attempts attempts${NC}" >&2
     return 1
 }
@@ -112,11 +112,22 @@ else
     exit 1
 fi
 
-# Check if qrencode is available for QR code generation
+# Check if qrencode is available for QR code generation, install if not
 if ! command -v qrencode &> /dev/null; then
-    echo -e "${RED}Error: qrencode is not installed${NC}"
-    echo -e "${YELLOW}Install it with: brew install qrencode${NC}"
-    exit 1
+    echo -e "${YELLOW}qrencode not found, installing via Homebrew...${NC}"
+    if command -v brew &> /dev/null; then
+        brew install qrencode
+        if ! command -v qrencode &> /dev/null; then
+            echo -e "${RED}Error: Failed to install qrencode${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✓ qrencode installed successfully${NC}"
+    else
+        echo -e "${RED}Error: Homebrew not found and qrencode is not installed${NC}"
+        echo -e "${YELLOW}Please install Homebrew first: https://brew.sh${NC}"
+        echo -e "${YELLOW}Then install qrencode: brew install qrencode${NC}"
+        exit 1
+    fi
 fi
 
 # Check if tailscale is available, install if not
