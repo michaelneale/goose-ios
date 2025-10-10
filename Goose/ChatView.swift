@@ -28,7 +28,7 @@ struct ChatView: View {
 
     var body: some View {
         ZStack {
-            // Main chat view
+            // Main content in VStack (not overlapping)
             VStack(spacing: 0) {
                 // Messages List
                 ScrollViewReader { proxy in
@@ -64,14 +64,12 @@ struct ChatView: View {
                                     Spacer()
                                 }
                                 .padding(.horizontal)
+                                .id("thinking-indicator")
                             }
-                            
-                            // Add bottom padding to account for floating input
-                            Spacer()
-                                .frame(height: 120)
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
+                        .padding(.bottom, 8) // Small padding at bottom
                     }
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                         // Only scroll when app comes to foreground, not on every update
@@ -85,118 +83,139 @@ struct ChatView: View {
                             scrollToBottom(proxy)
                         }
                     }
+                    .onChange(of: messages.count) { _ in
+                        // Auto-scroll on new messages
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            scrollToBottom(proxy)
+                        }
+                    }
                 }
-            }
-            
-            // Floating Input Area
-            VStack {
-                Spacer()
                 
-                // Voice output controls (when speaking)
-                if voiceOutputManager.isSpeaking {
-                    HStack {
-                        Spacer()
+                // Input Area - now part of the VStack, not floating
+                VStack(spacing: 0) {
+                    // Separator line
+                    Divider()
+                        .background(Color(.systemGray5))
+                    
+                    // Voice output controls (when speaking)
+                    if voiceOutputManager.isSpeaking {
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                voiceOutputManager.stopSpeaking()
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "speaker.wave.2.fill")
+                                    Text("Stop Reading")
+                                        .font(.caption)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.blue.opacity(0.2))
+                                .cornerRadius(15)
+                            }
+                            .padding(.top, 4)
+                            Spacer()
+                        }
+                    }
+                    
+                    HStack(spacing: 12) {
+                        // Voice output toggle button
                         Button(action: {
-                            voiceOutputManager.stopSpeaking()
+                            voiceOutputManager.toggleEnabled()
+                            print("🔊 Voice output \(voiceOutputManager.isEnabled ? "enabled" : "disabled")")
                         }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "speaker.wave.2.fill")
-                                Text("Stop Reading")
-                                    .font(.caption)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.blue.opacity(0.2))
-                            .cornerRadius(15)
+                            Image(systemName: voiceOutputManager.isEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                                .font(.title2)
+                                .foregroundColor(voiceOutputManager.isEnabled ? .blue : .gray)
                         }
-                        .padding(.bottom, 4)
-                        Spacer()
-                    }
-                }
-                
-                HStack(spacing: 12) {
-                    // Voice output toggle button
-                    Button(action: {
-                        voiceOutputManager.toggleEnabled()
-                        print("🔊 Voice output \(voiceOutputManager.isEnabled ? "enabled" : "disabled")")
-                    }) {
-                        Image(systemName: voiceOutputManager.isEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                            .font(.title2)
-                            .foregroundColor(voiceOutputManager.isEnabled ? .blue : .gray)
-                    }
-                    
-                    // File upload button
-                    Button(action: {
-                        // TODO: Implement file upload
-                        print("File upload tapped")
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                    }
-                    
-                    TextField("build, solve, create...", text: $inputText, axis: .vertical)
-                        .padding(12)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(25)
-                        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-                        .lineLimit(1...4)
-                        .onSubmit {
-                            sendMessage()
+                        
+                        // File upload button
+                        Button(action: {
+                            // TODO: Implement file upload
+                            print("File upload tapped")
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .foregroundColor(.primary)
                         }
-                        .onChange(of: voiceInputManager.transcribedText) { newText in
-                            if !newText.isEmpty && voiceInputManager.isRecording {
-                                inputText = newText
-                            }
-                        }
-                    
-                    // Voice input button
-                    Button(action: {
-                        if voiceInputManager.isRecording {
-                            voiceInputManager.stopRecording()
-                            // Send the message automatically after recording
-                            if !voiceInputManager.transcribedText.isEmpty {
+                        
+                        TextField("build, solve, create...", text: $inputText, axis: .vertical)
+                            .padding(12)
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(20)
+                            .lineLimit(1...4)
+                            .onSubmit {
                                 sendMessage()
                             }
-                        } else {
-                            Task {
-                                do {
-                                    try await voiceInputManager.startRecording()
-                                } catch {
-                                    print("❌ Failed to start recording: \(error)")
+                            .onChange(of: voiceInputManager.transcribedText) { newText in
+                                if !newText.isEmpty && voiceInputManager.isRecording {
+                                    inputText = newText
                                 }
                             }
+                        
+                        // Voice input button
+                        Button(action: {
+                            if voiceInputManager.isRecording {
+                                voiceInputManager.stopRecording()
+                                // Send the message automatically after recording
+                                if !voiceInputManager.transcribedText.isEmpty {
+                                    sendMessage()
+                                }
+                            } else {
+                                Task {
+                                    do {
+                                        try await voiceInputManager.startRecording()
+                                    } catch {
+                                        print("❌ Failed to start recording: \(error)")
+                                    }
+                                }
+                            }
+                        }) {
+                            Image(systemName: voiceInputManager.isRecording ? "mic.fill" : "mic")
+                                .font(.title2)
+                                .foregroundColor(voiceInputManager.isRecording ? .red : .primary)
+                                .symbolEffect(.pulse, isActive: voiceInputManager.isRecording)
                         }
-                    }) {
-                        Image(systemName: voiceInputManager.isRecording ? "mic.fill" : "mic")
-                            .font(.title2)
-                            .foregroundColor(voiceInputManager.isRecording ? .red : .primary)
-                            .symbolEffect(.pulse, isActive: voiceInputManager.isRecording)
-                    }
 
-                    Button(action: {
-                        if isLoading {
-                            stopStreaming()
-                        } else {
-                            sendMessage()
+                        Button(action: {
+                            if isLoading {
+                                stopStreaming()
+                            } else {
+                                sendMessage()
+                            }
+                        }) {
+                            Image(systemName: isLoading ? "stop.circle.fill" : "arrow.up.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(
+                                    isLoading
+                                        ? .red
+                                        : (inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                            ? .gray : .blue))
                         }
-                    }) {
-                        Image(systemName: isLoading ? "stop.circle.fill" : "arrow.up.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(
-                                isLoading
-                                    ? .red
-                                    : (inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                        ? .gray : .blue))
+                        .disabled(
+                            !isLoading && inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    .disabled(
-                        !isLoading && inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemBackground))
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
+                .background(
+                    // Add shadow at the top of input area
+                    VStack {
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.black.opacity(0.05), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 3)
+                        .offset(y: -3)
+                        Spacer()
+                    }
+                )
             }
             
-            // Sidebar
+            // Sidebar overlay (this can stay in ZStack as it's a modal)
             if showingSidebar {
                 SidebarView(isShowing: $showingSidebar, onSessionSelect: { sessionId in
                     loadSession(sessionId)
@@ -238,6 +257,9 @@ struct ChatView: View {
         messages.append(userMessage)
         inputText = ""
         isLoading = true
+        
+        // Re-enable auto-scroll when user sends a new message
+        shouldAutoScroll = true
 
         startChatStream()
     }
@@ -442,7 +464,7 @@ struct ChatView: View {
         case .modelChange(let modelEvent):
             print("Model changed: \(modelEvent.model) (\(modelEvent.mode))")
 
-        case .notification(let notificationEvent):
+        case .notification(_):
             // Just ignore notifications silently - they're too verbose for shell output
             break
 
