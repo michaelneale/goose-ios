@@ -121,14 +121,13 @@ struct ChatView: View {
                     Divider()
                         .background(Color(.systemGray5))
                     
-                    // Voice mode selector
+                    // Voice mode selector - Compact Three state slider
                     HStack {
-                        // Use the compact toggle for mobile
-                        CompactVoiceModeToggle(manager: voiceManager)
+                        Spacer()
+                        ThreeStateVoiceSlider(manager: voiceManager)
                         Spacer()
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
+                    .padding(.vertical, 6)
                     
                     // Show transcribed text while in voice mode
                     if voiceManager.voiceMode != .normal && !voiceManager.transcribedText.isEmpty {

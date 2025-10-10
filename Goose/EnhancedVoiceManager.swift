@@ -479,7 +479,125 @@ enum VoiceError: LocalizedError {
     }
 }
 
-// MARK: - Voice Mode Selector View
+// MARK: - Three State Slider View
+struct ThreeStateVoiceSlider: View {
+    @ObservedObject var manager: EnhancedVoiceManager
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging = false
+    
+    private let trackWidth: CGFloat = 120  // Much more compact
+    private let thumbSize: CGFloat = 26
+    private let trackHeight: CGFloat = 28
+    private let hapticFeedback = UIImpactFeedbackGenerator(style: .light)
+    
+    var body: some View {
+        // Compact slider without labels
+        ZStack(alignment: .leading) {
+            // Track background with subtle gradient
+            Capsule()
+                .fill(Color(.systemGray6))
+                .frame(width: trackWidth, height: trackHeight)
+                .overlay(
+                    Capsule()
+                        .stroke(Color(.systemGray4), lineWidth: 0.5)
+                )
+            
+            // Position indicators - just subtle marks, no dots
+            HStack(spacing: 0) {
+                ForEach(Array(VoiceMode.allCases.enumerated()), id: \.element) { index, mode in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(Color(.systemGray4))
+                            .frame(width: 1, height: trackHeight * 0.4)
+                    }
+                    Spacer()
+                }
+            }
+            .frame(width: trackWidth - 20)
+            .offset(x: 10)
+            
+            // Thumb with icon only
+            Circle()
+                .fill(Color.white)
+                .frame(width: thumbSize, height: thumbSize)
+                .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+                .overlay(
+                    Circle()
+                        .stroke(manager.voiceMode.color, lineWidth: 1.5)
+                )
+                .overlay(
+                    Image(systemName: manager.voiceMode.icon)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(manager.voiceMode.color)
+                )
+                .offset(x: thumbOffset + dragOffset)
+                .animation(isDragging ? nil : .spring(response: 0.3, dampingFraction: 0.8), value: thumbOffset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            isDragging = true
+                            
+                            // Constrain to track bounds
+                            let potentialOffset = thumbOffset + value.translation.width
+                            if potentialOffset >= 0 && potentialOffset <= trackWidth - thumbSize {
+                                dragOffset = value.translation.width
+                            } else if potentialOffset < 0 {
+                                dragOffset = -thumbOffset
+                            } else {
+                                dragOffset = trackWidth - thumbSize - thumbOffset
+                            }
+                            
+                            // Check if we've moved to a new mode
+                            let absolutePosition = thumbOffset + dragOffset
+                            let newMode = modeForPosition(absolutePosition)
+                            if newMode != manager.voiceMode {
+                                hapticFeedback.impactOccurred()
+                            }
+                        }
+                        .onEnded { value in
+                            isDragging = false
+                            let finalPosition = thumbOffset + dragOffset
+                            let newMode = modeForPosition(finalPosition)
+                            
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                manager.setMode(newMode)
+                                dragOffset = 0
+                            }
+                        }
+                )
+        }
+        .frame(width: trackWidth, height: trackHeight)
+        .onAppear {
+            hapticFeedback.prepare()
+        }
+    }
+    
+    private var thumbOffset: CGFloat {
+        let segmentWidth = (trackWidth - thumbSize) / 2
+        switch manager.voiceMode {
+        case .normal:
+            return 0
+        case .audio:
+            return segmentWidth
+        case .fullAudio:
+            return trackWidth - thumbSize
+        }
+    }
+    
+    private func modeForPosition(_ position: CGFloat) -> VoiceMode {
+        let normalizedPosition = position / (trackWidth - thumbSize)
+        
+        if normalizedPosition < 0.33 {
+            return .normal
+        } else if normalizedPosition < 0.67 {
+            return .audio
+        } else {
+            return .fullAudio
+        }
+    }
+}
+
+// MARK: - Voice Mode Selector View (Original Segmented Style)
 struct VoiceModeSelector: View {
     @ObservedObject var manager: EnhancedVoiceManager
     @State private var dragOffset: CGFloat = 0
