@@ -255,41 +255,98 @@ struct MarkdownText: View {
 }
 
 // MARK: - Tool Views
+struct CollapsibleToolRequestView: View {
+    let toolContent: ToolRequestContent
+    @State private var isExpanded: Bool = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+                    
+                    Image(systemName: "wrench.and.screwdriver")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    
+                    Text("Tool: \(toolContent.toolCall.name)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    if !isExpanded && !toolContent.toolCall.arguments.isEmpty {
+                        Text("(\(toolContent.toolCall.arguments.count) args)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            if isExpanded && !toolContent.toolCall.arguments.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider()
+                        .padding(.horizontal, 8)
+                    
+                    Text("Arguments:")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                    
+                    ForEach(Array(toolContent.toolCall.arguments.keys.sorted()), id: \.self) { key in
+                        HStack(alignment: .top) {
+                            Text("\(key):")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                                .frame(minWidth: 60, alignment: .trailing)
+                            
+                            Text("\(String(describing: toolContent.toolCall.arguments[key]?.value))")
+                                .font(.caption2)
+                                .foregroundColor(.primary)
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 2)
+                    }
+                    .padding(.bottom, 8)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.orange.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 0.5)
+        )
+    }
+}
+
+// Keep original for compatibility if needed
 struct ToolRequestView: View {
     let toolContent: ToolRequestContent
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: "wrench.and.screwdriver")
-                    .foregroundColor(.orange)
-                Text("Tool Request: \(toolContent.toolCall.name)")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Spacer()
-            }
-            
-            if !toolContent.toolCall.arguments.isEmpty {
-                Text("Arguments:")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                
-                ForEach(Array(toolContent.toolCall.arguments.keys.sorted()), id: \.self) { key in
-                    HStack {
-                        Text("• \(key):")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(String(describing: toolContent.toolCall.arguments[key]?.value))")
-                            .font(.caption2)
-                            .foregroundColor(.primary)
-                        Spacer()
-                    }
-                }
-            }
-        }
-        .padding(8)
-        .background(Color.orange.opacity(0.1))
-        .cornerRadius(8)
+        CollapsibleToolRequestView(toolContent: toolContent)
     }
 }
 
@@ -325,63 +382,125 @@ struct ToolResponseView: View {
     }
 }
 
+struct CollapsibleToolConfirmationView: View {
+    let toolContent: ToolConfirmationRequestContent
+    @State private var isExpanded: Bool = true // Start expanded for permission requests
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+                    
+                    Image(systemName: "questionmark.circle")
+                        .foregroundColor(.blue)
+                        .font(.caption)
+                    
+                    Text("Permission: \(toolContent.toolName)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    if !isExpanded {
+                        Text("(action required)")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                        .padding(.horizontal, 8)
+                    
+                    Text("Allow \(toolContent.toolName)?")
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                    
+                    if !toolContent.arguments.isEmpty {
+                        Text("Arguments:")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 4)
+                        
+                        ForEach(Array(toolContent.arguments.keys.sorted()), id: \.self) { key in
+                            HStack(alignment: .top) {
+                                Text("\(key):")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                    .frame(minWidth: 60, alignment: .trailing)
+                                
+                                Text("\(String(describing: toolContent.arguments[key]?.value))")
+                                    .font(.caption2)
+                                    .foregroundColor(.primary)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    
+                    HStack(spacing: 12) {
+                        Button("Deny") {
+                            // TODO: Implement permission response
+                        }
+                        .buttonStyle(.bordered)
+                        .foregroundColor(.red)
+                        
+                        Button("Allow Once") {
+                            // TODO: Implement permission response
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Button("Always Allow") {
+                            // TODO: Implement permission response
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.blue.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.blue.opacity(0.3), lineWidth: 0.5)
+        )
+    }
+}
+
+// Keep original for compatibility if needed
 struct ToolConfirmationView: View {
     let toolContent: ToolConfirmationRequestContent
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "questionmark.circle")
-                    .foregroundColor(.blue)
-                Text("Permission Request")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Spacer()
-            }
-            
-            Text("Allow \(toolContent.toolName)?")
-                .font(.body)
-                .fontWeight(.medium)
-            
-            if !toolContent.arguments.isEmpty {
-                Text("Arguments:")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                
-                ForEach(Array(toolContent.arguments.keys.sorted()), id: \.self) { key in
-                    HStack {
-                        Text("• \(key):")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(String(describing: toolContent.arguments[key]?.value))")
-                            .font(.caption2)
-                            .foregroundColor(.primary)
-                        Spacer()
-                    }
-                }
-            }
-            
-            HStack(spacing: 12) {
-                Button("Deny") {
-                    // TODO: Implement permission response
-                }
-                .buttonStyle(.bordered)
-                .foregroundColor(.red)
-                
-                Button("Allow Once") {
-                    // TODO: Implement permission response
-                }
-                .buttonStyle(.bordered)
-                
-                Button("Always Allow") {
-                    // TODO: Implement permission response
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(8)
-        .background(Color.blue.opacity(0.1))
-        .cornerRadius(8)
+        CollapsibleToolConfirmationView(toolContent: toolContent)
     }
 }
 
@@ -501,6 +620,148 @@ struct ToolCallProgressView: View {
 }
 
 // MARK: - Completed Tool Call View
+struct CollapsibleToolCallView: View {
+    let completedCall: CompletedToolCall
+    @State private var isExpanded: Bool = false
+    
+    var body: some View {
+        VStack(alignment: .center, spacing: 4) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+                    
+                    Image(systemName: completedCall.result.status == "success" ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                        .font(.caption)
+                    
+                    Text(completedCall.toolCall.name)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    Text("•")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Text(String(format: "%.2fs", completedCall.duration))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text(completedCall.result.status)
+                        .font(.caption2)
+                        .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemGray6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(completedCall.result.status == "success" ? Color.green.opacity(0.2) : Color.red.opacity(0.2), lineWidth: 0.5)
+                        )
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let firstArgument = getFirstArgument() {
+                        Text("Arguments:")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
+                        
+                        Text(firstArgument)
+                            .font(.caption2)
+                            .monospaced()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(nil)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(.systemGray5))
+                            )
+                    }
+                    
+                    if completedCall.result.status == "error", let error = completedCall.result.error {
+                        Text("Error:")
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                            .padding(.top, 4)
+                        
+                        Text(error.count > 200 ? String(error.prefix(200)) + "..." : error)
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                            .lineLimit(nil)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.red.opacity(0.1))
+                            )
+                    } else if let value = completedCall.result.value {
+                        Text("Result:")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
+                        
+                        let valueString = String(describing: value.value)
+                        Text(valueString.count > 200 ? String(valueString.prefix(200)) + "..." : valueString)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(nil)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(.systemGray5))
+                            )
+                    }
+                    
+                    Text(formatCompletionTime(completedCall.completedAt))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
+                }
+                .padding(.horizontal, 20)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
+    }
+    
+    private func getFirstArgument() -> String? {
+        guard !completedCall.toolCall.arguments.isEmpty else { return nil }
+        
+        var argumentStrings: [String] = []
+        for (key, value) in completedCall.toolCall.arguments.sorted(by: { $0.key < $1.key }) {
+            let valueString = String(describing: value.value)
+            argumentStrings.append("\(key): \(valueString)")
+        }
+        
+        let combined = argumentStrings.joined(separator: "\n")
+        return combined.count > 500 ? String(combined.prefix(500)) + "..." : combined
+    }
+    
+    private func formatCompletionTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return "completed \(formatter.string(from: date))"
+    }
+}
+
 struct CompletedToolCallView: View {
     let completedCall: CompletedToolCall
     

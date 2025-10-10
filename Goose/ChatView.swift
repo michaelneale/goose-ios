@@ -45,7 +45,7 @@ struct ChatView: View {
                                         if let activeCall = activeToolCalls[toolCallId] {
                                             ToolCallProgressView(toolCall: activeCall.toolCall)
                                         } else if let completedCall = completedToolCalls[toolCallId] {
-                                            CompletedToolCallView(completedCall: completedCall)
+                                            CollapsibleToolCallView(completedCall: completedCall)
                                         }
                                         Spacer()
                                     }
