@@ -14,8 +14,7 @@ struct ChatView: View {
     @State private var currentSessionId: String?
     
     // Voice features
-    @StateObject private var voiceInputManager = VoiceInputManager()
-    @StateObject private var voiceOutputManager = VoiceOutputManager()
+    @StateObject private var voiceManager = EnhancedVoiceManager()
     
     // Memory management
     private let maxMessages = 50 // Limit messages to prevent memory issues
@@ -122,39 +121,28 @@ struct ChatView: View {
                     Divider()
                         .background(Color(.systemGray5))
                     
-                    // Voice output controls (when speaking)
-                    if voiceOutputManager.isSpeaking {
+                    // Voice mode selector - Compact Three state slider
+                    HStack {
+                        Spacer()
+                        ThreeStateVoiceSlider(manager: voiceManager)
+                        Spacer()
+                    }
+                    .padding(.vertical, 6)
+                    
+                    // Show transcribed text while in voice mode
+                    if voiceManager.voiceMode != .normal && !voiceManager.transcribedText.isEmpty {
                         HStack {
-                            Spacer()
-                            Button(action: {
-                                voiceOutputManager.stopSpeaking()
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "speaker.wave.2.fill")
-                                    Text("Stop Reading")
-                                        .font(.caption)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.blue.opacity(0.2))
-                                .cornerRadius(15)
-                            }
-                            .padding(.top, 4)
+                            Text("Transcribing: \"\(voiceManager.transcribedText)\"")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
                             Spacer()
                         }
+                        .padding(.horizontal)
+                        .padding(.vertical, 4)
                     }
                     
                     HStack(spacing: 12) {
-                        // Voice output toggle button
-                        Button(action: {
-                            voiceOutputManager.toggleEnabled()
-                            print("🔊 Voice output \(voiceOutputManager.isEnabled ? "enabled" : "disabled")")
-                        }) {
-                            Image(systemName: voiceOutputManager.isEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                .font(.title2)
-                                .foregroundColor(voiceOutputManager.isEnabled ? .blue : .gray)
-                        }
-                        
                         // File upload button
                         Button(action: {
                             // TODO: Implement file upload
@@ -170,38 +158,10 @@ struct ChatView: View {
                             .background(Color(.secondarySystemBackground))
                             .cornerRadius(20)
                             .lineLimit(1...4)
+                            .disabled(voiceManager.voiceMode != .normal) // Disable when in voice mode
                             .onSubmit {
                                 sendMessage()
                             }
-                            .onChange(of: voiceInputManager.transcribedText) { newText in
-                                if !newText.isEmpty && voiceInputManager.isRecording {
-                                    inputText = newText
-                                }
-                            }
-                        
-                        // Voice input button
-                        Button(action: {
-                            if voiceInputManager.isRecording {
-                                voiceInputManager.stopRecording()
-                                // Send the message automatically after recording
-                                if !voiceInputManager.transcribedText.isEmpty {
-                                    sendMessage()
-                                }
-                            } else {
-                                Task {
-                                    do {
-                                        try await voiceInputManager.startRecording()
-                                    } catch {
-                                        print("❌ Failed to start recording: \(error)")
-                                    }
-                                }
-                            }
-                        }) {
-                            Image(systemName: voiceInputManager.isRecording ? "mic.fill" : "mic")
-                                .font(.title2)
-                                .foregroundColor(voiceInputManager.isRecording ? .red : .primary)
-                                .symbolEffect(.pulse, isActive: voiceInputManager.isRecording)
-                        }
 
                         Button(action: {
                             if isLoading {
@@ -250,6 +210,13 @@ struct ChatView: View {
             }
         }
         .onAppear {
+            // Set up voice manager callback
+            voiceManager.onSubmitMessage = { transcribedText in
+                // Create the message and send it
+                inputText = transcribedText
+                sendMessage()
+            }
+            
             Task {
                 await apiService.testConnection()
             }
@@ -483,23 +450,16 @@ struct ChatView: View {
                 }
             }
             
-            // Auto-speak the last assistant message if voice output is enabled
-            if voiceOutputManager.isEnabled,
+            // Handle voice mode response - only speak if in full audio mode
+            if voiceManager.voiceMode == .fullAudio,
                let lastMessage = messages.last,
                lastMessage.role == .assistant,
                let textContent = lastMessage.content.first(where: {
                    if case .text = $0 { return true } else { return false }
                }),
                case .text(let content) = textContent {
-                print("🔊 Speaking response (voice output enabled)")
-                
-                // Stop any active recording to free up audio session for playback
-                if voiceInputManager.isRecording {
-                    print("🎤 Stopping recording to allow voice output")
-                    voiceInputManager.stopRecording()
-                }
-                
-                voiceOutputManager.speak(content.text)
+                print("🎤 Speaking response in full audio mode")
+                voiceManager.speakResponse(content.text)
             }
 
         case .modelChange(let modelEvent):
