@@ -100,69 +100,28 @@ struct MessageContentView: View {
     }
 }
 
-// MARK: - Cached Markdown Text View
-struct MarkdownText: View {
-    let text: String
-    @State private var cachedAttributedText: AttributedString?
-    
-    // Memory management - limit cache size
-    private static var maxCacheSize = 1000 // characters
-    private static var cacheCleanupThreshold = 2000 // characters
-    
-    var body: some View {
-        Text(cachedAttributedText ?? AttributedString(text))
-            .textSelection(.enabled)
-            .onAppear {
-                if cachedAttributedText == nil {
-                    cachedAttributedText = parseMarkdown(text)
-                }
-            }
-            .onChange(of: text) {
-                // Only reparse if text changed significantly (not just appended)
-                let newText = text
-                if !newText.hasPrefix(text) || newText.count - text.count > 50 {
-                    cachedAttributedText = parseMarkdown(newText)
-                } else if let cached = cachedAttributedText {
-                    // For streaming text, just append the new part
-                    let newPart = String(newText.dropFirst(text.count))
-                    cachedAttributedText = cached + AttributedString(newPart)
-                }
-            }
-    }
-    
-    private func parseMarkdown(_ text: String) -> AttributedString {
-        // Trim whitespace from the input text
+// MARK: - Markdown Parsing Helper
+private struct MarkdownParser {
+    static func parse(_ text: String) -> AttributedString {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let document = Document(parsing: trimmedText)
         
-        // For large texts, only parse the last portion to avoid blocking
-        let textToParse = trimmedText.count > 1000 ? String(trimmedText.suffix(1000)) : trimmedText
-        
-        // Parse the markdown using swift-markdown
-        let document = Document(parsing: textToParse)
-        
-        // Convert to AttributedString with proper formatting
         var attributedString = AttributedString()
-        
         for child in document.children {
-            attributedString.append(processMarkdownElement(child))
+            attributedString.append(processElement(child))
         }
         
-        // Return the result, using trimmed text as fallback
-        if attributedString.characters.isEmpty {
-            return AttributedString(trimmedText)
-        }
-        
-        return attributedString
+        return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
     }
     
-    private func processMarkdownElement(_ element: Markup) -> AttributedString {
+    private static func processElement(_ element: Markup) -> AttributedString {
         var result = AttributedString()
         
         switch element {
         case let paragraph as Paragraph:
             for child in paragraph.children {
                 if let inlineChild = child as? InlineMarkup {
-                    result.append(processInlineMarkup(inlineChild))
+                    result.append(processInline(inlineChild))
                 }
             }
             result.append(AttributedString("\n"))
@@ -171,7 +130,7 @@ struct MarkdownText: View {
             var headingText = AttributedString()
             for child in heading.children {
                 if let inlineChild = child as? InlineMarkup {
-                    headingText.append(processInlineMarkup(inlineChild))
+                    headingText.append(processInline(inlineChild))
                 }
             }
             headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
@@ -188,14 +147,13 @@ struct MarkdownText: View {
         case let listItem as ListItem:
             result.append(AttributedString("• "))
             for child in listItem.children {
-                result.append(processMarkdownElement(child))
+                result.append(processElement(child))
             }
             
         default:
-            // Handle other block elements
             if let blockElement = element as? BlockMarkup {
                 for child in blockElement.children {
-                    result.append(processMarkdownElement(child))
+                    result.append(processElement(child))
                 }
             }
         }
@@ -203,7 +161,7 @@ struct MarkdownText: View {
         return result
     }
     
-    private func processInlineMarkup(_ element: InlineMarkup) -> AttributedString {
+    private static func processInline(_ element: InlineMarkup) -> AttributedString {
         switch element {
         case let text as Markdown.Text:
             return AttributedString(text.plainText)
@@ -212,7 +170,7 @@ struct MarkdownText: View {
             var strongText = AttributedString()
             for child in strong.children {
                 if let inlineChild = child as? InlineMarkup {
-                    strongText.append(processInlineMarkup(inlineChild))
+                    strongText.append(processInline(inlineChild))
                 }
             }
             strongText.font = .body.bold()
@@ -222,7 +180,7 @@ struct MarkdownText: View {
             var emphasisText = AttributedString()
             for child in emphasis.children {
                 if let inlineChild = child as? InlineMarkup {
-                    emphasisText.append(processInlineMarkup(inlineChild))
+                    emphasisText.append(processInline(inlineChild))
                 }
             }
             emphasisText.font = .body.italic()
@@ -238,7 +196,7 @@ struct MarkdownText: View {
             var linkText = AttributedString()
             for child in link.children {
                 if let inlineChild = child as? InlineMarkup {
-                    linkText.append(processInlineMarkup(inlineChild))
+                    linkText.append(processInline(inlineChild))
                 }
             }
             linkText.foregroundColor = .blue
@@ -249,9 +207,30 @@ struct MarkdownText: View {
             return linkText
             
         default:
-            // Fallback for other inline elements
             return AttributedString(element.plainText)
         }
+    }
+}
+
+// MARK: - Cached Markdown Text View
+struct MarkdownText: View {
+    let text: String
+    @State private var cachedAttributedText: AttributedString?
+    
+    var body: some View {
+        Text(cachedAttributedText ?? AttributedString(text))
+            .textSelection(.enabled)
+            .onAppear {
+                if cachedAttributedText == nil {
+                    cachedAttributedText = MarkdownParser.parse(text)
+                }
+            }
+            .onChange(of: text) {
+                // Only reparse if text changed significantly
+                if !text.hasPrefix(text) || text.count - text.count > 50 {
+                    cachedAttributedText = MarkdownParser.parse(text)
+                }
+            }
     }
 }
 
@@ -978,117 +957,7 @@ struct TruncatableMarkdownText: View {
     }
     
     private func parseMarkdown(_ text: String) -> AttributedString {
-        // Same markdown parsing logic as before
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let document = Document(parsing: trimmedText)
-        var attributedString = AttributedString()
-        
-        for child in document.children {
-            attributedString.append(processMarkdownElement(child))
-        }
-        
-        if attributedString.characters.isEmpty {
-            return AttributedString(trimmedText)
-        }
-        
-        return attributedString
-    }
-    
-    private func processMarkdownElement(_ element: Markup) -> AttributedString {
-        var result = AttributedString()
-        
-        switch element {
-        case let paragraph as Paragraph:
-            for child in paragraph.children {
-                if let inlineChild = child as? InlineMarkup {
-                    result.append(processInlineMarkup(inlineChild))
-                }
-            }
-            result.append(AttributedString("\n"))
-            
-        case let heading as Heading:
-            var headingText = AttributedString()
-            for child in heading.children {
-                if let inlineChild = child as? InlineMarkup {
-                    headingText.append(processInlineMarkup(inlineChild))
-                }
-            }
-            headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
-            result.append(headingText)
-            result.append(AttributedString("\n"))
-            
-        case let codeBlock as CodeBlock:
-            var codeText = AttributedString(codeBlock.code)
-            codeText.font = .monospaced(.body)()
-            codeText.backgroundColor = .secondary.opacity(0.1)
-            result.append(codeText)
-            result.append(AttributedString("\n"))
-            
-        case let listItem as ListItem:
-            result.append(AttributedString("• "))
-            for child in listItem.children {
-                result.append(processMarkdownElement(child))
-            }
-            
-        default:
-            if let blockElement = element as? BlockMarkup {
-                for child in blockElement.children {
-                    result.append(processMarkdownElement(child))
-                }
-            }
-        }
-        
-        return result
-    }
-    
-    private func processInlineMarkup(_ element: InlineMarkup) -> AttributedString {
-        switch element {
-        case let text as Markdown.Text:
-            return AttributedString(text.plainText)
-            
-        case let strong as Strong:
-            var strongText = AttributedString()
-            for child in strong.children {
-                if let inlineChild = child as? InlineMarkup {
-                    strongText.append(processInlineMarkup(inlineChild))
-                }
-            }
-            strongText.font = .body.bold()
-            return strongText
-            
-        case let emphasis as Emphasis:
-            var emphasisText = AttributedString()
-            for child in emphasis.children {
-                if let inlineChild = child as? InlineMarkup {
-                    emphasisText.append(processInlineMarkup(inlineChild))
-                }
-            }
-            emphasisText.font = .body.italic()
-            return emphasisText
-            
-        case let inlineCode as InlineCode:
-            var codeText = AttributedString(inlineCode.code)
-            codeText.font = .monospaced(.body)()
-            codeText.backgroundColor = .secondary.opacity(0.1)
-            return codeText
-            
-        case let link as Markdown.Link:
-            var linkText = AttributedString()
-            for child in link.children {
-                if let inlineChild = child as? InlineMarkup {
-                    linkText.append(processInlineMarkup(inlineChild))
-                }
-            }
-            linkText.foregroundColor = .blue
-            linkText.underlineStyle = .single
-            if let destination = link.destination {
-                linkText.link = URL(string: destination)
-            }
-            return linkText
-            
-        default:
-            return AttributedString(element.plainText)
-        }
+        return MarkdownParser.parse(text)
     }
 }
 
