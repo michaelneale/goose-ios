@@ -26,6 +26,9 @@ struct ChatView: View {
     @State private var shouldAutoScroll = true
     @State private var scrollRefreshTrigger = UUID() // Force scroll refresh
     @State private var lastScrollUpdate = Date() // Throttle streaming scrolls
+    @State private var isActivelyStreaming = false // Track if we're currently receiving streaming content
+    @State private var userIsScrolling = false // Track manual scroll interactions
+    @State private var lastContentHeight: CGFloat = 0 // Track content size changes
 
     var body: some View {
         ZStack {
@@ -67,11 +70,29 @@ struct ChatView: View {
                                 .padding(.horizontal)
                                 .id("thinking-indicator")
                             }
+                            
+
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
                         .padding(.bottom, 8) // Small padding at bottom
                     }
+                    .simultaneousGesture(
+                        DragGesture()
+                            .onChanged { _ in
+                                // User is manually scrolling
+                                if isLoading {
+                                    userIsScrolling = true
+                                    shouldAutoScroll = false
+                                    print("📜 User started scrolling - auto-scroll disabled")
+                                }
+                            }
+                            .onEnded { _ in
+                                // User finished scrolling gesture
+                                userIsScrolling = false
+                                print("📜 User finished scrolling gesture")
+                            }
+                    )
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                         // Only scroll when app comes to foreground, not on every update
                         if shouldAutoScroll {
@@ -85,9 +106,12 @@ struct ChatView: View {
                         }
                     }
                     .onChange(of: messages.count) { _ in
-                        // Auto-scroll on new messages
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            scrollToBottom(proxy)
+                        // Only auto-scroll for new messages if we're actively loading/streaming
+                        // This prevents jumping back to bottom when user scrolls up after streaming is done
+                        if isLoading && shouldAutoScroll {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                scrollToBottom(proxy)
+                            }
                         }
                     }
                 }
