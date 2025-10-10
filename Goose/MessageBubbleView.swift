@@ -6,7 +6,8 @@ struct MessageBubbleView: View {
     @State private var showFullText = false
     @State private var isTruncated = false
     
-    private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7 // 70% of screen height
+    // Reasonable preview size - roughly 6-8 lines of text
+    private let maxHeight: CGFloat = 160 // Approximately 6-8 lines of normal text
     
     var body: some View {
         HStack {
@@ -879,47 +880,101 @@ struct TruncatableMarkdownText: View {
     let maxHeight: CGFloat
     @Binding var isTruncated: Bool
     @State private var fullHeight: CGFloat = 0
+    @State private var displayText: String = ""
+    
+    // Configuration for smart truncation
+    private let maxPreviewLines = 8  // Show more lines (6-8 depending on content)
+    private let showLastLines = true // Show last lines instead of first
     
     var body: some View {
-        Text(parseMarkdown(text))
+        Text(parseMarkdown(displayText.isEmpty ? text : displayText))
             .textSelection(.enabled)
             .background(
                 GeometryReader { geometry in
                     Color.clear
                         .onAppear {
                             fullHeight = geometry.size.height
-                            isTruncated = fullHeight > maxHeight
+                            updateTruncation()
                         }
                         .onChange(of: geometry.size.height) {
                             fullHeight = geometry.size.height
-                            isTruncated = fullHeight > maxHeight
+                            updateTruncation()
+                        }
+                        .onChange(of: text) {
+                            updateTruncation()
                         }
                 }
             )
-            .frame(maxHeight: isTruncated ? maxHeight : nil)
-            .clipped()
             .overlay(
-                // Show gradient fade and "tap to expand" if truncated
+                // Show indicator if truncated
                 Group {
                     if isTruncated {
                         VStack {
-                            Spacer()
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color.clear, Color(.systemGray6)]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: 30)
-                            .overlay(
-                                Text("Tap to expand")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .padding(.bottom, 4)
-                            )
+                            // Show fade from top since we're showing last lines
+                            if showLastLines {
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color(.systemGray6).opacity(0.9), Color.clear]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                                .frame(height: 30)
+                                .overlay(
+                                    Text("Tap to see more")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, 6),
+                                    alignment: .top
+                                )
+                                
+                                Spacer()
+                            } else {
+                                // Original bottom fade for first lines
+                                Spacer()
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.clear, Color(.systemGray6)]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                                .frame(height: 30)
+                                .overlay(
+                                    Text("Tap to expand")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .padding(.bottom, 4),
+                                    alignment: .bottom
+                                )
+                            }
                         }
                     }
                 }
             )
+    }
+    
+    private func updateTruncation() {
+        // Split text into lines for smarter truncation
+        let lines = text.components(separatedBy: .newlines)
+        
+        // If text is short enough, show everything
+        if lines.count <= maxPreviewLines || fullHeight <= maxHeight {
+            displayText = text
+            isTruncated = false
+            return
+        }
+        
+        // Text needs truncation
+        isTruncated = true
+        
+        if showLastLines {
+            // Show the last N lines (often contains conclusion/summary)
+            let lastLines = lines.suffix(maxPreviewLines)
+            
+            // Just show the last lines without adding extra text
+            displayText = "…\n" + lastLines.joined(separator: "\n")
+        } else {
+            // Show first N lines (traditional approach)
+            let firstLines = lines.prefix(maxPreviewLines)
+            displayText = firstLines.joined(separator: "\n") + "\n…"
+        }
     }
     
     private func parseMarkdown(_ text: String) -> AttributedString {

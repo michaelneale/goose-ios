@@ -25,6 +25,7 @@ struct ChatView: View {
     @State private var scrollTimer: Timer?
     @State private var shouldAutoScroll = true
     @State private var scrollRefreshTrigger = UUID() // Force scroll refresh
+    @State private var lastScrollUpdate = Date() // Throttle streaming scrolls
 
     var body: some View {
         ZStack {
@@ -414,6 +415,15 @@ struct ChatView: View {
                     }
 
                     self.messages[existingIndex] = updatedMessage
+                    // Trigger scroll when message content is updated during streaming
+                    // Throttle to avoid excessive scrolling during rapid updates
+                    if self.shouldAutoScroll {
+                        let now = Date()
+                        if now.timeIntervalSince(self.lastScrollUpdate) > 0.1 { // Throttle to 10 updates per second
+                            self.lastScrollUpdate = now
+                            self.scrollRefreshTrigger = UUID()
+                        }
+                    }
                 } else {
                     self.messages.append(incomingMessage)
                     // Manage memory by limiting messages and tool calls
@@ -441,6 +451,13 @@ struct ChatView: View {
                 )
             }
             activeToolCalls.removeAll()
+            
+            // Force final scroll to bottom when streaming completes
+            if shouldAutoScroll {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    scrollRefreshTrigger = UUID()
+                }
+            }
             
             // Auto-speak the last assistant message if voice output is enabled
             if voiceOutputManager.isEnabled,
