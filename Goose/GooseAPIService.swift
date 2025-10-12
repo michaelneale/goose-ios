@@ -206,8 +206,32 @@ class GooseAPIService: ObservableObject {
                 throw APIError.httpError(httpResponse.statusCode, errorBody)
             }
 
-            let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
-            return (agentResponse.id, agentResponse.conversation ?? [])
+            // Debug: Print raw response
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("📥 Resume session response: \(jsonString.prefix(500))...")
+            }
+
+            do {
+                let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
+                return (agentResponse.id, agentResponse.conversation ?? [])
+            } catch {
+                print("❌ Decoding error: \(error)")
+                if let decodingError = error as? DecodingError {
+                    switch decodingError {
+                    case .dataCorrupted(let context):
+                        print("   Context: \(context)")
+                    case .keyNotFound(let key, let context):
+                        print("   Key '\(key.stringValue)' not found: \(context.debugDescription)")
+                    case .typeMismatch(let type, let context):
+                        print("   Type '\(type)' mismatch: \(context.debugDescription)")
+                    case .valueNotFound(let type, let context):
+                        print("   Value '\(type)' not found: \(context.debugDescription)")
+                    @unknown default:
+                        print("   Unknown decoding error")
+                    }
+                }
+                throw error
+            }
         }
     }
 

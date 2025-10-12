@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GooseCode - VIM/EMACS Style Coding Agent</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/themes.css">
+    <link rel="stylesheet" href="css/editor.css">
+    <!-- CodeMirror for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/monokai.min.css">
+</head>
+<body class="theme-dark vim-mode">
+    <!-- Main Container -->
+    <div id="app" class="app-container">
+        <!-- Header Bar -->
+        <header class="header-bar">
+            <div class="header-left">
+                <span class="logo">🪿 GooseCode</span>
+                <div class="mode-indicator">
+                    <span id="mode-display" class="mode-badge">NORMAL</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="command-palette" id="command-palette">
+                    <input type="text" id="command-input" placeholder=":" class="command-input" />
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="theme-toggle" id="theme-toggle">🌙</button>
+                <button class="layout-toggle" id="layout-toggle">⊞</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Side Panel (File Explorer) -->
+            <aside class="side-panel" id="side-panel">
+                <div class="panel-header">
+                    <h3>Explorer</h3>
+                    <button class="panel-toggle" data-panel="explorer">📁</button>
+                </div>
+                <div class="file-tree" id="file-tree">
+                    <div class="file-item folder expanded">
+                        <span class="file-icon">📁</span>
+                        <span class="file-name">project</span>
+                        <div class="file-children">
+                            <div class="file-item">
+                                <span class="file-icon">📄</span>
+                                <span class="file-name">index.html</span>
+                            </div>
+                            <div class="file-item">
+                                <span class="file-icon">🎨</span>
+                                <span class="file-name">style.css</span>
+                            </div>
+                            <div class="file-item">
+                                <span class="file-icon">⚡</span>
+                                <span class="file-name">script.js</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Editor Area -->
+            <section class="editor-section">
+                <!-- Tab Bar -->
+                <div class="tab-bar" id="tab-bar">
+                    <div class="tab active" data-file="index.html">
+                        <span class="tab-name">index.html</span>
+                        <button class="tab-close">×</button>
+                    </div>
+                    <div class="tab" data-file="style.css">
+                        <span class="tab-name">style.css</span>
+                        <button class="tab-close">×</button>
+                    </div>
+                    <button class="new-tab">+</button>
+                </div>
+
+                <!-- Editor Container -->
+                <div class="editor-container">
+                    <div class="editor-wrapper">
+                        <textarea id="code-editor" class="code-editor"><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid white;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to GooseCode!</h1>
+        <p>This is a live preview of your HTML/CSS/JavaScript code.</p>
+        <canvas id="myCanvas" width="400" height="300"></canvas>
+        <script>
+            const canvas = document.getElementById('myCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Draw a simple animation
+            let angle = 0;
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                ctx.translate(canvas.width/2, canvas.height/2);
+                ctx.rotate(angle);
+                ctx.fillStyle = '#FFD700';
+                ctx.fillRect(-50, -50, 100, 100);
+                ctx.restore();
+                angle += 0.02;
+                requestAnimationFrame(draw);
+            }
+            draw();
+        </script>
+    </div>
+</body>
+</html></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel (Preview/Terminal) -->
+            <aside class="right-panel" id="right-panel">
+                <div class="panel-tabs">
+                    <button class="panel-tab active" data-panel="preview">Preview</button>
+                    <button class="panel-tab" data-panel="terminal">Terminal</button>
+                    <button class="panel-tab" data-panel="ai-chat">AI Chat</button>
+                </div>
+                
+                <!-- Preview Panel -->
+                <div class="panel-content preview-panel active" id="preview-panel">
+                    <div class="preview-controls">
+                        <button id="run-code" class="run-button">▶ Run</button>
+                        <button id="refresh-preview" class="refresh-button">🔄</button>
+                    </div>
+                    <iframe id="preview-frame" class="preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+                </div>
+
+                <!-- Terminal Panel -->
+                <div class="panel-content terminal-panel" id="terminal-panel">
+                    <div class="terminal-header">
+                        <span>Terminal</span>
+                        <button class="clear-terminal">Clear</button>
+                    </div>
+                    <div class="terminal-output" id="terminal-output">
+                        <div class="terminal-line">GooseCode Terminal v1.0</div>
+                        <div class="terminal-line">Ready for commands...</div>
+                    </div>
+                    <div class="terminal-input-line">
+                        <span class="terminal-prompt">$ </span>
+                        <input type="text" class="terminal-input" id="terminal-input" placeholder="Enter command...">
+                    </div>
+                </div>
+
+                <!-- AI Chat Panel -->
+                <div class="panel-content ai-chat-panel" id="ai-chat-panel">
+                    <div class="chat-header">
+                        <span>🤖 AI Coding Assistant</span>
+                        <span class="status-indicator">● Ready</span>
+                    </div>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message ai-message">
+                            <div class="message-content">
+                                Hello! I'm your AI coding assistant. I can help you write, debug, and improve your code. What would you like to work on?
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <textarea class="chat-input" id="chat-input" placeholder="Ask me anything about your code..."></textarea>
+                        <button class="send-button" id="send-chat">Send</button>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <span class="status-item">Line 1, Col 1</span>
+                <span class="status-item">HTML</span>
+                <span class="status-item">UTF-8</span>
+            </div>
+            <div class="status-center">
+                <span class="status-item" id="file-status">index.html - Modified</span>
+            </div>
+            <div class="status-right">
+                <span class="status-item">VIM Mode</span>
+                <span class="status-item">🟢 Ready</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/keymap/vim.min.js"></script>
+    
+    <script src="js/editor.js"></script>
+    <script src="js/vim-bindings.js"></script>
+    <script src="js/panels.js"></script>
+    <script src="js/preview.js"></script>
+    <script src="js/terminal.js"></script>
+    <script src="js/ai-chat.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

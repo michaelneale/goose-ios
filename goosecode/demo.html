@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GooseCode Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .tagline {
+            font-size: 1.3em;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 60px 0;
+            text-align: left;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .feature h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #FFD700;
+        }
+        
+        .feature ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature li {
+            margin: 8px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .feature li:before {
+            content: '✨';
+            position: absolute;
+            left: 0;
+        }
+        
+        .demo-canvas {
+            margin: 40px 0;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        .cta {
+            margin: 60px 0;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            font-weight: bold;
+            transition: transform 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .shortcuts {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 40px 0;
+            text-align: left;
+        }
+        
+        .shortcuts h3 {
+            text-align: center;
+            color: #FFD700;
+            margin-bottom: 20px;
+        }
+        
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .shortcut-group h4 {
+            color: #4ECDC4;
+            margin-bottom: 10px;
+        }
+        
+        .shortcut {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-family: 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        
+        .shortcut-key {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🪿</div>
+        <h1>GooseCode</h1>
+        <p class="tagline">VIM/EMACS Style Coding Agent with Live Preview & AI Assistance</p>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>🎯 VIM/EMACS Experience</h3>
+                <ul>
+                    <li>Full VIM keybindings and modes</li>
+                    <li>Command palette with : commands</li>
+                    <li>Modal editing (Normal, Insert, Visual)</li>
+                    <li>Extensive keyboard shortcuts</li>
+                    <li>Customizable key mappings</li>
+                </ul>
+            </div>
+            
+            <div class="feature">
+                <h3>🖼️ Live Preview System</h3>
+                <ul>
+                    <li>Real-time HTML/CSS/JavaScript rendering</li>
+                    <li>Canvas graphics support</li>
+                    <li>Error detection and console capture</li>
+                    <li>Sandboxed execution environment</li>
+                    <li>Instant feedback on code changes</li>
+                </ul>
+            </div>
+            
+            <div class="feature">
+                <h3>🎨 Flexible Interface</h3>
+                <ul>
+                    <li>Resizable panels (Explorer, Editor, Preview)</li>
+                    <li>Multiple themes (Dark, Light, Monokai, Dracula)</li>
+                    <li>Responsive design for all devices</li>
+                    <li>Customizable layouts and workspaces</li>
+                    <li>Built-in terminal emulator</li>
+                </ul>
+            </div>
+            
+            <div class="feature">
+                <h3>🤖 AI Integration Ready</h3>
+                <ul>
+                    <li>Chat interface for coding assistance</li>
+                    <li>Code analysis and suggestions</li>
+                    <li>Template generation</li>
+                    <li>Debugging help and error explanations</li>
+                    <li>Ready for GPT-5 Code integration</li>
+                </ul>
+            </div>
+        </div>
+        
+        <canvas id="demoCanvas" class="demo-canvas" width="600" height="300"></canvas>
+        
+        <div class="shortcuts">
+            <h3>⌨️ Essential Keyboard Shortcuts</h3>
+            <div class="shortcut-grid">
+                <div class="shortcut-group">
+                    <h4>File Operations</h4>
+                    <div class="shortcut">
+                        <span>Save file</span>
+                        <span class="shortcut-key">:w</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Close file</span>
+                        <span class="shortcut-key">:q</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>New file</span>
+                        <span class="shortcut-key">:n</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Open file</span>
+                        <span class="shortcut-key">:e</span>
+                    </div>
+                </div>
+                
+                <div class="shortcut-group">
+                    <h4>Code Execution</h4>
+                    <div class="shortcut">
+                        <span>Run code</span>
+                        <span class="shortcut-key">F5</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Run code (VIM)</span>
+                        <span class="shortcut-key">:run</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Refresh preview</span>
+                        <span class="shortcut-key">:preview</span>
+                    </div>
+                </div>
+                
+                <div class="shortcut-group">
+                    <h4>Panel Management</h4>
+                    <div class="shortcut">
+                        <span>Toggle explorer</span>
+                        <span class="shortcut-key">Ctrl+B</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Toggle preview</span>
+                        <span class="shortcut-key">Ctrl+J</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Toggle terminal</span>
+                        <span class="shortcut-key">Ctrl+`</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>AI chat</span>
+                        <span class="shortcut-key">Ctrl+K</span>
+                    </div>
+                </div>
+                
+                <div class="shortcut-group">
+                    <h4>Themes & Layout</h4>
+                    <div class="shortcut">
+                        <span>Change theme</span>
+                        <span class="shortcut-key">:theme</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Change layout</span>
+                        <span class="shortcut-key">:layout</span>
+                    </div>
+                    <div class="shortcut">
+                        <span>Command palette</span>
+                        <span class="shortcut-key">Ctrl+P</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="cta">
+            <a href="index.html" class="cta-button">🚀 Launch GooseCode</a>
+        </div>
+        
+        <p style="margin-top: 60px; opacity: 0.7; font-size: 0.9em;">
+            Built with ❤️ for developers who love efficient, keyboard-driven coding experiences
+        </p>
+    </div>
+    
+    <script>
+        // Demo canvas animation
+        const canvas = document.getElementById('demoCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let time = 0;
+        const particles = [];
+        
+        // Create particles
+        for (let i = 0; i < 30; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                radius: Math.random() * 3 + 1,
+                hue: Math.random() * 360
+            });
+        }
+        
+        function animate() {
+            // Clear with fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update and draw particles
+            particles.forEach((particle, index) => {
+                // Update position
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                
+                // Bounce off edges
+                if (particle.x < 0 || particle.x > canvas.width) particle.vx *= -1;
+                if (particle.y < 0 || particle.y > canvas.height) particle.vy *= -1;
+                
+                // Draw particle with rainbow effect
+                const hue = (particle.hue + time * 50) % 360;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
+                ctx.fill();
+                
+                // Draw connections to nearby particles
+                particles.slice(index + 1).forEach(other => {
+                    const dx = particle.x - other.x;
+                    const dy = particle.y - other.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 100) {
+                        const opacity = (100 - distance) / 100 * 0.3;
+                        ctx.beginPath();
+                        ctx.moveTo(particle.x, particle.y);
+                        ctx.lineTo(other.x, other.y);
+                        ctx.strokeStyle = `hsla(${hue}, 70%, 60%, ${opacity})`;
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                });
+            });
+            
+            // Draw title in center
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fillText('Live Canvas Demo', canvas.width / 2, canvas.height / 2);
+            
+            ctx.font = '14px Arial';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fillText('Real-time graphics in GooseCode', canvas.width / 2, canvas.height / 2 + 30);
+            
+            time += 0.01;
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+        
+        // Add click effect
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Add explosion effect
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    radius: Math.random() * 2 + 1,
+                    hue: Math.random() * 360
+                });
+            }
+            
+            // Remove excess particles
+            if (particles.length > 50) {
+                particles.splice(0, particles.length - 50);
+            }
+        });
+    </script>
+</body>
+</html>

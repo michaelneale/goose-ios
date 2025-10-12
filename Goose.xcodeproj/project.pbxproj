@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2AC886D02E9823C7002AC656 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC886CF2E9823C2002AC656 /* WelcomeView.swift */; };
+		2AC886D12E9823C8002AC656 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC886D02E9823C3002AC656 /* ThemeManager.swift */; };
+		2AC886D22E9823C9002AC656 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC886D32E9823CA002AC656 /* TaskDetailView.swift */; };
+		2AC886D42E9823CB002AC656 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC886D52E9823CC002AC656 /* SplashScreenView.swift */; };
 		83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */; };
 		A1234567890ABCDEF001 /* GooseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF000 /* GooseApp.swift */; };
 		A1234567890ABCDEF003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF002 /* ContentView.swift */; };
@@ -21,6 +25,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2AC886CF2E9823C2002AC656 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		2AC886D02E9823C3002AC656 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
+		2AC886D32E9823CA002AC656 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
+		2AC886D52E9823CC002AC656 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
 		83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationHandler.swift; sourceTree = "<group>"; };
 		83ACD8A92E827DB500379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		83ACD8AC2E827FAE00379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -70,10 +78,14 @@
 				83ACD8AC2E827FAE00379D0E /* Info.plist */,
 				83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */,
 				83ACD8A92E827DB500379D0E /* Info.plist */,
-				A1234567890ABCDEF000 /* GooseApp.swift */,
-				A1234567890ABCDEF002 /* ContentView.swift */,
-				A1234567890ABCDEF009 /* ChatView.swift */,
-				A1234567890ABCDEF015 /* MessageBubbleView.swift */,
+			A1234567890ABCDEF000 /* GooseApp.swift */,
+			A1234567890ABCDEF002 /* ContentView.swift */,
+			2AC886CF2E9823C2002AC656 /* WelcomeView.swift */,
+			2AC886D52E9823CC002AC656 /* SplashScreenView.swift */,
+			2AC886D02E9823C3002AC656 /* ThemeManager.swift */,
+			A1234567890ABCDEF009 /* ChatView.swift */,
+			A1234567890ABCDEF015 /* MessageBubbleView.swift */,
+			2AC886D32E9823CA002AC656 /* TaskDetailView.swift */,
 				A1234567890ABCDEF017 /* SettingsView.swift */,
 				A1234567890ABCDEF011 /* Message.swift */,
 				A1234567890ABCDEF013 /* GooseAPIService.swift */,
@@ -167,10 +179,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1234567890ABCDEF003 /* ContentView.swift in Sources */,
-				A1234567890ABCDEF010 /* ChatView.swift in Sources */,
-				A1234567890ABCDEF012 /* Message.swift in Sources */,
-				83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */,
+			A1234567890ABCDEF003 /* ContentView.swift in Sources */,
+			A1234567890ABCDEF010 /* ChatView.swift in Sources */,
+			A1234567890ABCDEF012 /* Message.swift in Sources */,
+			83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */,
+			2AC886D02E9823C7002AC656 /* WelcomeView.swift in Sources */,
+			2AC886D42E9823CB002AC656 /* SplashScreenView.swift in Sources */,
+			2AC886D12E9823C8002AC656 /* ThemeManager.swift in Sources */,
+			2AC886D22E9823C9002AC656 /* TaskDetailView.swift in Sources */,
 				A1234567890ABCDEF014 /* GooseAPIService.swift in Sources */,
 				A1234567890ABCDEF016 /* MessageBubbleView.swift in Sources */,
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,

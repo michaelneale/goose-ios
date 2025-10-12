@@ -1,0 +1,413 @@
+/* CodeMirror Editor Customization */
+
+.CodeMirror {
+    height: 100% !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.CodeMirror-scroll {
+    padding: 16px !important;
+}
+
+.CodeMirror-gutters {
+    background: var(--bg-secondary) !important;
+    border-right: 1px solid var(--border-color) !important;
+}
+
+.CodeMirror-linenumber {
+    color: var(--text-secondary) !important;
+    padding: 0 8px !important;
+}
+
+.CodeMirror-cursor {
+    border-left: 2px solid var(--accent-color) !important;
+}
+
+.CodeMirror-selected {
+    background: var(--accent-color-alpha) !important;
+}
+
+.CodeMirror-focused .CodeMirror-selected {
+    background: var(--accent-color-alpha) !important;
+}
+
+.CodeMirror-line::selection,
+.CodeMirror-line > span::selection,
+.CodeMirror-line > span > span::selection {
+    background: var(--accent-color-alpha) !important;
+}
+
+.CodeMirror-line::-moz-selection,
+.CodeMirror-line > span::-moz-selection,
+.CodeMirror-line > span > span::-moz-selection {
+    background: var(--accent-color-alpha) !important;
+}
+
+/* VIM Mode Cursor Styling */
+.CodeMirror-fat-cursor .CodeMirror-cursor {
+    background: var(--vim-normal-color) !important;
+    border: none !important;
+    width: auto !important;
+}
+
+.CodeMirror.vim-mode-insert .CodeMirror-cursor {
+    border-left: 2px solid var(--vim-insert-color) !important;
+}
+
+.CodeMirror.vim-mode-normal .CodeMirror-cursor {
+    background: var(--vim-normal-color) !important;
+    border: none !important;
+}
+
+.CodeMirror.vim-mode-visual .CodeMirror-selected {
+    background: var(--vim-visual-color) !important;
+    opacity: 0.3;
+}
+
+/* Syntax Highlighting Overrides */
+.cm-keyword { color: #569cd6 !important; }
+.cm-atom { color: #d19a66 !important; }
+.cm-number { color: #d19a66 !important; }
+.cm-def { color: #dcdcaa !important; }
+.cm-variable { color: #9cdcfe !important; }
+.cm-variable-2 { color: #4fc1ff !important; }
+.cm-variable-3 { color: #4fc1ff !important; }
+.cm-property { color: #9cdcfe !important; }
+.cm-operator { color: #d4d4d4 !important; }
+.cm-comment { color: #6a9955 !important; font-style: italic; }
+.cm-string { color: #ce9178 !important; }
+.cm-string-2 { color: #ce9178 !important; }
+.cm-meta { color: #d4d4d4 !important; }
+.cm-qualifier { color: #d4d4d4 !important; }
+.cm-builtin { color: #569cd6 !important; }
+.cm-bracket { color: #d4d4d4 !important; }
+.cm-tag { color: #569cd6 !important; }
+.cm-attribute { color: #9cdcfe !important; }
+.cm-hr { color: #d4d4d4 !important; }
+.cm-link { color: #3794ff !important; }
+.cm-error { color: #f44747 !important; background: rgba(244, 71, 71, 0.1) !important; }
+
+/* Light Theme Syntax Highlighting */
+.theme-light .cm-keyword { color: #0000ff !important; }
+.theme-light .cm-atom { color: #008080 !important; }
+.theme-light .cm-number { color: #008080 !important; }
+.theme-light .cm-def { color: #795e26 !important; }
+.theme-light .cm-variable { color: #001080 !important; }
+.theme-light .cm-variable-2 { color: #001080 !important; }
+.theme-light .cm-variable-3 { color: #001080 !important; }
+.theme-light .cm-property { color: #001080 !important; }
+.theme-light .cm-operator { color: #000000 !important; }
+.theme-light .cm-comment { color: #008000 !important; font-style: italic; }
+.theme-light .cm-string { color: #a31515 !important; }
+.theme-light .cm-string-2 { color: #a31515 !important; }
+.theme-light .cm-meta { color: #000000 !important; }
+.theme-light .cm-qualifier { color: #000000 !important; }
+.theme-light .cm-builtin { color: #0000ff !important; }
+.theme-light .cm-bracket { color: #000000 !important; }
+.theme-light .cm-tag { color: #800000 !important; }
+.theme-light .cm-attribute { color: #ff0000 !important; }
+.theme-light .cm-hr { color: #000000 !important; }
+.theme-light .cm-link { color: #0000ee !important; }
+.theme-light .cm-error { color: #ff0000 !important; background: rgba(255, 0, 0, 0.1) !important; }
+
+/* Autocomplete Styling */
+.CodeMirror-hints {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    font-size: 14px !important;
+    max-height: 200px !important;
+    overflow-y: auto !important;
+}
+
+.CodeMirror-hint {
+    color: var(--text-primary) !important;
+    padding: 8px 12px !important;
+    border-radius: 4px !important;
+    margin: 2px !important;
+}
+
+.CodeMirror-hint-active {
+    background: var(--accent-color) !important;
+    color: var(--bg-primary) !important;
+}
+
+/* Search and Replace */
+.CodeMirror-search-field {
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 4px !important;
+    color: var(--text-primary) !important;
+    padding: 4px 8px !important;
+    font-family: inherit !important;
+}
+
+.CodeMirror-search-field:focus {
+    border-color: var(--accent-color) !important;
+    outline: none !important;
+}
+
+/* Folding */
+.CodeMirror-foldmarker {
+    background: var(--accent-color) !important;
+    color: var(--bg-primary) !important;
+    border-radius: 3px !important;
+    padding: 0 4px !important;
+    font-size: 12px !important;
+}
+
+.CodeMirror-foldgutter {
+    width: 16px !important;
+}
+
+.CodeMirror-foldgutter-open,
+.CodeMirror-foldgutter-folded {
+    cursor: pointer !important;
+    color: var(--text-secondary) !important;
+}
+
+.CodeMirror-foldgutter-open:hover,
+.CodeMirror-foldgutter-folded:hover {
+    color: var(--accent-color) !important;
+}
+
+/* Matching Brackets */
+.CodeMirror-matchingbracket {
+    background: var(--accent-color-alpha) !important;
+    color: var(--accent-color) !important;
+    border-radius: 2px !important;
+}
+
+.CodeMirror-nonmatchingbracket {
+    background: rgba(244, 71, 71, 0.2) !important;
+    color: var(--error-color) !important;
+    border-radius: 2px !important;
+}
+
+/* Active Line */
+.CodeMirror-activeline-background {
+    background: var(--bg-tertiary) !important;
+    opacity: 0.5 !important;
+}
+
+/* Ruler */
+.CodeMirror-ruler {
+    border-left: 1px solid var(--border-color) !important;
+}
+
+/* Scrollbars for CodeMirror */
+.CodeMirror-scrollbar-filler {
+    background: var(--bg-secondary) !important;
+}
+
+.CodeMirror-gutter-filler {
+    background: var(--bg-secondary) !important;
+}
+
+/* VIM Command Line */
+.CodeMirror-dialog {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    padding: 12px !important;
+}
+
+.CodeMirror-dialog input {
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 4px !important;
+    color: var(--text-primary) !important;
+    padding: 6px 12px !important;
+    font-family: inherit !important;
+    font-size: 14px !important;
+    width: 300px !important;
+}
+
+.CodeMirror-dialog input:focus {
+    border-color: var(--accent-color) !important;
+    outline: none !important;
+}
+
+/* Line Numbers */
+.CodeMirror-linenumbers {
+    width: 50px !important;
+}
+
+/* Minimap (if implemented) */
+.editor-minimap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100%;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    opacity: 0.8;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.editor-minimap.interactive {
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.minimap-viewport {
+    background: var(--accent-color-alpha);
+    border: 1px solid var(--accent-color);
+    position: absolute;
+    left: 0;
+    right: 0;
+    min-height: 20px;
+}
+
+/* Error and Warning Indicators */
+.error-marker {
+    background: var(--error-color);
+    width: 4px !important;
+    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.warning-marker {
+    background: var(--warning-color);
+    width: 4px !important;
+    height: 100%;
+    position: absolute;
+    left: 4px;
+    top: 0;
+}
+
+/* Breadcrumb Navigation */
+.breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.breadcrumb-item {
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.breadcrumb-item:hover {
+    color: var(--accent-color);
+}
+
+.breadcrumb-separator {
+    color: var(--text-secondary);
+    margin: 0 4px;
+}
+
+/* Code Lens */
+.code-lens {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-style: italic;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.code-lens:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent-color);
+}
+
+/* Inlay Hints */
+.inlay-hint {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.7;
+    padding: 0 2px;
+}
+
+/* Selection Highlight */
+.selection-highlight {
+    background: var(--accent-color-alpha) !important;
+    border-radius: 2px;
+}
+
+/* Word Highlight */
+.word-highlight {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 2px;
+}
+
+/* Find/Replace Widget */
+.find-widget {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    min-width: 300px;
+}
+
+.find-input-group {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.find-input {
+    flex: 1;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.find-input:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+.find-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.find-button {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.find-button:hover {
+    background: var(--accent-color);
+    color: var(--bg-primary);
+}
+
+.find-button.active {
+    background: var(--accent-color);
+    color: var(--bg-primary);
+}

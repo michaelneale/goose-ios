@@ -3,56 +3,86 @@ import Markdown
 
 struct MessageBubbleView: View {
     let message: Message
+    let completedTasks: [CompletedToolCall]
+    let sessionName: String
     @State private var showFullText = false
     @State private var isTruncated = false
+    @EnvironmentObject var themeManager: ThemeManager
     
     private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7 // 70% of screen height
     
     var body: some View {
-        HStack {
-            if message.role == .user {
-                Spacer()
+        VStack(alignment: .leading, spacing: 8) {
+            // Message content - filter out tool responses AND tool requests (we'll show them consolidated)
+            let filteredContent = message.content.filter { 
+                !isToolResponse($0) && !isToolRequest($0)
             }
             
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                // Message content - only show if there's non-tool-response content
-                let filteredContent = message.content.filter { !isToolResponse($0) }
-                
-                if !filteredContent.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
-                            TruncatableMessageContentView(
-                                content: content,
-                                maxHeight: maxHeight,
-                                showFullText: $showFullText,
-                                isTruncated: $isTruncated
-                            )
-                        }
+            if !filteredContent.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
+                        TruncatableMessageContentView(
+                            content: content,
+                            maxHeight: maxHeight,
+                            showFullText: $showFullText,
+                            isTruncated: $isTruncated,
+                            isUserMessage: message.role == .user
+                        )
                     }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(message.role == .user ? Color.blue : Color(.systemGray6))
-                    )
-                    .foregroundColor(message.role == .user ? .white : .primary)
-                    .onTapGesture {
-                        if isTruncated {
-                            showFullText = true
-                        }
-                    }
-                    
-                    // Timestamp
-                    Text(formatTimestamp(message.created))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
                 }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.role == .user ? .trailing : .leading)
             
-            if message.role == .assistant {
-                Spacer()
+            // Show consolidated task completion pill if there are completed tasks
+            if !completedTasks.isEmpty {
+                // For single task, go directly to output; for multiple, show combined view
+                if completedTasks.count == 1 {
+                    // Single task - go directly to output
+                    NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(themeManager)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Text(completedTasks[0].toolCall.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Multiple tasks - show all outputs in one view
+                    NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(themeManager)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Text("\(completedTasks.count) Tasks completed")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
@@ -67,6 +97,13 @@ struct MessageBubbleView: View {
     
     private func isToolResponse(_ content: MessageContent) -> Bool {
         if case .toolResponse = content {
+            return true
+        }
+        return false
+    }
+    
+    private func isToolRequest(_ content: MessageContent) -> Bool {
+        if case .toolRequest = content {
             return true
         }
         return false
@@ -255,6 +292,36 @@ struct MarkdownText: View {
 }
 
 // MARK: - Tool Views
+// Compact pill view for tool requests
+struct CompactToolRequestPill: View {
+    let toolContent: ToolRequestContent
+    let completedTasks: [CompletedToolCall]
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(themeManager.secondaryTextColor)
+            
+            Text("\(completedTasks.count) Task\(completedTasks.count == 1 ? "" : "s") completed")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(themeManager.secondaryTextColor)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundColor(themeManager.secondaryTextColor)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(themeManager.isDarkMode ? Color(red: 0.13, green: 0.13, blue: 0.13) : Color(red: 0.97, green: 0.97, blue: 0.97))
+        .cornerRadius(16)
+        .frame(maxWidth: 200)
+    }
+}
+
 struct ToolRequestView: View {
     let toolContent: ToolRequestContent
     
@@ -389,8 +456,8 @@ struct ToolConfirmationView: View {
     ScrollView {
         VStack(spacing: 16) {
             // Basic message examples
-            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"))
-            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."))
+            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [], sessionName: "Test Session")
+            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [], sessionName: "Test Session")
             
             // Comprehensive markdown test examples
             MessageBubbleView(message: Message(role: .assistant, text: """
@@ -420,7 +487,7 @@ Visit [Apple](https://apple.com) for more info.
 • Third `code` item
 
 *This tests comprehensive markdown rendering.*
-"""))
+"""), completedTasks: [], sessionName: "Test Session")
             
             MessageBubbleView(message: Message(role: .user, text: """
 Testing more complex markdown:
@@ -438,10 +505,11 @@ def hello_world():
 ```
 
 **Note**: This should all render properly.
-"""))
+"""), completedTasks: [], sessionName: "Test Session")
         }
         .padding()
     }
+    .environmentObject(ThemeManager.shared)
 }
 
 // MARK: - Tool Call Progress View
@@ -584,19 +652,22 @@ struct TruncatableMessageContentView: View {
     let maxHeight: CGFloat
     @Binding var showFullText: Bool
     @Binding var isTruncated: Bool
+    let isUserMessage: Bool
+    @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
         switch content {
         case .text(let textContent):
-            TruncatableMarkdownText(
-                text: textContent.text,
-                maxHeight: maxHeight,
-                isTruncated: $isTruncated
-            )
-            .textSelection(.enabled)
+            Text(textContent.text)
+                .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
+                .lineSpacing(8)
+                .foregroundColor(themeManager.primaryTextColor)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
-        case .toolRequest(let toolContent):
-            ToolRequestView(toolContent: toolContent)
+        case .toolRequest(_):
+            // Tool requests are now shown as consolidated pills in MessageBubbleView
+            EmptyView()
             
         case .toolResponse(_):
             // Hide tool responses - user doesn't want to see them
