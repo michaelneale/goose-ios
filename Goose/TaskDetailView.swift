@@ -192,7 +192,7 @@ struct TaskDetailView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 4)
+                .padding(.top, 38)
                 .padding(.bottom, 24)
             }
             .background(
@@ -480,8 +480,8 @@ struct TaskOutputDetailView: View {
                     
                     Spacer()
                 }
-                .padding(.horizontal, 0)
-                .padding(.top, 0)
+                .padding(.horizontal, 16)
+                .padding(.top, 38)
                 .padding(.bottom, 24)
             }
             .background(
