@@ -194,17 +194,17 @@ struct TaskDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
                 .padding(.bottom, 24)
-                .background(
-                    ZStack {
-                        Rectangle()
-                            .fill(.ultraThinMaterial)
-                        Rectangle()
-                            .fill(themeManager.backgroundColor.opacity(0.95))
-                    }
-                )
-                
-                Spacer()
             }
+            .background(
+                ZStack {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                    Rectangle()
+                        .fill(themeManager.backgroundColor.opacity(0.95))
+                }
+                .ignoresSafeArea()
+            )
+            .frame(maxWidth: .infinity, alignment: .top)
         }
         .navigationBarHidden(true)
     }
@@ -481,17 +481,17 @@ struct TaskOutputDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
                 .padding(.bottom, 24)
-                .background(
-                    ZStack {
-                        Rectangle()
-                            .fill(.ultraThinMaterial)
-                        Rectangle()
-                            .fill(themeManager.backgroundColor.opacity(0.95))
-                    }
-                )
-                
-                Spacer()
             }
+            .background(
+                ZStack {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                    Rectangle()
+                        .fill(themeManager.backgroundColor.opacity(0.95))
+                }
+                .ignoresSafeArea()
+            )
+            .frame(maxWidth: .infinity, alignment: .top)
         }
         .navigationBarHidden(true)
     }
