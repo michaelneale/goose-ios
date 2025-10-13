@@ -158,54 +158,54 @@ struct TaskDetailView: View {
         }
         .background(themeManager.backgroundColor)
         
-        // Custom navigation bar overlay
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                // Back button
-                Button(action: {
-                    dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(themeManager.primaryTextColor)
+            // Custom navigation bar overlay
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    // Back button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .frame(width: 44, height: 44)
+                    }
+                    
+                    Spacer()
+                    
+                    // Breadcrumb
+                    HStack(spacing: 4) {
+                        Text(sessionName)
+                            .font(.system(size: 14))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(themeManager.primaryTextColor)
+                        
+                        Text(taskName)
+                            .font(.system(size: 14))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    // Spacer for symmetry
+                    Color.clear
                         .frame(width: 44, height: 44)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 50) // Add padding to move it down
+                .frame(height: 60)
+                .background(themeManager.backgroundColor)
                 
                 Spacer()
-                
-                // Breadcrumb
-                HStack(spacing: 4) {
-                    Text(sessionName)
-                        .font(.system(size: 14))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                        .foregroundColor(themeManager.primaryTextColor)
-                    
-                    Text(taskName)
-                        .font(.system(size: 14))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .lineLimit(1)
-                }
-                
-                Spacer()
-                
-                // Spacer for symmetry
-                Color.clear
-                    .frame(width: 44, height: 44)
             }
-            .padding(.horizontal, 16)
-            .frame(height: 60)
-            .background(themeManager.backgroundColor)
-            
-            Spacer()
-        }
         }
         .navigationBarHidden(true)
-        .edgesIgnoringSafeArea(.top)
     }
 }
 
@@ -262,74 +262,16 @@ struct TaskOutputDetailView: View {
     }
     
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             VStack(spacing: 0) {
-                // Add top padding for custom nav bar
-                Spacer()
-                    .frame(height: 60)
-                
-                // Search field
-                HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(themeManager.secondaryTextColor)
-                    .font(.system(size: 16))
-                
-                TextField("Search output...", text: $searchText)
-                    .font(.system(size: 16))
-                    .foregroundColor(themeManager.primaryTextColor)
-                    .onChange(of: searchText) { _ in
-                        performSearch()
-                    }
-                
-                if !searchMatches.isEmpty {
-                    Text("\(currentMatchIndex + 1)/\(searchMatches.count)")
-                        .font(.system(size: 12))
-                        .foregroundColor(themeManager.secondaryTextColor)
-                    
-                    Button(action: previousMatch) {
-                        Image(systemName: "chevron.up")
-                            .foregroundColor(themeManager.secondaryTextColor)
-                            .font(.system(size: 14))
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button(action: nextMatch) {
-                        Image(systemName: "chevron.down")
-                            .foregroundColor(themeManager.secondaryTextColor)
-                            .font(.system(size: 14))
-                    }
-                    .buttonStyle(.plain)
-                }
-                
-                if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                        searchMatches = []
-                        currentMatchIndex = 0
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(themeManager.secondaryTextColor)
-                            .font(.system(size: 16))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(themeManager.chatInputBackgroundColor.opacity(0.85))
-            .cornerRadius(26)
-            .padding(.horizontal, 16)
-            .padding(.top, 0)
-            .padding(.bottom, 12)
-            
-            // Task output
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Timestamp (if provided from message)
-                    if let timestamp = messageTimestamp {
-                        Text(formatTimestamp(timestamp))
-                            .font(.system(size: 12))
-                            .foregroundColor(themeManager.secondaryTextColor)
+                // Task output with padding for nav bar
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Timestamp (if provided from message)
+                        if let timestamp = messageTimestamp {
+                            Text(formatTimestamp(timestamp))
+                                .font(.system(size: 12))
+                                .foregroundColor(themeManager.secondaryTextColor)
                             .padding(.bottom, 8)
                     }
                     
@@ -436,60 +378,120 @@ struct TaskOutputDetailView: View {
                                 .textSelection(.enabled)
                         }
                     }
+                    }
+                    .padding()
+                    .padding(.top, 60) // Padding for nav bar
+                    .padding(.bottom, 100) // Padding for search bar
                 }
-                .padding()
             }
-        }
-        .background(themeManager.backgroundColor)
-        
-        // Custom navigation bar overlay
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                // Back button
-                Button(action: {
-                    dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .frame(width: 44, height: 44)
-                }
-                
-                Spacer()
-                
-                // Breadcrumb
-                HStack(spacing: 4) {
-                    Text(sessionName)
-                        .font(.system(size: 14))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                        .foregroundColor(themeManager.primaryTextColor)
-                    
-                    Text(task.toolCall.name)
-                        .font(.system(size: 14))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .lineLimit(1)
-                }
-                
-                Spacer()
-                
-                // Spacer for symmetry
-                Color.clear
-                    .frame(width: 44, height: 44)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 60)
             .background(themeManager.backgroundColor)
             
-            Spacer()
-        }
+            // Search field at bottom
+            VStack {
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(themeManager.secondaryTextColor)
+                        .font(.system(size: 16))
+                    
+                    TextField("Search output...", text: $searchText)
+                        .font(.system(size: 16))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .onChange(of: searchText) { _ in
+                            performSearch()
+                        }
+                    
+                    if !searchMatches.isEmpty {
+                        Text("\(currentMatchIndex + 1)/\(searchMatches.count)")
+                            .font(.system(size: 12))
+                            .foregroundColor(themeManager.secondaryTextColor)
+                        
+                        Button(action: previousMatch) {
+                            Image(systemName: "chevron.up")
+                                .foregroundColor(themeManager.secondaryTextColor)
+                                .font(.system(size: 14))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: nextMatch) {
+                            Image(systemName: "chevron.down")
+                                .foregroundColor(themeManager.secondaryTextColor)
+                                .font(.system(size: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                            searchMatches = []
+                            currentMatchIndex = 0
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(themeManager.secondaryTextColor)
+                                .font(.system(size: 16))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                .cornerRadius(26)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+            }
+        
+        
+            // Custom navigation bar overlay
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    // Back button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .frame(width: 44, height: 44)
+                    }
+                    
+                    Spacer()
+                    
+                    // Breadcrumb
+                    HStack(spacing: 4) {
+                        Text(sessionName)
+                            .font(.system(size: 14))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(themeManager.primaryTextColor)
+                        
+                        Text(task.toolCall.name)
+                            .font(.system(size: 14))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    // Spacer for symmetry
+                    Color.clear
+                        .frame(width: 44, height: 44)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 50) // Add padding to move it down
+                .frame(height: 60)
+                .background(themeManager.backgroundColor)
+                
+                Spacer()
+            }
         }
         .navigationBarHidden(true)
-        .edgesIgnoringSafeArea(.top)
     }
 }
 
