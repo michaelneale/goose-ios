@@ -309,6 +309,25 @@ struct ChatView: View {
             .frame(maxWidth: .infinity, alignment: .top)
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
+        .onChange(of: voiceManager.transcribedText) { newText in
+            // Update input text with transcribed text
+            if !newText.isEmpty && voiceManager.voiceMode != .normal {
+                inputText = newText
+            }
+        }
+        .onChange(of: voiceManager.voiceMode) { newMode in
+            // When voice mode returns to normal, send the transcribed message
+            if newMode == .normal && !voiceManager.transcribedText.isEmpty {
+                inputText = voiceManager.transcribedText
+                // Auto-send after a brief delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        sendMessage()
+                        voiceManager.transcribedText = "" // Clear transcribed text
+                    }
+                }
+            }
+        }
         .onAppear {
             Task {
                 await apiService.testConnection()

@@ -13,6 +13,9 @@ struct WelcomeView: View {
     @EnvironmentObject var themeManager: ThemeManager
     var onStartChat: (String) -> Void
     
+    // Voice features
+    @StateObject private var voiceManager = EnhancedVoiceManager()
+    
     // New states for enhanced welcome view
     @State private var recentSessions: [ChatSession] = []
     @State private var isLoadingSessions = true
@@ -157,6 +160,21 @@ struct WelcomeView: View {
             }
             
             // Bottom input area
+            VStack(spacing: 0) {
+                // Show transcribed text while in voice mode
+                if voiceManager.voiceMode != .normal && !voiceManager.transcribedText.isEmpty {
+                    HStack {
+                        Text("Transcribing: \"\(voiceManager.transcribedText)\"")
+                            .font(.caption)
+                            .foregroundColor(themeManager.secondaryTextColor)
+                            .lineLimit(2)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .background(themeManager.backgroundColor.opacity(0.95))
+                }
+                
             VStack(alignment: .leading, spacing: 12) {
                 // Text field on top
                 TextField("I want to...", text: $inputText, axis: .vertical)
@@ -164,6 +182,7 @@ struct WelcomeView: View {
                     .foregroundColor(themeManager.chatInputTextColor)
                     .lineLimit(1...4)
                     .padding(.vertical, 8)
+                    .disabled(voiceManager.voiceMode != .normal)
                     .onSubmit {
                         if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             onStartChat(inputText)
@@ -230,13 +249,28 @@ struct WelcomeView: View {
                         }
                         .buttonStyle(.plain)
                         
-                        // Wave - audio
+                        // Voice mode indicator text
+                        if voiceManager.voiceMode != .normal {
+                            Text(voiceManager.voiceMode == .audio ? "Transcribe" : "Full Audio")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(themeManager.isDarkMode ? .blue : .blue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.blue.opacity(0.1))
+                                )
+                        }
+                        
+                        // Wave - audio/voice button
                         Button(action: {
-                            print("Audio tapped")
+                            // Cycle through voice modes
+                            voiceManager.cycleVoiceMode()
                         }) {
-                            Image(systemName: "waveform")
+                            Image(systemName: voiceManager.voiceMode == .normal ? "waveform" : "waveform.circle.fill")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(themeManager.chatInputIconColor)
+                                .foregroundColor(voiceManager.voiceMode == .normal ? themeManager.chatInputIconColor : .blue)
                                 .frame(width: 32, height: 32)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16)
@@ -273,8 +307,28 @@ struct WelcomeView: View {
                     .inset(by: 0.5)
                     .stroke(themeManager.chatInputBorderColor, lineWidth: 0.5)
             )
+            } // End of transcription VStack
             .padding(.horizontal, 16)
             .padding(.bottom, 40)
+        }
+        .onChange(of: voiceManager.transcribedText) { newText in
+            // Update input text with transcribed text
+            if !newText.isEmpty && voiceManager.voiceMode != .normal {
+                inputText = newText
+            }
+        }
+        .onChange(of: voiceManager.voiceMode) { newMode in
+            // When voice mode returns to normal, send the transcribed message
+            if newMode == .normal && !voiceManager.transcribedText.isEmpty {
+                inputText = voiceManager.transcribedText
+                // Auto-send after a brief delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onStartChat(inputText)
+                        voiceManager.transcribedText = "" // Clear transcribed text
+                    }
+                }
+            }
         }
         .onAppear {
             // Start typewriter animation
