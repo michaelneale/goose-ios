@@ -264,7 +264,7 @@ struct TaskOutputDetailView: View {
     }
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 // Task output with padding for nav bar
                 ScrollView {
