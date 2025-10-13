@@ -208,6 +208,7 @@ struct TaskDetailView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
         .navigationBarHidden(true)
+        .ignoresSafeArea(edges: .top)
     }
 }
 
@@ -448,7 +449,7 @@ struct TaskOutputDetailView: View {
         
             // Custom navigation bar overlay with frosted glass
             VStack(spacing: 0) {
-                HStack(spacing: 8) {
+                HStack(spacing: 0) {
                     // Back button
                     Button(action: {
                         dismiss()
@@ -479,8 +480,8 @@ struct TaskOutputDetailView: View {
                     
                     Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
+                .padding(.horizontal, 0)
+                .padding(.top, 0)
                 .padding(.bottom, 24)
             }
             .background(
@@ -496,6 +497,7 @@ struct TaskOutputDetailView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
         .navigationBarHidden(true)
+        .ignoresSafeArea(edges: .top)
     }
 }
 
