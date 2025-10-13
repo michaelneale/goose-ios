@@ -275,12 +275,8 @@ struct ChatView: View {
                 .padding(.bottom, 0)
             }
             
-            // Custom navigation bar with background
+            // Custom navigation bar with background blur
             VStack(spacing: 0) {
-                // Status bar spacer
-                Color.clear
-                    .frame(height: 0)
-                
                 HStack(spacing: 8) {
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -310,8 +306,9 @@ struct ChatView: View {
                     Rectangle()
                         .fill(.ultraThinMaterial)
                     Rectangle()
-                        .fill(themeManager.backgroundColor.opacity(0.85))
+                        .fill(themeManager.backgroundColor.opacity(0.5))
                 }
+                .ignoresSafeArea()
             )
             .frame(maxWidth: .infinity, alignment: .top)
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)

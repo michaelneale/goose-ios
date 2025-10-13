@@ -33,7 +33,7 @@ struct WelcomeView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top navigation bar with background
+            // Top navigation bar with background blur
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Button(action: {
@@ -59,8 +59,9 @@ struct WelcomeView: View {
                     Rectangle()
                         .fill(.ultraThinMaterial)
                     Rectangle()
-                        .fill(themeManager.backgroundColor.opacity(0.85))
+                        .fill(themeManager.backgroundColor.opacity(0.5))
                 }
+                .ignoresSafeArea()
             )
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
             
