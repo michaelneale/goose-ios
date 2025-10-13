@@ -305,7 +305,7 @@ struct WelcomeView: View {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: 21)
-                            .fill(themeManager.chatInputBackgroundColor.opacity(0.3))
+                            .fill(themeManager.chatInputBackgroundColor.opacity(0.25))
                     )
             )
             .overlay(
