@@ -317,17 +317,14 @@ struct WelcomeView: View {
                 inputText = newText
             }
         }
-        .onChange(of: voiceManager.state) { newState in
-            // Auto-send when transcription completes (goes to idle while still in voice mode)
-            if newState == .idle && voiceManager.voiceMode != .normal && !voiceManager.transcribedText.isEmpty {
-                inputText = voiceManager.transcribedText
-                // Auto-send after a brief delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        .onAppear {
+            // Set up voice manager callback for auto-sending messages
+            voiceManager.onSubmitMessage = { message in
+                inputText = message
+                // Auto-send the message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         onStartChat(inputText)
-                        // Switch back to normal mode and clear
-                        voiceManager.voiceMode = .normal
-                        voiceManager.transcribedText = ""
                     }
                 }
             }
