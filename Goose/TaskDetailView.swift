@@ -166,8 +166,10 @@ struct TaskDetailView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(themeManager.primaryTextColor)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PlainButtonStyle())
+                .background(Color.clear)
             }
             
             // Breadcrumb in the center
@@ -431,8 +433,10 @@ struct TaskOutputDetailView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(themeManager.primaryTextColor)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PlainButtonStyle())
+                .background(Color.clear)
             }
             
             // Breadcrumb in the center
