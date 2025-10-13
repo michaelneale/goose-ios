@@ -171,9 +171,7 @@ struct TaskDetailView: View {
                             .frame(width: 44, height: 44)
                     }
                     
-                    Spacer()
-                    
-                    // Breadcrumb
+                    // Breadcrumb (left-aligned)
                     HStack(spacing: 4) {
                         Text(sessionName)
                             .font(.system(size: 14))
@@ -192,14 +190,9 @@ struct TaskDetailView: View {
                     }
                     
                     Spacer()
-                    
-                    // Spacer for symmetry
-                    Color.clear
-                        .frame(width: 44, height: 44)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
+                .padding(.vertical, 8)
                 .background(
                     ZStack {
                         Rectangle()
@@ -464,9 +457,7 @@ struct TaskOutputDetailView: View {
                             .frame(width: 44, height: 44)
                     }
                     
-                    Spacer()
-                    
-                    // Breadcrumb
+                    // Breadcrumb (left-aligned)
                     HStack(spacing: 4) {
                         Text(sessionName)
                             .font(.system(size: 14))
@@ -485,14 +476,9 @@ struct TaskOutputDetailView: View {
                     }
                     
                     Spacer()
-                    
-                    // Spacer for symmetry
-                    Color.clear
-                        .frame(width: 44, height: 44)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
+                .padding(.vertical, 8)
                 .background(
                     ZStack {
                         Rectangle()
