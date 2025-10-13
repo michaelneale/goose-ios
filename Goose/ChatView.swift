@@ -129,7 +129,7 @@ struct ChatView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
-                        .background(themeManager.backgroundColor.opacity(0.95))
+                        .background(themeManager.backgroundColor.opacity(0.75))
                     }
                 
                 VStack(alignment: .leading, spacing: 12) {
@@ -262,7 +262,7 @@ struct ChatView: View {
                         .fill(.ultraThinMaterial)
                         .overlay(
                             RoundedRectangle(cornerRadius: 21)
-                                .fill(themeManager.chatInputBackgroundColor.opacity(0.25))
+                                .fill(themeManager.chatInputBackgroundColor.opacity(0.5))
                         )
                 )
                 } // End of transcription VStack
