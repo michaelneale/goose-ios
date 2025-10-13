@@ -205,6 +205,7 @@ struct TaskDetailView: View {
                 .ignoresSafeArea()
             )
             .frame(maxWidth: .infinity, alignment: .top)
+            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
         .navigationBarHidden(true)
     }
@@ -492,6 +493,7 @@ struct TaskOutputDetailView: View {
                 .ignoresSafeArea()
             )
             .frame(maxWidth: .infinity, alignment: .top)
+            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
         .navigationBarHidden(true)
     }
