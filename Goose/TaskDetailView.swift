@@ -192,7 +192,8 @@ struct TaskDetailView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
                 .background(
                     ZStack {
                         Rectangle()
@@ -380,7 +381,7 @@ struct TaskOutputDetailView: View {
                     }
                     }
                     .padding()
-                    .padding(.top, 56) // Padding for nav bar (matches main chat)
+                    .padding(.top, 0) // Padding for nav bar (matches main chat)
                     .padding(.bottom, 100) // Padding for search bar
                 }
             }
@@ -478,7 +479,8 @@ struct TaskOutputDetailView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
                 .background(
                     ZStack {
                         Rectangle()
