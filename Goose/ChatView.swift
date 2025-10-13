@@ -239,7 +239,7 @@ struct ChatView: View {
                             Button(action: {
                                 if isLoading {
                                     stopStreaming()
-                                } else {
+                                } else if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                     sendMessage()
                                 }
                             }) {
@@ -251,7 +251,7 @@ struct ChatView: View {
                                     .cornerRadius(16)
                             }
                             .buttonStyle(.plain)
-                            .disabled(!isLoading && inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .allowsHitTesting(!inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
                         }
                     }
                 }

@@ -294,7 +294,7 @@ struct WelcomeView: View {
                                 .cornerRadius(16)
                         }
                         .buttonStyle(.plain)
-                        .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .allowsHitTesting(!inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
             }
