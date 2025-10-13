@@ -7,13 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Array Extension for Safe Subscripting
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
-}
-
 // MARK: - Task Detail View (Shows completed tasks with conversation)
 struct TaskDetailView: View {
     let message: Message
@@ -175,13 +168,13 @@ struct TaskDetailView: View {
                 HStack(spacing: 4) {
                     Text(sessionName)
                         .font(.system(size: 14))
-                        .foregroundColor(themeManager.primaryTextColor)
+                        .foregroundColor(themeManager.secondaryTextColor)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12))
-                        .foregroundColor(themeManager.primaryTextColor)
+                        .foregroundColor(themeManager.secondaryTextColor)
                     
                     Text(taskName)
                         .font(.system(size: 14))
@@ -202,9 +195,6 @@ struct TaskOutputDetailView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
-    @State private var searchMatches: [Int] = []
-    @State private var currentMatchIndex: Int = 0
-    @State private var outputLines: [String] = []
     
     // Format timestamp
     private func formatTimestamp(_ timestamp: Int64) -> String {
@@ -213,36 +203,6 @@ struct TaskOutputDetailView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
-    }
-    
-    // Search functionality
-    private func performSearch() {
-        guard !searchText.isEmpty else {
-            searchMatches = []
-            currentMatchIndex = 0
-            return
-        }
-        
-        searchMatches = []
-        for (index, line) in outputLines.enumerated() {
-            if line.lowercased().contains(searchText.lowercased()) {
-                searchMatches.append(index)
-            }
-        }
-        
-        if !searchMatches.isEmpty {
-            currentMatchIndex = 0
-        }
-    }
-    
-    private func nextMatch() {
-        guard !searchMatches.isEmpty else { return }
-        currentMatchIndex = (currentMatchIndex + 1) % searchMatches.count
-    }
-    
-    private func previousMatch() {
-        guard !searchMatches.isEmpty else { return }
-        currentMatchIndex = (currentMatchIndex - 1 + searchMatches.count) % searchMatches.count
     }
     
     var body: some View {
@@ -256,35 +216,10 @@ struct TaskOutputDetailView: View {
                 TextField("Search output...", text: $searchText)
                     .font(.system(size: 16))
                     .foregroundColor(themeManager.primaryTextColor)
-                    .onChange(of: searchText) { _ in
-                        performSearch()
-                    }
-                
-                if !searchMatches.isEmpty {
-                    Text("\(currentMatchIndex + 1)/\(searchMatches.count)")
-                        .font(.system(size: 12))
-                        .foregroundColor(themeManager.secondaryTextColor)
-                    
-                    Button(action: previousMatch) {
-                        Image(systemName: "chevron.up")
-                            .foregroundColor(themeManager.secondaryTextColor)
-                            .font(.system(size: 14))
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button(action: nextMatch) {
-                        Image(systemName: "chevron.down")
-                            .foregroundColor(themeManager.secondaryTextColor)
-                            .font(.system(size: 14))
-                    }
-                    .buttonStyle(.plain)
-                }
                 
                 if !searchText.isEmpty {
                     Button(action: {
                         searchText = ""
-                        searchMatches = []
-                        currentMatchIndex = 0
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(themeManager.secondaryTextColor)
@@ -353,7 +288,7 @@ struct TaskOutputDetailView: View {
                         .padding(.bottom, 8)
                     }
                     
-                    // Full output/result - displayed directly as code with line numbers
+                    // Full output/result - displayed directly as code
                     if let value = task.result.value {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Output")
@@ -362,43 +297,12 @@ struct TaskOutputDetailView: View {
                                 .padding(.bottom, 4)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    ForEach(Array(outputLines.enumerated()), id: \.offset) { index, line in
-                                        HStack(alignment: .top, spacing: 12) {
-                                            // Line number
-                                            Text("\(index + 1)")
-                                                .font(.system(size: 12, design: .monospaced))
-                                                .foregroundColor(themeManager.secondaryTextColor.opacity(0.5))
-                                                .frame(minWidth: 40, alignment: .trailing)
-                                            
-                                            // Line content with search highlight
-                                            if searchMatches.contains(index) {
-                                                Text(line)
-                                                    .font(.system(size: 12, design: .monospaced))
-                                                    .foregroundColor(themeManager.primaryTextColor)
-                                                    .background(
-                                                        searchMatches[safe: currentMatchIndex] == index ?
-                                                            Color.orange.opacity(0.4) : Color.yellow.opacity(0.3)
-                                                    )
-                                                    .id("line-\(index)")
-                                            } else {
-                                                Text(line)
-                                                    .font(.system(size: 12, design: .monospaced))
-                                                    .foregroundColor(themeManager.primaryTextColor)
-                                            }
-                                            
-                                            Spacer()
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                }
-                                .textSelection(.enabled)
+                                Text(String(describing: value.value))
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundColor(themeManager.primaryTextColor)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
                             }
-                        }
-                        .onAppear {
-                            // Split output into lines
-                            let outputString = String(describing: value.value)
-                            outputLines = outputString.components(separatedBy: .newlines)
                         }
                     }
                     
@@ -440,13 +344,13 @@ struct TaskOutputDetailView: View {
                 HStack(spacing: 4) {
                     Text(sessionName)
                         .font(.system(size: 14))
-                        .foregroundColor(themeManager.primaryTextColor)
+                        .foregroundColor(themeManager.secondaryTextColor)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12))
-                        .foregroundColor(themeManager.primaryTextColor)
+                        .foregroundColor(themeManager.secondaryTextColor)
                     
                     Text(task.toolCall.name)
                         .font(.system(size: 14))
