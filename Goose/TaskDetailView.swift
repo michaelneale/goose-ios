@@ -58,7 +58,7 @@ struct TaskDetailView: View {
                         .font(.system(size: 12))
                         .foregroundColor(themeManager.secondaryTextColor)
                         .padding(.bottom, 4)
-                        .padding(.top, 60) // Add padding for custom nav bar
+                        .padding(.top, 56) // Add padding for custom nav bar (matches main chat)
                 
                 // Show the conversation/reasoning text
                 if !messageText.isEmpty {
@@ -158,7 +158,7 @@ struct TaskDetailView: View {
         }
         .background(themeManager.backgroundColor)
         
-            // Custom navigation bar overlay
+            // Custom navigation bar overlay with frosted glass
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     // Back button
@@ -198,9 +198,16 @@ struct TaskDetailView: View {
                         .frame(width: 44, height: 44)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 50) // Add padding to move it down
-                .frame(height: 60)
-                .background(themeManager.backgroundColor)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+                .background(
+                    ZStack {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                        Rectangle()
+                            .fill(themeManager.backgroundColor.opacity(0.95))
+                    }
+                )
                 
                 Spacer()
             }
@@ -380,7 +387,7 @@ struct TaskOutputDetailView: View {
                     }
                     }
                     .padding()
-                    .padding(.top, 60) // Padding for nav bar
+                    .padding(.top, 56) // Padding for nav bar (matches main chat)
                     .padding(.bottom, 100) // Padding for search bar
                 }
             }
@@ -444,7 +451,7 @@ struct TaskOutputDetailView: View {
             }
         
         
-            // Custom navigation bar overlay
+            // Custom navigation bar overlay with frosted glass
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     // Back button
@@ -484,9 +491,16 @@ struct TaskOutputDetailView: View {
                         .frame(width: 44, height: 44)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 50) // Add padding to move it down
-                .frame(height: 60)
-                .background(themeManager.backgroundColor)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+                .background(
+                    ZStack {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                        Rectangle()
+                            .fill(themeManager.backgroundColor.opacity(0.95))
+                    }
+                )
                 
                 Spacer()
             }
