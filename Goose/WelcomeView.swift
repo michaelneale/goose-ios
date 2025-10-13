@@ -215,24 +215,25 @@ struct WelcomeView: View {
                     }
                     .buttonStyle(.plain)
                     
+                    // Puzzle icon - extensions
+                    Button(action: {
+                        print("Extensions tapped")
+                    }) {
+                        Image(systemName: "puzzlepiece.extension")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(themeManager.chatInputIconColor)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .inset(by: 0.5)
+                                    .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    
                     Spacer()
                     
                     HStack(spacing: 10) {
-                        // Puzzle icon - extensions
-                        Button(action: {
-                            print("Extensions tapped")
-                        }) {
-                            Image(systemName: "puzzlepiece.extension")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(themeManager.chatInputIconColor)
-                                .frame(width: 32, height: 32)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .inset(by: 0.5)
-                                        .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
-                                )
-                        }
-                        .buttonStyle(.plain)
                         
                         // Auto selector - LLM dropdown
                         Button(action: {
