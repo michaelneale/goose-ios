@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2A84454C2E9D39220050DB04 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A84454B2E9D39220050DB04 /* ThemeManager.swift */; };
 		5FB46C8A5B96A5D68C7CA66F /* VoiceInputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */; };
 		834A2CB82E98D93A00D15D6A /* ContinuousVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834A2CB72E98D93A00D15D6A /* ContinuousVoiceManager.swift */; };
 		834A2CB92E98D93B00D15D6A /* EnhancedVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834A2CB82E98D93B00D15D6A /* EnhancedVoiceManager.swift */; };
@@ -28,6 +29,7 @@
 
 /* Begin PBXFileReference section */
 		0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputManager.swift; sourceTree = "<group>"; };
+		2A84454B2E9D39220050DB04 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		834A2CB72E98D93A00D15D6A /* ContinuousVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContinuousVoiceManager.swift; path = Goose/ContinuousVoiceManager.swift; sourceTree = "<group>"; };
 		834A2CB82E98D93B00D15D6A /* EnhancedVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedVoiceManager.swift; sourceTree = "<group>"; };
 		838F2DE32E9CA43D00E2FC48 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
@@ -80,6 +82,7 @@
 		A1234567890ABCDEF991 /* Goose */ = {
 			isa = PBXGroup;
 			children = (
+				2A84454B2E9D39220050DB04 /* ThemeManager.swift */,
 				838F2DE32E9CA43D00E2FC48 /* SplashScreenView.swift */,
 				838F2DE42E9CA43D00E2FC48 /* WelcomeView.swift */,
 				83ACD8AC2E827FAE00379D0E /* Info.plist */,
@@ -187,6 +190,7 @@
 			files = (
 				A1234567890ABCDEF003 /* ContentView.swift in Sources */,
 				838F2DE52E9CA43D00E2FC48 /* SplashScreenView.swift in Sources */,
+				2A84454C2E9D39220050DB04 /* ThemeManager.swift in Sources */,
 				838F2DE62E9CA43D00E2FC48 /* WelcomeView.swift in Sources */,
 				A1234567890ABCDEF010 /* ChatView.swift in Sources */,
 				5FB46C8A5B96A5D68C7CA66F /* VoiceInputManager.swift in Sources */,

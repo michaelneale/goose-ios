@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct GooseApp: App {
     @StateObject private var configurationHandler = ConfigurationHandler.shared
+    @StateObject private var themeManager = ThemeManager.shared
     
     init() {
         // Set demo defaults on first launch only
@@ -13,6 +14,8 @@ struct GooseApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(configurationHandler)
+                .environmentObject(themeManager)
+                .preferredColorScheme(themeManager.colorScheme)
                 .onOpenURL { url in
                     print("📱 App received URL: \(url)")
                     _ = configurationHandler.handleURL(url)

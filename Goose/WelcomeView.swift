@@ -1,35 +1,46 @@
+//
+//  WelcomeView.swift
+//  Goose
+//
+//  Created by Thomas Petersen on 10/9/25.
+//
+
 import SwiftUI
 
 struct WelcomeView: View {
     @Binding var showingSidebar: Bool
     @State private var inputText = ""
-    @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject var themeManager: ThemeManager
     var onStartChat: (String) -> Void
-    var onSessionSelect: (String) -> Void
     
-    // States for welcome view
+    // New states for enhanced welcome view
     @State private var recentSessions: [ChatSession] = []
     @State private var isLoadingSessions = true
-    @State private var isSettingsPresented = false
+    @State private var tokenProgress: CGFloat = 0.0 // Animate from 0 to actual value
+    private let totalTokens: Double = 100000 // Fake total tokens
+    private let usedTokens: Double = 45000 // Fake used tokens (45%)
     
     // Animation states
     @State private var displayedText = ""
+    @State private var showTokensSection = false
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
     @State private var showLogo = false
-    private let fullText = "Morning!\nWhat do you want to do?"
+    private let fullText = "Morning Spence!\nWhat do you want to do?"
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top navigation bar
+            // Top navigation bar with background
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Button(action: {
-                        isSettingsPresented = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSidebar.toggle()
+                        }
                     }) {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
-                            .foregroundColor(.primary)
+                            .foregroundColor(themeManager.primaryTextColor)
                             .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
@@ -40,7 +51,7 @@ struct WelcomeView: View {
                 .padding(.top, 66)
                 .padding(.bottom, 8)
             }
-            .background(Color(UIColor.systemBackground).opacity(0.95))
+            .background(themeManager.backgroundColor.opacity(0.95))
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
             
             ScrollView(showsIndicators: false) {
@@ -50,7 +61,7 @@ struct WelcomeView: View {
                         Text(displayedText)
                             .font(.system(size: 20, weight: .medium))
                             .lineSpacing(6)
-                            .foregroundColor(.primary)
+                            .foregroundColor(themeManager.primaryTextColor)
                         
                         Spacer()
                         
@@ -58,7 +69,7 @@ struct WelcomeView: View {
                             Image("GooseLogo")
                                 .resizable()
                                 .renderingMode(.template)
-                                .foregroundColor(.primary)
+                                .foregroundColor(themeManager.primaryTextColor)
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 48, height: 48)
                                 .transition(.scale.combined(with: .opacity))
@@ -66,13 +77,41 @@ struct WelcomeView: View {
                     }
                     .padding(.top, 32)
                     
+                    // Tokens Used Section
+                    if showTokensSection {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("TOKENS USED")
+                                .font(.system(size: 12, weight: .semibold))
+                                .tracking(1.02)
+                                .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
+                            
+                            // Progress bar
+                            GeometryReader { geometry in
+                                ZStack(alignment: .leading) {
+                                    // Background - light gray for both themes
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(themeManager.isDarkMode ? Color(red: 0.10, green: 0.10, blue: 0.13) : Color(red: 0.95, green: 0.95, blue: 0.95))
+                                        .frame(height: 12)
+                                    
+                                    // Foreground (animated) - white in dark mode, black in light mode
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(themeManager.isDarkMode ? Color.white : Color.black)
+                                        .frame(width: geometry.size.width * tokenProgress, height: 12)
+                                }
+                            }
+                            .frame(height: 12)
+                        }
+                        .padding(.top, 16)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    
                     // Recent Sessions Section
                     VStack(alignment: .leading, spacing: 16) {
                         if showSessionsTitle {
                             Text("RECENT SESSIONS")
                                 .font(.system(size: 12, weight: .semibold))
                                 .tracking(1.02)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
                                 .padding(.top, 16)
                         }
                         
@@ -82,7 +121,7 @@ struct WelcomeView: View {
                                 Spacer()
                                 ProgressView()
                                     .scaleEffect(0.8)
-                                    .tint(.secondary)
+                                    .tint(themeManager.secondaryTextColor)
                                 Spacer()
                             }
                             .frame(height: 100)
@@ -90,7 +129,7 @@ struct WelcomeView: View {
                             // Empty state
                             Text("No recent sessions")
                                 .font(.system(size: 14))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(themeManager.secondaryTextColor)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 32)
                         } else {
@@ -99,10 +138,12 @@ struct WelcomeView: View {
                                 ForEach(Array(recentSessions.prefix(3).enumerated()), id: \.element.id) { index, session in
                                     if index < visibleSessionsCount {
                                         WelcomeSessionRowView(session: session)
+                                            .environmentObject(themeManager)
                                             .transition(.opacity)
                                             .onTapGesture {
                                                 // Load the session when tapped
-                                                onSessionSelect(session.id)
+                                                print("Selected session: \(session.id)")
+                                                onStartChat("") // This will trigger navigation to chat
                                             }
                                     }
                                 }
@@ -120,7 +161,7 @@ struct WelcomeView: View {
                 // Text field on top
                 TextField("I want to...", text: $inputText, axis: .vertical)
                     .font(.system(size: 16))
-                    .foregroundColor(.primary)
+                    .foregroundColor(themeManager.chatInputTextColor)
                     .lineLimit(1...4)
                     .padding(.vertical, 8)
                     .onSubmit {
@@ -131,44 +172,109 @@ struct WelcomeView: View {
                 
                 // Buttons row at bottom
                 HStack(spacing: 10) {
-                    Spacer()
-                    
-                    // Send button
+                    // Plus button - file attachment
                     Button(action: {
-                        if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            onStartChat(inputText)
-                        }
+                        print("File attachment tapped")
                     }) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(colorScheme == .dark ? .black : .white)
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(themeManager.chatInputIconColor)
                             .frame(width: 32, height: 32)
-                            .background(
-                                inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty 
-                                ? Color.gray.opacity(0.3) 
-                                : (colorScheme == .dark ? Color.white : Color.black)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .inset(by: 0.5)
+                                    .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
                             )
-                            .cornerRadius(16)
                     }
                     .buttonStyle(.plain)
-                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 10) {
+                        // Puzzle icon - extensions
+                        Button(action: {
+                            print("Extensions tapped")
+                        }) {
+                            Image(systemName: "puzzlepiece.extension")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(themeManager.chatInputIconColor)
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .inset(by: 0.5)
+                                        .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Auto selector - LLM dropdown
+                        Button(action: {
+                            print("LLM selector tapped")
+                        }) {
+                            HStack(spacing: 5) {
+                                Text("Auto")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(themeManager.chatInputIconColor)
+                                
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(themeManager.chatInputIconColor)
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(width: 84, height: 32)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .inset(by: 0.5)
+                                    .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Wave - audio
+                        Button(action: {
+                            print("Audio tapped")
+                        }) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(themeManager.chatInputIconColor)
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .inset(by: 0.5)
+                                        .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Send button - white/black background based on theme
+                        Button(action: {
+                            if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                onStartChat(inputText)
+                            }
+                        }) {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundColor(themeManager.chatInputIconColor)
+                                .frame(width: 32, height: 32)
+                                .background(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.white.opacity(0.3) : (themeManager.isDarkMode ? Color.white : Color.black))
+                                .cornerRadius(16)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                 }
             }
             .padding(10)
             .frame(maxWidth: .infinity)
-            .background(Color(UIColor.secondarySystemBackground))
+            .background(themeManager.chatInputBackgroundColor)
             .cornerRadius(21)
             .overlay(
                 RoundedRectangle(cornerRadius: 21)
                     .inset(by: 0.5)
-                    .stroke(Color(UIColor.separator), lineWidth: 0.5)
+                    .stroke(themeManager.chatInputBorderColor, lineWidth: 0.5)
             )
             .padding(.horizontal, 16)
             .padding(.bottom, 40)
-        }
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsView()
-                .environmentObject(ConfigurationHandler.shared)
         }
         .onAppear {
             // Start typewriter animation
@@ -196,17 +302,31 @@ struct WelcomeView: View {
                         showLogo = true
                     }
                     
-                    // Show sessions title
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            showSessionsTitle = true
+                    // Show tokens section after logo
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            showTokensSection = true
                         }
                         
-                        // Show sessions one by one quickly (100ms between each)
-                        for i in 0..<min(3, recentSessions.count) {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4 + Double(i) * 0.1) {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    visibleSessionsCount = i + 1
+                        // Animate progress bar
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            withAnimation(.easeOut(duration: 0.8)) {
+                                tokenProgress = CGFloat(usedTokens / totalTokens)
+                            }
+                        }
+                        
+                        // Show sessions title
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                showSessionsTitle = true
+                            }
+                            
+                            // Show sessions one by one quickly (100ms between each)
+                            for i in 0..<3 {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4 + Double(i) * 0.1) {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        visibleSessionsCount = i + 1
+                                    }
                                 }
                             }
                         }
@@ -228,17 +348,6 @@ struct WelcomeView: View {
         await MainActor.run {
             recentSessions = Array(sessions.prefix(3))
             isLoadingSessions = false
-            
-            // Update visible count if sessions loaded after animation
-            if showSessionsTitle && visibleSessionsCount == 0 {
-                for i in 0..<min(3, recentSessions.count) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            visibleSessionsCount = i + 1
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -246,18 +355,11 @@ struct WelcomeView: View {
 // MARK: - Welcome Session Row View
 struct WelcomeSessionRowView: View {
     let session: ChatSession
-    @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject var themeManager: ThemeManager
     
     var formattedTimestamp: String {
-        // Parse the ISO8601 date string
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let sessionDate = formatter.date(from: session.updatedAt) else {
-            return session.updatedAt
-        }
-        
         let now = Date()
+        let sessionDate = session.timestamp
         let interval = now.timeIntervalSince(sessionDate)
         
         let minutes = Int(interval / 60)
@@ -277,28 +379,23 @@ struct WelcomeSessionRowView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(session.description.isEmpty ? "Session \(session.id.prefix(8))" : session.description)
+            Text(session.title)
                 .font(.system(size: 16))
-                .foregroundColor(.primary)
-                .lineLimit(1)
+                .foregroundColor(themeManager.primaryTextColor)
             
             Text(formattedTimestamp)
                 .font(.system(size: 12))
                 .tracking(0.06)
-                .foregroundColor(.secondary)
+                .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 #Preview {
-    WelcomeView(
-        showingSidebar: .constant(false),
-        onStartChat: { text in
-            print("Starting chat with: \(text)")
-        },
-        onSessionSelect: { sessionId in
-            print("Selected session: \(sessionId)")
-        }
-    )
+    WelcomeView(showingSidebar: .constant(false)) { text in
+        print("Starting chat with: \(text)")
+    }
+    .environmentObject(ThemeManager.shared)
 }
+

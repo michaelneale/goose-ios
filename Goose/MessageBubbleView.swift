@@ -6,13 +6,13 @@ struct MessageBubbleView: View {
     let completedTasks: [CompletedToolCall]
     @State private var showFullText = false
     @State private var isTruncated = false
+    @EnvironmentObject var themeManager: ThemeManager
     
-    // Maximum height for truncation - about 70% of screen like PR #11
-    private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7
+    private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7 // 70% of screen height
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Message content - filter out tool responses AND tool requests (we'll show them as pills)
+            // Message content - filter out tool responses AND tool requests (we'll show them consolidated)
             let filteredContent = message.content.filter { 
                 !isToolResponse($0) && !isToolRequest($0)
             }
@@ -31,11 +31,12 @@ struct MessageBubbleView: View {
                 }
             }
             
-            // Show consolidated task completion pill if there are completed tasks (PR #11 style)
+            // Show consolidated task completion pill if there are completed tasks
             if !completedTasks.isEmpty {
-                // Show all completed tools as collapsible items (they were actually expandable in PR #11)
+                // Show all completed tools as collapsible items
                 ForEach(completedTasks, id: \.toolCall.name) { completedTask in
                     CompletedToolPillView(completedCall: completedTask)
+                        .environmentObject(themeManager)
                 }
             }
         }
@@ -93,28 +94,69 @@ struct MessageContentView: View {
     }
 }
 
-// MARK: - Markdown Parsing Helper
-private struct MarkdownParser {
-    static func parse(_ text: String) -> AttributedString {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let document = Document(parsing: trimmedText)
-        
-        var attributedString = AttributedString()
-        for child in document.children {
-            attributedString.append(processElement(child))
-        }
-        
-        return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
+// MARK: - Cached Markdown Text View
+struct MarkdownText: View {
+    let text: String
+    @State private var cachedAttributedText: AttributedString?
+    
+    // Memory management - limit cache size
+    private static var maxCacheSize = 1000 // characters
+    private static var cacheCleanupThreshold = 2000 // characters
+    
+    var body: some View {
+        Text(cachedAttributedText ?? AttributedString(text))
+            .textSelection(.enabled)
+            .onAppear {
+                if cachedAttributedText == nil {
+                    cachedAttributedText = parseMarkdown(text)
+                }
+            }
+            .onChange(of: text) {
+                // Only reparse if text changed significantly (not just appended)
+                let newText = text
+                if !newText.hasPrefix(text) || newText.count - text.count > 50 {
+                    cachedAttributedText = parseMarkdown(newText)
+                } else if let cached = cachedAttributedText {
+                    // For streaming text, just append the new part
+                    let newPart = String(newText.dropFirst(text.count))
+                    cachedAttributedText = cached + AttributedString(newPart)
+                }
+            }
     }
     
-    private static func processElement(_ element: Markup) -> AttributedString {
+    private func parseMarkdown(_ text: String) -> AttributedString {
+        // Trim whitespace from the input text
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // For large texts, only parse the last portion to avoid blocking
+        let textToParse = trimmedText.count > 1000 ? String(trimmedText.suffix(1000)) : trimmedText
+        
+        // Parse the markdown using swift-markdown
+        let document = Document(parsing: textToParse)
+        
+        // Convert to AttributedString with proper formatting
+        var attributedString = AttributedString()
+        
+        for child in document.children {
+            attributedString.append(processMarkdownElement(child))
+        }
+        
+        // Return the result, using trimmed text as fallback
+        if attributedString.characters.isEmpty {
+            return AttributedString(trimmedText)
+        }
+        
+        return attributedString
+    }
+    
+    private func processMarkdownElement(_ element: Markup) -> AttributedString {
         var result = AttributedString()
         
         switch element {
         case let paragraph as Paragraph:
             for child in paragraph.children {
                 if let inlineChild = child as? InlineMarkup {
-                    result.append(processInline(inlineChild))
+                    result.append(processInlineMarkup(inlineChild))
                 }
             }
             result.append(AttributedString("\n"))
@@ -123,7 +165,7 @@ private struct MarkdownParser {
             var headingText = AttributedString()
             for child in heading.children {
                 if let inlineChild = child as? InlineMarkup {
-                    headingText.append(processInline(inlineChild))
+                    headingText.append(processInlineMarkup(inlineChild))
                 }
             }
             headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
@@ -140,13 +182,14 @@ private struct MarkdownParser {
         case let listItem as ListItem:
             result.append(AttributedString("• "))
             for child in listItem.children {
-                result.append(processElement(child))
+                result.append(processMarkdownElement(child))
             }
             
         default:
+            // Handle other block elements
             if let blockElement = element as? BlockMarkup {
                 for child in blockElement.children {
-                    result.append(processElement(child))
+                    result.append(processMarkdownElement(child))
                 }
             }
         }
@@ -154,7 +197,7 @@ private struct MarkdownParser {
         return result
     }
     
-    private static func processInline(_ element: InlineMarkup) -> AttributedString {
+    private func processInlineMarkup(_ element: InlineMarkup) -> AttributedString {
         switch element {
         case let text as Markdown.Text:
             return AttributedString(text.plainText)
@@ -163,7 +206,7 @@ private struct MarkdownParser {
             var strongText = AttributedString()
             for child in strong.children {
                 if let inlineChild = child as? InlineMarkup {
-                    strongText.append(processInline(inlineChild))
+                    strongText.append(processInlineMarkup(inlineChild))
                 }
             }
             strongText.font = .body.bold()
@@ -173,7 +216,7 @@ private struct MarkdownParser {
             var emphasisText = AttributedString()
             for child in emphasis.children {
                 if let inlineChild = child as? InlineMarkup {
-                    emphasisText.append(processInline(inlineChild))
+                    emphasisText.append(processInlineMarkup(inlineChild))
                 }
             }
             emphasisText.font = .body.italic()
@@ -189,7 +232,7 @@ private struct MarkdownParser {
             var linkText = AttributedString()
             for child in link.children {
                 if let inlineChild = child as? InlineMarkup {
-                    linkText.append(processInline(inlineChild))
+                    linkText.append(processInlineMarkup(inlineChild))
                 }
             }
             linkText.foregroundColor = .blue
@@ -200,141 +243,78 @@ private struct MarkdownParser {
             return linkText
             
         default:
+            // Fallback for other inline elements
             return AttributedString(element.plainText)
         }
     }
 }
 
-// MARK: - Cached Markdown Text View
-struct MarkdownText: View {
-    let text: String
-    var isUserMessage: Bool = false
-    @State private var cachedAttributedText: AttributedString?
-    @State private var previousText = ""
-    
-    var body: some View {
-        Text(cachedAttributedText ?? AttributedString(text))
-            .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
-            .textSelection(.enabled)
-            .onAppear {
-                if cachedAttributedText == nil {
-                    cachedAttributedText = MarkdownParser.parse(text)
-                    previousText = text
-                }
-            }
-            .onChange(of: text) { newText in
-                // Only reparse if text changed significantly
-                if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
-                    // Full reparse for significant changes
-                    cachedAttributedText = MarkdownParser.parse(newText)
-                } else if newText != previousText {
-                    // For streaming: just append the new part efficiently
-                    if let cached = cachedAttributedText {
-                        let newPart = String(newText.dropFirst(previousText.count))
-                        // Try to append without full reparse for efficiency
-                        cachedAttributedText = cached + AttributedString(newPart)
-                    } else {
-                        cachedAttributedText = MarkdownParser.parse(newText)
-                    }
-                }
-                previousText = newText
-            }
-    }
-}
-
 // MARK: - Tool Views
-struct CollapsibleToolRequestView: View {
+// Compact pill view for tool requests
+struct CompactToolRequestPill: View {
     let toolContent: ToolRequestContent
-    @State private var isExpanded: Bool = false
+    let completedTasks: [CompletedToolCall]
+    @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 12)
-                    
-                    Image(systemName: "wrench.and.screwdriver")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    
-                    Text("Tool: \(toolContent.toolCall.name)")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    if !isExpanded && !toolContent.toolCall.arguments.isEmpty {
-                        Text("(\(toolContent.toolCall.arguments.count) args)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PlainButtonStyle())
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(themeManager.secondaryTextColor)
             
-            if isExpanded && !toolContent.toolCall.arguments.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Divider()
-                        .padding(.horizontal, 8)
-                    
-                    Text("Arguments:")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.top, 4)
-                    
-                    ForEach(Array(toolContent.toolCall.arguments.keys.sorted()), id: \.self) { key in
-                        HStack(alignment: .top) {
-                            Text("\(key):")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
-                                .frame(minWidth: 60, alignment: .trailing)
-                            
-                            Text("\(String(describing: toolContent.toolCall.arguments[key]?.value))")
-                                .font(.caption2)
-                                .foregroundColor(.primary)
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: false, vertical: true)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 2)
-                    }
-                    .padding(.bottom, 8)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            Text("\(completedTasks.count) Task\(completedTasks.count == 1 ? "" : "s") completed")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(themeManager.secondaryTextColor)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundColor(themeManager.secondaryTextColor)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.orange.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.orange.opacity(0.3), lineWidth: 0.5)
-        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(themeManager.isDarkMode ? Color(red: 0.13, green: 0.13, blue: 0.13) : Color(red: 0.97, green: 0.97, blue: 0.97))
+        .cornerRadius(16)
+        .frame(maxWidth: 200)
     }
 }
 
-// Keep original for compatibility if needed
 struct ToolRequestView: View {
     let toolContent: ToolRequestContent
     
     var body: some View {
-        CollapsibleToolRequestView(toolContent: toolContent)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: "wrench.and.screwdriver")
+                    .foregroundColor(.orange)
+                Text("Tool Request: \(toolContent.toolCall.name)")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Spacer()
+            }
+            
+            if !toolContent.toolCall.arguments.isEmpty {
+                Text("Arguments:")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                
+                ForEach(Array(toolContent.toolCall.arguments.keys.sorted()), id: \.self) { key in
+                    HStack {
+                        Text("• \(key):")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(String(describing: toolContent.toolCall.arguments[key]?.value))")
+                            .font(.caption2)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .padding(8)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(8)
     }
 }
 
@@ -370,125 +350,63 @@ struct ToolResponseView: View {
     }
 }
 
-struct CollapsibleToolConfirmationView: View {
-    let toolContent: ToolConfirmationRequestContent
-    @State private var isExpanded: Bool = true // Start expanded for permission requests
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 12)
-                    
-                    Image(systemName: "questionmark.circle")
-                        .foregroundColor(.blue)
-                        .font(.caption)
-                    
-                    Text("Permission: \(toolContent.toolName)")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    if !isExpanded {
-                        Text("(action required)")
-                            .font(.caption2)
-                            .foregroundColor(.blue)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 8) {
-                    Divider()
-                        .padding(.horizontal, 8)
-                    
-                    Text("Allow \(toolContent.toolName)?")
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 12)
-                        .padding(.top, 4)
-                    
-                    if !toolContent.arguments.isEmpty {
-                        Text("Arguments:")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.top, 4)
-                        
-                        ForEach(Array(toolContent.arguments.keys.sorted()), id: \.self) { key in
-                            HStack(alignment: .top) {
-                                Text("\(key):")
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.secondary)
-                                    .frame(minWidth: 60, alignment: .trailing)
-                                
-                                Text("\(String(describing: toolContent.arguments[key]?.value))")
-                                    .font(.caption2)
-                                    .foregroundColor(.primary)
-                                    .lineLimit(nil)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 2)
-                        }
-                    }
-                    
-                    HStack(spacing: 12) {
-                        Button("Deny") {
-                            // TODO: Implement permission response
-                        }
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.red)
-                        
-                        Button("Allow Once") {
-                            // TODO: Implement permission response
-                        }
-                        .buttonStyle(.bordered)
-                        
-                        Button("Always Allow") {
-                            // TODO: Implement permission response
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.blue.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.blue.opacity(0.3), lineWidth: 0.5)
-        )
-    }
-}
-
-// Keep original for compatibility if needed
 struct ToolConfirmationView: View {
     let toolContent: ToolConfirmationRequestContent
     
     var body: some View {
-        CollapsibleToolConfirmationView(toolContent: toolContent)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "questionmark.circle")
+                    .foregroundColor(.blue)
+                Text("Permission Request")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Spacer()
+            }
+            
+            Text("Allow \(toolContent.toolName)?")
+                .font(.body)
+                .fontWeight(.medium)
+            
+            if !toolContent.arguments.isEmpty {
+                Text("Arguments:")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                
+                ForEach(Array(toolContent.arguments.keys.sorted()), id: \.self) { key in
+                    HStack {
+                        Text("• \(key):")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(String(describing: toolContent.arguments[key]?.value))")
+                            .font(.caption2)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                }
+            }
+            
+            HStack(spacing: 12) {
+                Button("Deny") {
+                    // TODO: Implement permission response
+                }
+                .buttonStyle(.bordered)
+                .foregroundColor(.red)
+                
+                Button("Allow Once") {
+                    // TODO: Implement permission response
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Always Allow") {
+                    // TODO: Implement permission response
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(8)
+        .background(Color.blue.opacity(0.1))
+        .cornerRadius(8)
     }
 }
 
@@ -496,8 +414,8 @@ struct ToolConfirmationView: View {
     ScrollView {
         VStack(spacing: 16) {
             // Basic message examples
-            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [])
-            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [])
+            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [], sessionName: "Test Session")
+            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [], sessionName: "Test Session")
             
             // Comprehensive markdown test examples
             MessageBubbleView(message: Message(role: .assistant, text: """
@@ -527,7 +445,7 @@ Visit [Apple](https://apple.com) for more info.
 • Third `code` item
 
 *This tests comprehensive markdown rendering.*
-"""), completedTasks: [])
+"""), completedTasks: [], sessionName: "Test Session")
             
             MessageBubbleView(message: Message(role: .user, text: """
 Testing more complex markdown:
@@ -545,113 +463,11 @@ def hello_world():
 ```
 
 **Note**: This should all render properly.
-"""), completedTasks: [])
+"""), completedTasks: [], sessionName: "Test Session")
         }
         .padding()
     }
-}
-
-// MARK: - Completed Tool Pill View (PR #11 style - expandable)
-struct CompletedToolPillView: View {
-    let completedCall: CompletedToolCall
-    @State private var isExpanded: Bool = false
-    
-    var body: some View {
-        Button(action: {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isExpanded.toggle()
-            }
-        }) {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.secondary)
-                
-                Text(completedCall.toolCall.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.secondary)
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color(.systemGray6).opacity(0.85))
-            .cornerRadius(16)
-        }
-        .buttonStyle(.plain)
-        
-        if isExpanded {
-            VStack(alignment: .leading, spacing: 8) {
-                // Show tool details
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Status:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(completedCall.result.status)
-                            .font(.caption)
-                            .foregroundColor(completedCall.result.status == "success" ? .green : .red)
-                            .fontWeight(.medium)
-                        
-                        Spacer()
-                        
-                        Text(String(format: "%.2fs", completedCall.duration))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    if !completedCall.toolCall.arguments.isEmpty {
-                        Text("Arguments:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-                        
-                        ForEach(Array(completedCall.toolCall.arguments.keys.sorted()), id: \.self) { key in
-                            HStack(alignment: .top, spacing: 4) {
-                                Text("\(key):")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                let valueString = String(describing: completedCall.toolCall.arguments[key]?.value ?? "")
-                                Text(valueString.count > 100 ? String(valueString.prefix(100)) + "..." : valueString)
-                                    .font(.caption2)
-                                    .foregroundColor(.primary)
-                                    .lineLimit(3)
-                            }
-                        }
-                    }
-                    
-                    if let error = completedCall.result.error {
-                        Text("Error:")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .padding(.top, 4)
-                        Text(error.count > 200 ? String(error.prefix(200)) + "..." : error)
-                            .font(.caption2)
-                            .foregroundColor(.red)
-                            .lineLimit(3)
-                    } else if let value = completedCall.result.value {
-                        Text("Result:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-                        let valueString = String(describing: value.value)
-                        Text(valueString.count > 200 ? String(valueString.prefix(200)) + "..." : valueString)
-                            .font(.caption2)
-                            .foregroundColor(.primary)
-                            .lineLimit(5)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6).opacity(0.3))
-                .cornerRadius(12)
-            }
-            .transition(.opacity.combined(with: .move(edge: .top)))
-        }
-    }
+    .environmentObject(ThemeManager.shared)
 }
 
 // MARK: - Tool Call Progress View
@@ -710,7 +526,83 @@ struct ToolCallProgressView: View {
     }
 }
 
-
+// MARK: - Completed Tool Call View
+struct CompletedToolCallView: View {
+    let completedCall: CompletedToolCall
+    
+    var body: some View {
+        VStack(alignment: .center, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: completedCall.result.status == "success" ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                    .font(.caption)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(completedCall.toolCall.name)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    if let firstArgument = getFirstArgument() {
+                        Text(firstArgument)
+                            .font(.caption2)
+                            .monospaced()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text(String(format: "%.2fs", completedCall.duration))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Text(completedCall.result.status)
+                            .font(.caption2)
+                            .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                            .fontWeight(.medium)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(completedCall.result.status == "success" ? Color.green.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            
+            Text(formatCompletionTime(completedCall.completedAt))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
+    }
+    
+    private func getFirstArgument() -> String? {
+        guard let firstKey = completedCall.toolCall.arguments.keys.sorted().first,
+              let firstValue = completedCall.toolCall.arguments[firstKey] else {
+            return nil
+        }
+        
+        let valueString = String(describing: firstValue.value)
+        // Truncate if too long
+        return valueString.count > 50 ? String(valueString.prefix(50)) + "..." : valueString
+    }
+    
+    private func formatCompletionTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return "completed \(formatter.string(from: date))"
+    }
+}
 
 // MARK: - Truncatable Message Content View
 struct TruncatableMessageContentView: View {
@@ -719,18 +611,20 @@ struct TruncatableMessageContentView: View {
     @Binding var showFullText: Bool
     @Binding var isTruncated: Bool
     let isUserMessage: Bool
+    @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
         switch content {
         case .text(let textContent):
-            // Use MarkdownText for proper markdown rendering  
-            MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
+            Text(textContent.text)
+                .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
                 .lineSpacing(8)
-                .foregroundColor(.primary)
+                .foregroundColor(themeManager.primaryTextColor)
+                .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
         case .toolRequest(_):
-            // Hide tool requests - they'll be shown as consolidated pills
+            // Tool requests are now shown as consolidated pills in MessageBubbleView
             EmptyView()
             
         case .toolResponse(_):
@@ -753,105 +647,161 @@ struct TruncatableMarkdownText: View {
     let maxHeight: CGFloat
     @Binding var isTruncated: Bool
     @State private var fullHeight: CGFloat = 0
-    @State private var displayText: String = ""
-    
-    // Configuration for smart truncation
-    private let maxPreviewLines = 8  // Show more lines (6-8 depending on content)
-    private let showLastLines = true // Show last lines instead of first
     
     var body: some View {
-        Text(parseMarkdown(displayText.isEmpty ? text : displayText))
+        Text(parseMarkdown(text))
             .textSelection(.enabled)
             .background(
                 GeometryReader { geometry in
                     Color.clear
                         .onAppear {
                             fullHeight = geometry.size.height
-                            updateTruncation()
+                            isTruncated = fullHeight > maxHeight
                         }
                         .onChange(of: geometry.size.height) {
                             fullHeight = geometry.size.height
-                            updateTruncation()
-                        }
-                        .onChange(of: text) {
-                            updateTruncation()
+                            isTruncated = fullHeight > maxHeight
                         }
                 }
             )
+            .frame(maxHeight: isTruncated ? maxHeight : nil)
+            .clipped()
             .overlay(
-                // Show indicator if truncated
+                // Show gradient fade and "tap to expand" if truncated
                 Group {
                     if isTruncated {
                         VStack {
-                            // Show fade from top since we're showing last lines
-                            if showLastLines {
-                                LinearGradient(
-                                    gradient: Gradient(colors: [Color(.systemGray6).opacity(0.9), Color.clear]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                                .frame(height: 30)
-                                .overlay(
-                                    Text("Tap to see more")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .padding(.top, 6),
-                                    alignment: .top
-                                )
-                                
-                                Spacer()
-                            } else {
-                                // Original bottom fade for first lines
-                                Spacer()
-                                LinearGradient(
-                                    gradient: Gradient(colors: [Color.clear, Color(.systemGray6)]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                                .frame(height: 30)
-                                .overlay(
-                                    Text("Tap to expand")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .padding(.bottom, 4),
-                                    alignment: .bottom
-                                )
-                            }
+                            Spacer()
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color.clear, Color(.systemGray6)]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 30)
+                            .overlay(
+                                Text("Tap to expand")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .padding(.bottom, 4)
+                            )
                         }
                     }
                 }
             )
     }
     
-    private func updateTruncation() {
-        // Split text into lines for smarter truncation
-        let lines = text.components(separatedBy: .newlines)
+    private func parseMarkdown(_ text: String) -> AttributedString {
+        // Same markdown parsing logic as before
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let document = Document(parsing: trimmedText)
+        var attributedString = AttributedString()
         
-        // If text is short enough, show everything
-        if lines.count <= maxPreviewLines || fullHeight <= maxHeight {
-            displayText = text
-            isTruncated = false
-            return
+        for child in document.children {
+            attributedString.append(processMarkdownElement(child))
         }
         
-        // Text needs truncation
-        isTruncated = true
-        
-        if showLastLines {
-            // Show the last N lines (often contains conclusion/summary)
-            let lastLines = lines.suffix(maxPreviewLines)
-            
-            // Just show the last lines without adding extra text
-            displayText = "…\n" + lastLines.joined(separator: "\n")
-        } else {
-            // Show first N lines (traditional approach)
-            let firstLines = lines.prefix(maxPreviewLines)
-            displayText = firstLines.joined(separator: "\n") + "\n…"
+        if attributedString.characters.isEmpty {
+            return AttributedString(trimmedText)
         }
+        
+        return attributedString
     }
     
-    private func parseMarkdown(_ text: String) -> AttributedString {
-        return MarkdownParser.parse(text)
+    private func processMarkdownElement(_ element: Markup) -> AttributedString {
+        var result = AttributedString()
+        
+        switch element {
+        case let paragraph as Paragraph:
+            for child in paragraph.children {
+                if let inlineChild = child as? InlineMarkup {
+                    result.append(processInlineMarkup(inlineChild))
+                }
+            }
+            result.append(AttributedString("\n"))
+            
+        case let heading as Heading:
+            var headingText = AttributedString()
+            for child in heading.children {
+                if let inlineChild = child as? InlineMarkup {
+                    headingText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
+            result.append(headingText)
+            result.append(AttributedString("\n"))
+            
+        case let codeBlock as CodeBlock:
+            var codeText = AttributedString(codeBlock.code)
+            codeText.font = .monospaced(.body)()
+            codeText.backgroundColor = .secondary.opacity(0.1)
+            result.append(codeText)
+            result.append(AttributedString("\n"))
+            
+        case let listItem as ListItem:
+            result.append(AttributedString("• "))
+            for child in listItem.children {
+                result.append(processMarkdownElement(child))
+            }
+            
+        default:
+            if let blockElement = element as? BlockMarkup {
+                for child in blockElement.children {
+                    result.append(processMarkdownElement(child))
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    private func processInlineMarkup(_ element: InlineMarkup) -> AttributedString {
+        switch element {
+        case let text as Markdown.Text:
+            return AttributedString(text.plainText)
+            
+        case let strong as Strong:
+            var strongText = AttributedString()
+            for child in strong.children {
+                if let inlineChild = child as? InlineMarkup {
+                    strongText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            strongText.font = .body.bold()
+            return strongText
+            
+        case let emphasis as Emphasis:
+            var emphasisText = AttributedString()
+            for child in emphasis.children {
+                if let inlineChild = child as? InlineMarkup {
+                    emphasisText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            emphasisText.font = .body.italic()
+            return emphasisText
+            
+        case let inlineCode as InlineCode:
+            var codeText = AttributedString(inlineCode.code)
+            codeText.font = .monospaced(.body)()
+            codeText.backgroundColor = .secondary.opacity(0.1)
+            return codeText
+            
+        case let link as Markdown.Link:
+            var linkText = AttributedString()
+            for child in link.children {
+                if let inlineChild = child as? InlineMarkup {
+                    linkText.append(processInlineMarkup(inlineChild))
+                }
+            }
+            linkText.foregroundColor = .blue
+            linkText.underlineStyle = .single
+            if let destination = link.destination {
+                linkText.link = URL(string: destination)
+            }
+            return linkText
+            
+        default:
+            return AttributedString(element.plainText)
+        }
     }
 }
 

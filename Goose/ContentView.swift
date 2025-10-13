@@ -3,101 +3,128 @@ import SwiftUI
 struct ContentView: View {
     @State private var isSettingsPresented = false
     @State private var showingSidebar = false
-    @State private var showingSplash = true
-    @State private var hasActiveChat = false
-    @State private var initialMessage = ""
-    @State private var shouldSendInitialMessage = false
+    @State private var showingChat = false
+    @State private var initialMessage: String?
     @State private var selectedSessionId: String?
+    @State private var sessionName: String = "New Session"
+    @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
+    @State private var showSplash = true // Show splash screen on launch
     @EnvironmentObject var configurationHandler: ConfigurationHandler
+    @EnvironmentObject var themeManager: ThemeManager
 
     var body: some View {
-        if showingSplash {
-            // Splash Screen
-            SplashScreenView(isActive: $showingSplash)
-                .onAppear {
-                    // Warm up the demo server if in trial mode (non-blocking)
-                    warmUpServer()
-                }
-        } else {
-            NavigationView {
-                if !hasActiveChat {
-                    // Welcome View when no active chat
-                    WelcomeView(showingSidebar: $showingSidebar, onStartChat: { message in
-                        // Start new chat with the message
-                        initialMessage = message
-                        shouldSendInitialMessage = !message.isEmpty
-                        selectedSessionId = nil // Clear session ID for new chat
-                        withAnimation {
-                            hasActiveChat = true
+        ZStack {
+            if showSplash {
+                SplashScreenView(isActive: $showSplash)
+                    .environmentObject(themeManager)
+                    .onChange(of: showSplash) { newValue in
+                        print("🔄 showSplash changed to: \(newValue)")
+                    }
+            } else {
+        ZStack(alignment: .leading) {
+            // Main content - full height edge to edge
+            GeometryReader { geometry in
+                ZStack {
+                    Group {
+                        if showingChat {
+                            NavigationView {
+                                ChatView(showingSidebar: $showingSidebar, initialMessage: initialMessage, sessionIdToLoad: selectedSessionId, sessionName: sessionName)
+                                    .id(selectedSessionId ?? initialMessage ?? UUID().uuidString) // Force recreate when session changes
+                                    .navigationBarHidden(true)
+                            }
+                            .navigationViewStyle(.stack) // Ensure proper slide transitions
+                        } else {
+                            WelcomeView(showingSidebar: $showingSidebar) { text in
+                                initialMessage = text
+                                selectedSessionId = nil // Starting new chat from welcome screen
+                                withAnimation {
+                                    showingChat = true
+                                }
+                            }
                         }
-                    }, onSessionSelect: { sessionId in
-                        // Load existing session
-                        selectedSessionId = sessionId
-                        withAnimation {
-                            hasActiveChat = true
-                        }
-                    })
-                    .navigationBarHidden(true)
-                } else {
-                    // Chat View when there's an active chat
-                    ChatViewWithInitialMessage(
-                        showingSidebar: $showingSidebar,
-                        initialMessage: initialMessage,
-                        shouldSendMessage: shouldSendInitialMessage,
-                        selectedSessionId: selectedSessionId,
-                        onMessageSent: {
-                            // Clear the initial message after sending
-                            initialMessage = ""
-                            shouldSendInitialMessage = false
-                            selectedSessionId = nil
-                        }
-                    )
-                    .navigationBarHidden(true)
+                    }
                     .sheet(isPresented: $isSettingsPresented) {
                         SettingsView()
                             .environmentObject(configurationHandler)
+                            .environmentObject(themeManager)
                     }
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .background(themeManager.backgroundColor)
+                .offset(x: showingSidebar ? 360 : 0)
+                .animation(.easeInOut(duration: 0.3), value: showingSidebar)
             }
-            .overlay(alignment: .top) {
-                if configurationHandler.isConfiguring {
-                    ConfigurationStatusView(message: "Configuring...", isLoading: true)
-                } else if configurationHandler.configurationSuccess {
-                    ConfigurationStatusView(message: "✅ Configuration successful!", isSuccess: true)
-                } else if let error = configurationHandler.configurationError {
-                    ConfigurationStatusView(message: "❌ \(error)", isError: true)
-                        .onTapGesture {
-                            configurationHandler.clearError()
+            .edgesIgnoringSafeArea(.all)
+            
+            // Sidebar overlay
+            if showingSidebar {
+                SidebarView(
+                    isShowing: $showingSidebar,
+                    isSettingsPresented: $isSettingsPresented,
+                    cachedSessions: $cachedSessions,
+                    onSessionSelect: { sessionId, description in
+                        selectedSessionId = sessionId
+                        sessionName = description.isEmpty ? "Untitled Session" : description
+                        initialMessage = nil
+                        withAnimation {
+                            showingSidebar = false
+                            showingChat = true
                         }
-                }
+                    }, 
+                    onNewSession: {
+                        selectedSessionId = nil
+                        sessionName = "New Session"
+                        initialMessage = nil
+                        withAnimation {
+                            showingSidebar = false
+                            showingChat = true
+                        }
+                        Task {
+                            await preloadSessions()
+                        }
+                    },
+                    onOverview: {
+                        withAnimation {
+                            showingSidebar = false
+                            showingChat = false
+                        }
+                    }
+                )
+                .transition(.move(edge: .leading))
             }
         }
+        .overlay(alignment: .top) {
+            if configurationHandler.isConfiguring {
+                ConfigurationStatusView(message: "Configuring...", isLoading: true)
+            } else if configurationHandler.configurationSuccess {
+                ConfigurationStatusView(message: "✅ Configuration successful!", isSuccess: true)
+            } else if let error = configurationHandler.configurationError {
+                ConfigurationStatusView(message: "❌ \(error)", isError: true)
+                    .onTapGesture {
+                        configurationHandler.clearError()
+                    }
+            }
+        }
+        .onAppear {
+            // Preload sessions on app launch
+            Task {
+                await preloadSessions()
+            }
+        }
+        } // End of else block
+        } // End of outer ZStack
     }
     
-    /// Warm up the server on first launch (non-blocking)
-    private func warmUpServer() {
-        // Check if we're using the demo server
-        let baseURL = UserDefaults.standard.string(forKey: "goose_base_url") ?? "https://demo-goosed.fly.dev"
-        
-        // Only warm up if it's the demo server
-        if baseURL.contains("demo-goosed.fly.dev") {
-            Task {
-                // Fire-and-forget warm-up request
-                // We don't care about the response, just want to wake up the server
-                if let url = URL(string: baseURL) {
-                    var request = URLRequest(url: url)
-                    request.httpMethod = "GET"
-                    request.timeoutInterval = 10
-                    
-                    do {
-                        // Perform the request but don't wait or care about response
-                        let _ = try await URLSession.shared.data(for: request)
-                        print("🔥 Demo server warmed up")
-                    } catch {
-                        // Silently ignore any errors - this is just a warm-up
-                        print("🔥 Demo server warm-up attempted")
-                    }
-                }
+    // Preload sessions in background
+    private func preloadSessions() async {
+        print("📥 Attempting to preload sessions...")
+        let fetchedSessions = await GooseAPIService.shared.fetchSessions()
+        await MainActor.run {
+            // Limit to first 10 sessions for performance
+            self.cachedSessions = Array(fetchedSessions.prefix(10))
+            print("✅ Preloaded \(self.cachedSessions.count) sessions")
+            if self.cachedSessions.isEmpty {
+                print("⚠️ No sessions preloaded - server may not be connected or no sessions exist")
             }
         }
     }
@@ -147,43 +174,8 @@ struct ConfigurationStatusView: View {
     }
 }
 
-// Wrapper to handle initial message and session loading
-struct ChatViewWithInitialMessage: View {
-    @Binding var showingSidebar: Bool
-    let initialMessage: String
-    let shouldSendMessage: Bool
-    let selectedSessionId: String?
-    let onMessageSent: () -> Void
-    
-    var body: some View {
-        ChatView(showingSidebar: $showingSidebar)
-            .onAppear {
-                // Load session if one was selected
-                if let sessionId = selectedSessionId {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        NotificationCenter.default.post(
-                            name: Notification.Name("LoadSession"),
-                            object: nil,
-                            userInfo: ["sessionId": sessionId]
-                        )
-                        onMessageSent()
-                    }
-                } else if shouldSendMessage && !initialMessage.isEmpty {
-                    // Send the initial message after a brief delay to ensure view is ready
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        NotificationCenter.default.post(
-                            name: Notification.Name("SendInitialMessage"),
-                            object: nil,
-                            userInfo: ["message": initialMessage]
-                        )
-                        onMessageSent()
-                    }
-                }
-            }
-    }
-}
-
 #Preview {
     ContentView()
         .environmentObject(ConfigurationHandler.shared)
+        .environmentObject(ThemeManager.shared)
 }

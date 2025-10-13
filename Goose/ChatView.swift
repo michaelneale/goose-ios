@@ -2,43 +2,40 @@ import SwiftUI
 
 struct ChatView: View {
     @Binding var showingSidebar: Bool
+    var initialMessage: String? = nil
+    var sessionIdToLoad: String? = nil
+    var sessionName: String = "New Session"
     @StateObject private var apiService = GooseAPIService.shared
     @State private var messages: [Message] = []
     @State private var inputText = ""
     @State private var isLoading = false
     @State private var currentStreamTask: URLSessionDataTask?
     @State private var showingErrorDetails = false
+    @State private var isSettingsPresented = false
     @State private var activeToolCalls: [String: ToolCallWithTiming] = [:]
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
     @State private var currentSessionId: String?
-    @State private var isSettingsPresented = false
-
+    @State private var localCachedSessions: [ChatSession] = [] // Local cached sessions for ChatView's sidebar
+    @EnvironmentObject var themeManager: ThemeManager
+    
     // Voice features
     @StateObject private var voiceManager = EnhancedVoiceManager()
-
+    
     // Memory management
-    private let maxMessages = 50  // Limit messages to prevent memory issues
-    private let maxToolCalls = 20  // Limit tool calls to prevent memory issues
-
+    private let maxMessages = 50 // Limit messages to prevent memory issues
+    private let maxToolCalls = 20 // Limit tool calls to prevent memory issues
+    
     // Efficient scroll management
     @State private var scrollTimer: Timer?
     @State private var shouldAutoScroll = true
-    @State private var scrollRefreshTrigger = UUID()  // Force scroll refresh
-    @State private var lastScrollUpdate = Date()  // Throttle streaming scrolls
-    @State private var isActivelyStreaming = false  // Track if we're currently receiving streaming content
-    @State private var userIsScrolling = false  // Track manual scroll interactions
-    @State private var lastContentHeight: CGFloat = 0  // Track content size changes
+    @State private var scrollRefreshTrigger = UUID() // Force scroll refresh
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Background color
-            Color(UIColor.systemBackground)
-                .ignoresSafeArea()
-
-            // Main content that stops before input area
+            // Main chat view
             VStack(spacing: 0) {
-                // Messages scroll view with proper constraints
+                // Messages List
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 12) {
@@ -47,11 +44,11 @@ struct ChatView: View {
                                     message: message,
                                     completedTasks: getCompletedTasksForMessage(message.id)
                                 )
-                                .id(message.id)
-
+                                    .environmentObject(themeManager)
+                                    .id(message.id)
+                                
                                 // Show ONLY active/in-progress tool calls (completed ones are in the pill)
-                                ForEach(getToolCallsForMessage(message.id), id: \.self) {
-                                    toolCallId in
+                                ForEach(getToolCallsForMessage(message.id), id: \.self) { toolCallId in
                                     if let activeCall = activeToolCalls[toolCallId] {
                                         HStack {
                                             Spacer()
@@ -74,37 +71,16 @@ struct ChatView: View {
                                     Spacer()
                                 }
                                 .padding(.horizontal)
-                                .id("thinking-indicator")
                             }
-
-                            // Add space at the bottom so the last message can scroll above the input area
-                            // This is actual content space, not padding, so it scrolls with the messages
+                            
+                            // Add bottom padding to account for floating input
                             Spacer()
-                                .frame(height: 180)
+                                .frame(height: 120)
                         }
                         .padding(.horizontal)
-                        .padding(.top, apiService.isTrialMode ? 130 : 82)  // Extra space for trial banner
+                        .padding(.top, 90)
                     }
-                    .simultaneousGesture(
-                        DragGesture()
-                            .onChanged { _ in
-                                // User is manually scrolling
-                                if isLoading {
-                                    userIsScrolling = true
-                                    shouldAutoScroll = false
-                                    print("📜 User started scrolling - auto-scroll disabled")
-                                }
-                            }
-                            .onEnded { _ in
-                                // User finished scrolling gesture
-                                userIsScrolling = false
-                                print("📜 User finished scrolling gesture")
-                            }
-                    )
-                    .onReceive(
-                        NotificationCenter.default.publisher(
-                            for: UIApplication.willEnterForegroundNotification)
-                    ) { _ in
+                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                         // Only scroll when app comes to foreground, not on every update
                         if shouldAutoScroll {
                             scrollToBottom(proxy)
@@ -116,18 +92,9 @@ struct ChatView: View {
                             scrollToBottom(proxy)
                         }
                     }
-                    .onChange(of: messages.count) { _ in
-                        // Only auto-scroll for new messages if we're actively loading/streaming
-                        // This prevents jumping back to bottom when user scrolls up after streaming is done
-                        if isLoading && shouldAutoScroll {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                scrollToBottom(proxy)
-                            }
-                        }
-                    }
                 }
             }
-
+            
             // Gradient fade overlay to dim content above the input box
             VStack {
                 Spacer()
@@ -135,188 +102,185 @@ struct ChatView: View {
                     gradient: Gradient(colors: [
                         Color.clear,
                         Color(UIColor.systemBackground).opacity(0.7),
-                        Color(UIColor.systemBackground).opacity(0.95),
+                        Color(UIColor.systemBackground)
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 100)
+                .frame(height: 180)
                 .allowsHitTesting(false)
             }
-
-            // Floating input area
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .ignoresSafeArea()
+            
+            // Floating Input Area
             VStack {
                 Spacer()
-
+                
                 VStack(spacing: 0) {
                     // Show transcribed text while in voice mode
                     if voiceManager.voiceMode != .normal && !voiceManager.transcribedText.isEmpty {
                         HStack {
                             Text("Transcribing: \"\(voiceManager.transcribedText)\"")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(themeManager.secondaryTextColor)
                                 .lineLimit(2)
                             Spacer()
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
-                        .background(Color(UIColor.systemBackground).opacity(0.95))
+                        .background(themeManager.backgroundColor.opacity(0.95))
                     }
-
-                    // Input field with buttons
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Text field on top
-                        TextField("I want to...", text: $inputText, axis: .vertical)
-                            .font(.system(size: 16))
-                            .foregroundColor(.primary)
-                            .lineLimit(1...4)
-                            .padding(.vertical, 8)
-                            .disabled(voiceManager.voiceMode != .normal)
-                            .onSubmit {
-                                if !inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    .isEmpty
-                                {
-                                    sendMessage()
-                                }
-                            }
-
-                        // Buttons row at bottom
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    // Text field on top
+                    TextField("I want to...", text: $inputText, axis: .vertical)
+                        .font(.system(size: 16))
+                        .foregroundColor(themeManager.chatInputTextColor)
+                        .lineLimit(1...4)
+                        .padding(.vertical, 8)
+                        .disabled(voiceManager.voiceMode != .normal)
+                        .onSubmit {
+                            sendMessage()
+                        }
+                    
+                    // Buttons row at bottom
+                    HStack(spacing: 10) {
+                        // Plus button - file attachment
+                        Button(action: {
+                            print("File attachment tapped")
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(themeManager.chatInputIconColor)
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .inset(by: 0.5)
+                                        .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Spacer()
+                        
                         HStack(spacing: 10) {
-                            // Plus button - file attachment
+                            // Puzzle icon - extensions
                             Button(action: {
-                                print("File attachment tapped")
+                                print("Extensions tapped")
                             }) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.primary)
+                                Image(systemName: "puzzlepiece.extension")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(themeManager.chatInputIconColor)
                                     .frame(width: 32, height: 32)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 16)
                                             .inset(by: 0.5)
-                                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
+                                            .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
                                     )
                             }
                             .buttonStyle(.plain)
-
-                            Spacer()
-
-                            HStack(spacing: 10) {
-                                // Voice mode indicator text
-                                if voiceManager.voiceMode != .normal {
-                                    Text(
-                                        voiceManager.voiceMode == .audio
-                                            ? "Transcribe" : "Full Audio"
-                                    )
+                            
+                            // Auto selector - LLM dropdown
+                            Button(action: {
+                                print("LLM selector tapped")
+                            }) {
+                                HStack(spacing: 5) {
+                                    Text("Auto")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(themeManager.chatInputIconColor)
+                                    
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundColor(themeManager.chatInputIconColor)
+                                }
+                                .padding(.horizontal, 10)
+                                .frame(width: 84, height: 32)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .inset(by: 0.5)
+                                        .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            
+                            // Voice mode indicator text
+                            if voiceManager.voiceMode != .normal {
+                                Text(voiceManager.voiceMode == .audio ? "Transcribe" : "Full Audio")
                                     .font(.caption)
                                     .fontWeight(.medium)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(themeManager.isDarkMode ? .blue : .blue)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(
                                         RoundedRectangle(cornerRadius: 12)
                                             .fill(Color.blue.opacity(0.1))
                                     )
-                                }
-
-                                // Audio/Voice button
-                                Button(action: {
-                                    // Cycle through voice modes
-                                    voiceManager.cycleVoiceMode()
-                                }) {
-                                    Image(
-                                        systemName: voiceManager.voiceMode == .normal
-                                            ? "waveform" : "waveform.circle.fill"
-                                    )
+                            }
+                            
+                            // Wave - audio/voice button
+                            Button(action: {
+                                // Cycle through voice modes
+                                voiceManager.cycleVoiceMode()
+                            }) {
+                                Image(systemName: voiceManager.voiceMode == .normal ? "waveform" : "waveform.circle.fill")
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(
-                                        voiceManager.voiceMode == .normal ? .primary : .blue
-                                    )
+                                    .foregroundColor(voiceManager.voiceMode == .normal ? themeManager.chatInputIconColor : .blue)
                                     .frame(width: 32, height: 32)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 16)
                                             .inset(by: 0.5)
-                                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
+                                            .stroke(themeManager.chatInputButtonBorderColor, lineWidth: 0.5)
                                     )
-                                }
-                                .buttonStyle(.plain)
-
-                                // Send/Stop button
-                                Button(action: {
-                                    if isLoading {
-                                        stopStreaming()
-                                    } else if !inputText.trimmingCharacters(
-                                        in: .whitespacesAndNewlines
-                                    ).isEmpty {
-                                        sendMessage()
-                                    }
-                                }) {
-                                    Image(systemName: isLoading ? "stop.fill" : "arrow.up")
-                                        .font(.system(size: 17, weight: .medium))
-                                        .foregroundColor(
-                                            isLoading
-                                                ? .white : (inputText.isEmpty ? .gray : .white)
-                                        )
-                                        .frame(width: 32, height: 32)
-                                        .background(
-                                            isLoading
-                                                ? Color.red
-                                                : (inputText.trimmingCharacters(
-                                                    in: .whitespacesAndNewlines
-                                                ).isEmpty
-                                                    ? Color.gray.opacity(0.3)
-                                                    : Color.blue)
-                                        )
-                                        .cornerRadius(16)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(
-                                    !isLoading
-                                        && inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                            .isEmpty
-                                )
                             }
+                            .buttonStyle(.plain)
+                            
+                            // Send button - white/black background based on theme
+                            Button(action: {
+                                if isLoading {
+                                    stopStreaming()
+                                } else {
+                                    sendMessage()
+                                }
+                            }) {
+                                Image(systemName: isLoading ? "stop.fill" : "arrow.up")
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundColor(themeManager.chatInputIconColor)
+                                    .frame(width: 32, height: 32)
+                                    .background(isLoading ? Color.red : (inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray.opacity(0.3) : (themeManager.isDarkMode ? Color.white : Color.black)))
+                                    .cornerRadius(16)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!isLoading && inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 21)
-                            .fill(.regularMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 21)
-                                    .fill(Color(UIColor.secondarySystemBackground).opacity(0.85))
-                            )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 21)
-                            .inset(by: 0.5)
-                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 0)
                 }
+                .padding(10)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 21)
+                        .fill(.regularMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 21)
+                                .fill(themeManager.chatInputBackgroundColor.opacity(0.85))
+                        )
+                )
+                } // End of transcription VStack
+                .overlay(
+                    RoundedRectangle(cornerRadius: 21)
+                        .inset(by: 0.5)
+                        .stroke(themeManager.chatInputBorderColor, lineWidth: 0.5)
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 0)
             }
-
+            
             // Custom navigation bar with background
             VStack(spacing: 0) {
-                // Trial mode banner if applicable
-                if apiService.isTrialMode {
-                    HStack {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundColor(.white)
-                        Text(
-                            "Trial Mode: connect to your own Goose agent for the full personal experience"
-                        )
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.orange)
-                }
-
-                // Navigation bar
+                // Status bar spacer
+                Color.clear
+                    .frame(height: 0)
+                
                 HStack(spacing: 8) {
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -325,88 +289,47 @@ struct ChatView: View {
                     }) {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
-                            .foregroundColor(.primary)
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
-
+                    
+                    Text(sessionName)
+                        .font(.system(size: 16))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .lineLimit(1)
+                    
                     Spacer()
-
-                    Text("goose")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    Spacer()
-
-                    // Empty space where settings was - keeps title centered
-                    Color.clear
-                        .frame(width: 22, height: 22)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 50)  // Account for status bar
-                .padding(.bottom, 12)
-                .background(
-                    Color(UIColor.systemBackground)
-                        .opacity(0.95)
-                        .background(.regularMaterial)
-                )
+                .padding(.top, 4)
+                .padding(.bottom, 24)
             }
-
-            // Sidebar overlay (this can stay in ZStack as it's a modal)
-            if showingSidebar {
-                SidebarView(
-                    isShowing: $showingSidebar,
-                    isSettingsPresented: $isSettingsPresented,
-                    onSessionSelect: { sessionId in
-                        loadSession(sessionId)
-                    },
-                    onNewSession: {
-                        createNewSession()
-                    })
-            }
-        }
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsView()
-                .environmentObject(ConfigurationHandler.shared)
+            .background(themeManager.backgroundColor.opacity(0.95))
+            .frame(maxWidth: .infinity, alignment: .top)
+            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
         .onAppear {
-            // Set up voice manager callback
-            voiceManager.onSubmitMessage = { transcribedText in
-                // Create the message and send it
-                inputText = transcribedText
-                sendMessage()
-            }
-
             Task {
                 await apiService.testConnection()
-            }
-
-            // Listen for initial message from WelcomeView
-            NotificationCenter.default.addObserver(
-                forName: Notification.Name("SendInitialMessage"),
-                object: nil,
-                queue: .main
-            ) { notification in
-                if let message = notification.userInfo?["message"] as? String {
-                    inputText = message
-                    sendMessage()
-                }
-            }
-            
-            // Listen for session load from WelcomeView
-            NotificationCenter.default.addObserver(
-                forName: Notification.Name("LoadSession"),
-                object: nil,
-                queue: .main
-            ) { notification in
-                if let sessionId = notification.userInfo?["sessionId"] as? String {
+                
+                // If we have a session ID to load, load it first
+                if let sessionId = sessionIdToLoad, !sessionId.isEmpty {
                     loadSession(sessionId)
+                }
+                // Otherwise, if we have an initial message from the welcome screen, send it
+                else if let message = initialMessage, !message.isEmpty {
+                    await MainActor.run {
+                        inputText = message
+                        sendMessage()
+                    }
                 }
             }
         }
     }
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         var lastId: String?
-
+        
         if let lastMessage = messages.last {
             let toolCallsForLastMessage = getToolCallsForMessage(lastMessage.id)
             if !toolCallsForLastMessage.isEmpty {
@@ -415,10 +338,9 @@ struct ChatView: View {
                 lastId = lastMessage.id
             }
         }
-
+        
         if let scrollId = lastId {
             withAnimation(.easeOut(duration: 0.3)) {
-                // Use .bottom to scroll all the way, the padding in the content should handle visibility
                 proxy.scrollTo(scrollId, anchor: .bottom)
             }
         }
@@ -433,9 +355,6 @@ struct ChatView: View {
         inputText = ""
         isLoading = true
 
-        // Re-enable auto-scroll when user sends a new message
-        shouldAutoScroll = true
-
         startChatStream()
     }
 
@@ -444,42 +363,39 @@ struct ChatView: View {
             do {
                 // Create session if we don't have one
                 if currentSessionId == nil {
-                    let (sessionId, initialMessages) = try await apiService.startAgent(
-                        workingDir: "/tmp")
+                    let (sessionId, initialMessages) = try await apiService.startAgent(workingDir: "/tmp")
                     print("✅ SESSION CREATED: \(sessionId)")
-
+                    
                     // Load any initial messages from the session
                     if !initialMessages.isEmpty {
                         await MainActor.run {
                             messages = initialMessages
                         }
                     }
-
+                    
                     // Read provider and model from config
                     print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
                     guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
-                        let model = await apiService.readConfigValue(key: "GOOSE_MODEL")
-                    else {
+                          let model = await apiService.readConfigValue(key: "GOOSE_MODEL") else {
                         throw APIError.noData
                     }
-
+                    
                     print("🔧 UPDATING PROVIDER TO \(provider) WITH MODEL \(model)")
-                    try await apiService.updateProvider(
-                        sessionId: sessionId, provider: provider, model: model)
+                    try await apiService.updateProvider(sessionId: sessionId, provider: provider, model: model)
                     print("✅ PROVIDER UPDATED FOR SESSION: \(sessionId)")
-
+                    
                     // Extend the system prompt with iOS-specific context
                     print("🔧 EXTENDING PROMPT FOR SESSION: \(sessionId)")
                     try await apiService.extendSystemPrompt(sessionId: sessionId)
                     print("✅ PROMPT EXTENDED FOR SESSION: \(sessionId)")
-
+                    
                     // Load enabled extensions just like desktop does
                     print("🔧 LOADING ENABLED EXTENSIONS FOR SESSION: \(sessionId)")
                     try await apiService.loadEnabledExtensions(sessionId: sessionId)
-
+                    
                     currentSessionId = sessionId
                 }
-
+                
                 guard let sessionId = currentSessionId else {
                     throw APIError.invalidResponse
                 }
@@ -512,7 +428,7 @@ struct ChatView: View {
                 await MainActor.run {
                     isLoading = false
                     print("🚨 Session setup error: \(error)")
-
+                    
                     let errorMessage = Message(
                         role: .assistant,
                         text: "❌ Failed to initialize session: \(error.localizedDescription)"
@@ -530,7 +446,7 @@ struct ChatView: View {
             print("⚠️ Ignoring SSE event - stream was cancelled")
             return
         }
-
+        
         switch event {
         case .message(let messageEvent):
             let incomingMessage = messageEvent.message
@@ -569,10 +485,8 @@ struct ChatView: View {
                     print("⚠️ Ignoring UI update - session was cleared")
                     return
                 }
-
-                if let existingIndex = self.messages.firstIndex(where: {
-                    $0.id == incomingMessage.id
-                }) {
+                
+                if let existingIndex = self.messages.firstIndex(where: { $0.id == incomingMessage.id }) {
                     var updatedMessage = self.messages[existingIndex]
 
                     if let existingTextContent = updatedMessage.content.first(where: {
@@ -589,21 +503,11 @@ struct ChatView: View {
                             updatedMessage = Message(
                                 id: incomingMessage.id, role: incomingMessage.role,
                                 content: [MessageContent.text(TextContent(text: combinedText))],
-                                created: incomingMessage.created, metadata: incomingMessage.metadata
-                            )
+                                created: incomingMessage.created, metadata: incomingMessage.metadata)
                         }
                     }
 
                     self.messages[existingIndex] = updatedMessage
-                    // Trigger scroll when message content is updated during streaming
-                    // Throttle to avoid excessive scrolling during rapid updates
-                    if self.shouldAutoScroll {
-                        let now = Date()
-                        if now.timeIntervalSince(self.lastScrollUpdate) > 0.1 {  // Throttle to 10 updates per second
-                            self.lastScrollUpdate = now
-                            self.scrollRefreshTrigger = UUID()
-                        }
-                    }
                 } else {
                     self.messages.append(incomingMessage)
                     // Manage memory by limiting messages and tool calls
@@ -632,30 +536,10 @@ struct ChatView: View {
             }
             activeToolCalls.removeAll()
 
-            // Force final scroll to bottom when streaming completes
-            if shouldAutoScroll {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    scrollRefreshTrigger = UUID()
-                }
-            }
-
-            // Handle voice mode response - only speak if in full audio mode
-            if voiceManager.voiceMode == .fullAudio,
-                let lastMessage = messages.last,
-                lastMessage.role == .assistant,
-                let textContent = lastMessage.content.first(where: {
-                    if case .text = $0 { return true } else { return false }
-                }),
-                case .text(let content) = textContent
-            {
-                print("🎤 Speaking response in full audio mode")
-                voiceManager.speakResponse(content.text)
-            }
-
         case .modelChange(let modelEvent):
             print("Model changed: \(modelEvent.model) (\(modelEvent.mode))")
 
-        case .notification(_):
+        case .notification(let notificationEvent):
             // Just ignore notifications silently - they're too verbose for shell output
             break
 
@@ -669,52 +553,127 @@ struct ChatView: View {
         currentStreamTask = nil
         isLoading = false
     }
-
+    
     private func getToolCallsForMessage(_ messageId: String) -> [String] {
         return toolCallMessageMap.compactMap { (toolCallId, mappedMessageId) in
             mappedMessageId == messageId ? toolCallId : nil
         }.sorted()
     }
-
+    
     private func getCompletedTasksForMessage(_ messageId: String) -> [CompletedToolCall] {
-        let toolCallIds = getToolCallsForMessage(messageId)
-        return toolCallIds.compactMap { completedToolCalls[$0] }
+        // Get the message
+        guard let message = messages.first(where: { $0.id == messageId }) else {
+            print("⚠️ Message \(messageId) not found")
+            return []
+        }
+        
+        // Extract tool request IDs from message content
+        let toolRequestIds = message.content.compactMap { content -> String? in
+            if case .toolRequest(let toolContent) = content {
+                return toolContent.id
+            }
+            return nil
+        }
+        
+        // Look up completed tasks by ID
+        let completed = toolRequestIds.compactMap { toolId in
+            completedToolCalls[toolId]
+        }
+        
+        if !toolRequestIds.isEmpty {
+            print("📊 Message \(messageId.prefix(8))... has \(toolRequestIds.count) tool requests, \(completed.count) completed")
+            if completed.count != toolRequestIds.count {
+                print("  ⚠️ Missing completions for: \(toolRequestIds.filter { !completedToolCalls.keys.contains($0) })")
+            }
+        }
+        
+        return completed
     }
-
+    
+    private func reconstructToolCallsFromMessages() {
+        print("🔧 Reconstructing tool calls from \(messages.count) messages...")
+        
+        // Step 1: Collect all tool requests and responses from messages
+        var toolRequests: [String: (toolCall: ToolCall, messageId: String)] = [:]
+        var toolResponses: [String: ToolResult] = [:]
+        
+        for message in messages {
+            for content in message.content {
+                switch content {
+                case .toolRequest(let toolRequest):
+                    toolRequests[toolRequest.id] = (toolRequest.toolCall, message.id)
+                    print("  📥 Found tool request: \(toolRequest.toolCall.name) (ID: \(toolRequest.id))")
+                    
+                case .toolResponse(let toolResponse):
+                    toolResponses[toolResponse.id] = toolResponse.toolResult
+                    print("  📤 Found tool response: \(toolResponse.id) - \(toolResponse.toolResult.status)")
+                    
+                default:
+                    break
+                }
+            }
+        }
+        
+        // Step 2: Match requests with responses and create CompletedToolCall objects
+        var reconstructedCount = 0
+        for (toolId, requestData) in toolRequests {
+            if let result = toolResponses[toolId] {
+                // Create CompletedToolCall with placeholder timing
+                completedToolCalls[toolId] = CompletedToolCall(
+                    toolCall: requestData.toolCall,
+                    result: result,
+                    duration: 0.0, // Historical - no duration data
+                    completedAt: Date() // Use current date as placeholder
+                )
+                
+                // Map tool call to message
+                toolCallMessageMap[toolId] = requestData.messageId
+                
+                reconstructedCount += 1
+                print("  ✅ Matched: \(requestData.toolCall.name)")
+            } else {
+                print("  ⚠️ Unmatched request: \(requestData.toolCall.name) (ID: \(toolId))")
+            }
+        }
+        
+        print("📊 Reconstructed \(reconstructedCount) completed tool calls from messages")
+        print("📊 completedToolCalls dictionary now has \(completedToolCalls.count) entries")
+    }
+    
     private func limitMessages() {
         guard messages.count > maxMessages else { return }
-
+        
         // Keep only the most recent messages, but always keep the first message (usually system prompt)
         let messagesToRemove = messages.count - maxMessages
-        let startIndex = messages.count > 1 ? 1 : 0  // Keep first message if exists
-
+        let startIndex = messages.count > 1 ? 1 : 0 // Keep first message if exists
+        
         let removedMessages = Array(messages[startIndex..<startIndex + messagesToRemove])
         messages.removeSubrange(startIndex..<startIndex + messagesToRemove)
-
+        
         // Clean up tool call mappings for removed messages
         for removedMessage in removedMessages {
             toolCallMessageMap = toolCallMessageMap.filter { $0.value != removedMessage.id }
         }
-
+        
         print("🧹 Memory cleanup: removed \(messagesToRemove) old messages")
     }
-
+    
     private func limitToolCalls() {
         // Limit completed tool calls to prevent memory accumulation
         guard completedToolCalls.count > maxToolCalls else { return }
-
+        
         let toolCallsToRemove = completedToolCalls.count - maxToolCalls
         let sortedCalls = completedToolCalls.sorted { $0.value.completedAt < $1.value.completedAt }
-
+        
         for i in 0..<toolCallsToRemove {
             let toolCallId = sortedCalls[i].key
             completedToolCalls.removeValue(forKey: toolCallId)
             toolCallMessageMap.removeValue(forKey: toolCallId)
         }
-
+        
         print("🧹 Tool call cleanup: removed \(toolCallsToRemove) old tool calls")
     }
-
+    
     func loadSession(_ sessionId: String) {
         // CRITICAL: Cancel any existing stream before switching sessions
         if let currentTask = currentStreamTask {
@@ -722,92 +681,60 @@ struct ChatView: View {
             currentTask.cancel()
             currentStreamTask = nil
         }
-
-        // Handle trial mode sessions differently
-        if apiService.isTrialMode && sessionId.starts(with: "trial-demo-") {
-            Task {
-                await MainActor.run {
-                    // Clear ALL old state first
-                    self.stopStreaming()
-                    activeToolCalls.removeAll()
-                    completedToolCalls.removeAll()
-                    toolCallMessageMap.removeAll()
-                    currentSessionId = nil  // Trial sessions don't have real session IDs
-
-                    // Load the mock messages
-                    messages = apiService.getMockMessages(for: sessionId)
-
-                    // Add a trial mode notice at the beginning
-                    let trialNotice = Message(
-                        role: .assistant,
-                        text:
-                            "🔔 **Trial Mode**: This is a trial session. To access persistent sessions and full functionality, connect to your personal goose agent."
-                    )
-                    messages.insert(trialNotice, at: 0)
-
-                    // Force scroll to bottom after loading
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        shouldAutoScroll = true
-                        scrollRefreshTrigger = UUID()
-                    }
-                }
-            }
-            return
-        }
-
+        
         Task {
             do {
                 // Resume the session
-                let (resumedSessionId, sessionMessages) = try await apiService.resumeAgent(
-                    sessionId: sessionId)
+                let (resumedSessionId, sessionMessages) = try await apiService.resumeAgent(sessionId: sessionId)
                 print("✅ SESSION RESUMED: \(resumedSessionId)")
                 print("📝 Loaded \(sessionMessages.count) messages")
-
+                
                 // Read provider and model from config (same as new session)
                 print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
                 guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
-                    let model = await apiService.readConfigValue(key: "GOOSE_MODEL")
-                else {
+                      let model = await apiService.readConfigValue(key: "GOOSE_MODEL") else {
                     throw APIError.noData
                 }
-
+                
                 print("🔧 UPDATING PROVIDER TO \(provider) WITH MODEL \(model)")
-                try await apiService.updateProvider(
-                    sessionId: resumedSessionId, provider: provider, model: model)
+                try await apiService.updateProvider(sessionId: resumedSessionId, provider: provider, model: model)
                 print("✅ PROVIDER UPDATED FOR RESUMED SESSION: \(resumedSessionId)")
-
+                
                 // Extend the system prompt with iOS-specific context (same as new session)
                 print("🔧 EXTENDING PROMPT FOR RESUMED SESSION: \(resumedSessionId)")
                 try await apiService.extendSystemPrompt(sessionId: resumedSessionId)
                 print("✅ PROMPT EXTENDED FOR RESUMED SESSION: \(resumedSessionId)")
-
+                
                 // Load enabled extensions just like desktop does (same as new session)
                 print("🔧 LOADING ENABLED EXTENSIONS FOR RESUMED SESSION: \(resumedSessionId)")
                 try await apiService.loadEnabledExtensions(sessionId: resumedSessionId)
-
+                
                 // Update all state on main thread at once
                 await MainActor.run {
                     // CRITICAL: Clear ALL old state first to prevent event contamination
-                    self.stopStreaming()  // This clears currentStreamTask and isLoading
+                    self.stopStreaming() // This clears currentStreamTask and isLoading
                     activeToolCalls.removeAll()
                     completedToolCalls.removeAll()
                     toolCallMessageMap.removeAll()
-
+                    
                     // Set new state with forced UI refresh
                     currentSessionId = resumedSessionId
-
+                    
                     // Force UI refresh by clearing and setting messages
                     messages.removeAll()
                     messages = sessionMessages
-
+                    
                     print("📊 Messages array now has \(messages.count) messages")
                     print("📊 First message ID: \(messages.first?.id ?? "none")")
                     print("📊 Last message ID: \(messages.last?.id ?? "none")")
-
+                    
+                    // 🔧 RECONSTRUCT tool call data from historical messages
+                    reconstructToolCallsFromMessages()
+                    
                     // Force scroll to bottom after loading
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         shouldAutoScroll = true
-                        scrollRefreshTrigger = UUID()  // Force UI refresh and scroll
+                        scrollRefreshTrigger = UUID() // Force UI refresh and scroll
                     }
                 }
             } catch {
@@ -822,7 +749,7 @@ struct ChatView: View {
             }
         }
     }
-
+    
     func createNewSession() {
         // CRITICAL: Cancel any existing stream before creating new session
         if let currentTask = currentStreamTask {
@@ -830,7 +757,7 @@ struct ChatView: View {
             currentTask.cancel()
             currentStreamTask = nil
         }
-
+        
         // Clear all state for a fresh session
         messages.removeAll()
         activeToolCalls.removeAll()
@@ -838,7 +765,7 @@ struct ChatView: View {
         toolCallMessageMap.removeAll()
         currentSessionId = nil
         isLoading = false
-
+        
         print("🆕 Created new session - cleared all state")
     }
 }
@@ -847,164 +774,210 @@ struct ChatView: View {
 struct SidebarView: View {
     @Binding var isShowing: Bool
     @Binding var isSettingsPresented: Bool
-    let onSessionSelect: (String) -> Void
+    @Binding var cachedSessions: [ChatSession] // Use cached sessions from parent
+    let onSessionSelect: (String, String) -> Void
     let onNewSession: () -> Void
-    @State private var sessions: [ChatSession] = []
-
+    let onOverview: () -> Void
+    @EnvironmentObject var themeManager: ThemeManager
+    
     var body: some View {
-        ZStack {
-            // Background overlay
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
+        VStack(spacing: 0) {
+            // Top section: Search + New Session button
+            HStack(spacing: 8) {
+                // Search field
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14))
+                        .foregroundColor(themeManager.secondaryTextColor)
+                    
+                    TextField("Search", text: .constant(""))
+                        .font(.system(size: 14))
+                        .foregroundColor(themeManager.primaryTextColor)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                .cornerRadius(8)
+                
+                // New session button (+ icon)
+                Button(action: {
+                    onNewSession()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isShowing = false
                     }
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .frame(width: 32, height: 32)
+                        .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                        .cornerRadius(8)
                 }
-
-            // Sidebar panel
-            HStack {
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 0)
+            .padding(.bottom, 20)
+            
+            // Scrollable content: Categories + Sessions
+            ScrollView(showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Header with New Session button at top
-                    HStack {
-                        Button(action: {
-                            onNewSession()
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isShowing = false
-                            }
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.primary)
-                                .frame(width: 32, height: 32)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer()
-
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isShowing = false
-                            }
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
-                        }
+                    // Categories section
+                    VStack(alignment: .leading, spacing: 16) {
+                        CategoryButton(icon: "tray", title: "Inbox")
+                        CategoryButton(icon: "checklist", title: "Tasks")
+                        CategoryButton(icon: "books.vertical", title: "Library")
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-
-                    Divider()
-
+                    .padding(.leading, 20)
+                    .padding(.trailing, 16)
+                    .padding(.top, 32)
+                    .padding(.bottom, 32)
+                    
                     // Sessions list
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            // Sessions header
-                            HStack {
-                                Text("Sessions")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Spacer()
+                    LazyVStack(spacing: 0) {
+                        if cachedSessions.isEmpty {
+                            // Show empty state
+                            VStack(spacing: 12) {
+                                Image(systemName: "tray")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(themeManager.secondaryTextColor.opacity(0.5))
+                                
+                                Text("No sessions yet")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(themeManager.secondaryTextColor)
+                                
+                                Text("Start a new conversation")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(themeManager.secondaryTextColor.opacity(0.7))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
                             }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-
-                            ForEach(sessions) { session in
+                            .padding(.vertical, 32)
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            ForEach(cachedSessions) { session in
                                 SessionRowView(session: session)
                                     .onTapGesture {
-                                        onSessionSelect(session.id)
+                                        onSessionSelect(session.id, session.description)
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             isShowing = false
                                         }
                                     }
-                                Divider()
-                                    .padding(.leading)
                             }
                         }
                     }
-
-                    Spacer()
-
-                    Divider()
-
-                    // Bottom row: Settings button (matching PR #11 style)
-                    Button(action: {
-                        // Close sidebar immediately
-                        isShowing = false
-                        // Open settings immediately (sheet will present after sidebar closes)
-                        isSettingsPresented = true
-                    }) {
-                        HStack {
-                            Image(systemName: "gear")
-                                .font(.system(size: 18))
-                                .foregroundColor(.primary)
-
-                            Text("Settings")
-                                .font(.system(size: 16))
-                                .foregroundColor(.primary)
-
-                            Spacer()
-                        }
-                        .padding()
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .background(Color(.systemBackground))
                 }
-                .frame(width: 280)
-                .background(Color(.systemBackground))
-                .offset(x: isShowing ? 0 : -280)
-
+            }
+            
+            // Bottom row: Settings and Theme icons
+            HStack(spacing: 24) {
+                // Settings button
+                Button(action: {
+                    print("⚙️ Settings button tapped")
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isShowing = false
+                    }
+                    // Small delay to let sidebar close before showing sheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isSettingsPresented = true
+                        print("⚙️ isSettingsPresented set to: \(isSettingsPresented)")
+                    }
+                }) {
+                    Image(systemName: "gear")
+                        .font(.system(size: 20))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                
+                // Theme toggle
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        themeManager.isDarkMode.toggle()
+                    }
+                }) {
+                    Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                
                 Spacer()
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(themeManager.backgroundColor)
         }
-        .onAppear {
-            Task {
-                await loadSessions()
+        .frame(width: 360)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(themeManager.backgroundColor)
+        .onChange(of: isShowing) { newValue in
+            if newValue {
+                // Refresh sessions in background when drawer opens (optional)
+                Task {
+                    await refreshSessions()
+                }
             }
         }
     }
-
-    private func loadSessions() async {
+    
+    // Optional: Refresh sessions in background when drawer opens
+    private func refreshSessions() async {
+        print("🔄 Attempting to refresh sessions...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
         await MainActor.run {
-            self.sessions = fetchedSessions
+            // Update cached sessions with latest data (limit to 10)
+            cachedSessions = Array(fetchedSessions.prefix(10))
+            print("🔄 Refreshed \(cachedSessions.count) sessions from API")
+            if cachedSessions.isEmpty {
+                print("⚠️ No sessions found - make sure server is connected and has sessions")
+            }
         }
+    }
+}
+
+// MARK: - Category Button
+struct CategoryButton: View {
+    let icon: String
+    let title: String
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
+        Button(action: {
+            // Category action
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(themeManager.primaryTextColor)
+                    .frame(width: 20)
+                
+                Text(title)
+                    .font(.system(size: 18))
+                    .foregroundColor(themeManager.primaryTextColor)
+                
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 
 // MARK: - Session Row View
 struct SessionRowView: View {
     let session: ChatSession
-
+    @EnvironmentObject var themeManager: ThemeManager
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(session.title)
-                .font(.headline)
-                .lineLimit(1)
-
-            Text(session.lastMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-
-            Text(formatDate(session.timestamp))
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+        Text(session.title)
+            .font(.system(size: 16, weight: .medium))
+            .foregroundColor(themeManager.primaryTextColor)
+            .lineLimit(1)
+            .padding(.leading, 20)
+            .padding(.trailing, 1)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 // MARK: - Chat Session Model (matches goosed API)
@@ -1014,7 +987,7 @@ struct ChatSession: Identifiable, Codable {
     let messageCount: Int
     let createdAt: String
     let updatedAt: String
-
+    
     enum CodingKeys: String, CodingKey {
         case id
         case description
@@ -1022,16 +995,16 @@ struct ChatSession: Identifiable, Codable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
-
+    
     // Computed properties for UI display
     var title: String {
         return description.isEmpty ? "Untitled Session" : description
     }
-
+    
     var lastMessage: String {
         return "\(messageCount) message\(messageCount == 1 ? "" : "s")"
     }
-
+    
     var timestamp: Date {
         // Parse the ISO 8601 date string
         let formatter = ISO8601DateFormatter()
@@ -1054,4 +1027,5 @@ struct CompletedToolCall {
 
 #Preview {
     ChatView(showingSidebar: .constant(false))
+        .environmentObject(ThemeManager.shared)
 }
