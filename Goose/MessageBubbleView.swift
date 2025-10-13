@@ -414,8 +414,8 @@ struct ToolConfirmationView: View {
     ScrollView {
         VStack(spacing: 16) {
             // Basic message examples
-            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [], sessionName: "Test Session")
-            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [], sessionName: "Test Session")
+            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [])
+            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [])
             
             // Comprehensive markdown test examples
             MessageBubbleView(message: Message(role: .assistant, text: """
@@ -445,7 +445,7 @@ Visit [Apple](https://apple.com) for more info.
 • Third `code` item
 
 *This tests comprehensive markdown rendering.*
-"""), completedTasks: [], sessionName: "Test Session")
+"""), completedTasks: [])
             
             MessageBubbleView(message: Message(role: .user, text: """
 Testing more complex markdown:
@@ -463,7 +463,7 @@ def hello_world():
 ```
 
 **Note**: This should all render properly.
-"""), completedTasks: [], sessionName: "Test Session")
+"""), completedTasks: [])
         }
         .padding()
     }
