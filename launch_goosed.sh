@@ -38,7 +38,7 @@ trap cleanup SIGINT SIGTERM EXIT
 echo -e "${GREEN}Starting goosed on port ${PORT}...${NC}"
 export GOOSE_PORT=$PORT
 export GOOSE_SERVER__SECRET_KEY="$SECRET"
-goosed agent > /dev/null 2>&1 &
+goosed agent &
 GOOSED_PID=$!
 
 # Wait for goosed to be ready
