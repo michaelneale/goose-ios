@@ -300,8 +300,14 @@ struct WelcomeView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity)
-            .background(themeManager.chatInputBackgroundColor)
-            .cornerRadius(21)
+            .background(
+                RoundedRectangle(cornerRadius: 21)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 21)
+                            .fill(themeManager.chatInputBackgroundColor.opacity(0.3))
+                    )
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 21)
                     .inset(by: 0.5)

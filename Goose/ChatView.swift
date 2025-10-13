@@ -259,10 +259,10 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 21)
-                        .fill(.regularMaterial)
+                        .fill(.ultraThinMaterial)
                         .overlay(
                             RoundedRectangle(cornerRadius: 21)
-                                .fill(themeManager.chatInputBackgroundColor.opacity(0.85))
+                                .fill(themeManager.chatInputBackgroundColor.opacity(0.3))
                         )
                 )
                 } // End of transcription VStack
