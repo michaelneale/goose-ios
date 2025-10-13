@@ -305,7 +305,14 @@ struct ChatView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 24)
             }
-            .background(themeManager.backgroundColor.opacity(0.95))
+            .background(
+                ZStack {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                    Rectangle()
+                        .fill(themeManager.backgroundColor.opacity(0.85))
+                }
+            )
             .frame(maxWidth: .infinity, alignment: .top)
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }

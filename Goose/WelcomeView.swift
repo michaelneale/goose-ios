@@ -54,7 +54,14 @@ struct WelcomeView: View {
                 .padding(.top, 66)
                 .padding(.bottom, 8)
             }
-            .background(themeManager.backgroundColor.opacity(0.95))
+            .background(
+                ZStack {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                    Rectangle()
+                        .fill(themeManager.backgroundColor.opacity(0.85))
+                }
+            )
             .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
             
             ScrollView(showsIndicators: false) {
