@@ -50,13 +50,15 @@ struct TaskDetailView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Timestamp at the top
-                Text(formatTimestamp(message.created))
-                    .font(.system(size: 12))
-                    .foregroundColor(themeManager.secondaryTextColor)
-                    .padding(.bottom, 4)
+        ZStack(alignment: .topLeading) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Timestamp at the top
+                    Text(formatTimestamp(message.created))
+                        .font(.system(size: 12))
+                        .foregroundColor(themeManager.secondaryTextColor)
+                        .padding(.bottom, 4)
+                        .padding(.top, 60) // Add padding for custom nav bar
                 
                 // Show the conversation/reasoning text
                 if !messageText.isEmpty {
@@ -155,27 +157,23 @@ struct TaskDetailView: View {
             .padding()
         }
         .background(themeManager.backgroundColor)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            // Back chevron on the left
-            ToolbarItem(placement: .navigationBarLeading) {
+        
+        // Custom navigation bar overlay
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                // Back button
                 Button(action: {
                     dismiss()
                 }) {
-                    HStack(spacing: 0) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(themeManager.primaryTextColor)
-                    }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .frame(width: 44, height: 44)
                 }
-                .buttonStyle(BorderlessButtonStyle())
-            }
-            
-            // Breadcrumb in the center
-            ToolbarItem(placement: .principal) {
+                
+                Spacer()
+                
+                // Breadcrumb
                 HStack(spacing: 4) {
                     Text(sessionName)
                         .font(.system(size: 14))
@@ -192,8 +190,22 @@ struct TaskDetailView: View {
                         .foregroundColor(themeManager.primaryTextColor)
                         .lineLimit(1)
                 }
+                
+                Spacer()
+                
+                // Spacer for symmetry
+                Color.clear
+                    .frame(width: 44, height: 44)
             }
+            .padding(.horizontal, 16)
+            .frame(height: 60)
+            .background(themeManager.backgroundColor)
+            
+            Spacer()
         }
+        }
+        .navigationBarHidden(true)
+        .edgesIgnoringSafeArea(.top)
     }
 }
 
@@ -250,9 +262,14 @@ struct TaskOutputDetailView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Search field
-            HStack(spacing: 12) {
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                // Add top padding for custom nav bar
+                Spacer()
+                    .frame(height: 60)
+                
+                // Search field
+                HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(themeManager.secondaryTextColor)
                     .font(.system(size: 16))
@@ -424,27 +441,23 @@ struct TaskOutputDetailView: View {
             }
         }
         .background(themeManager.backgroundColor)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            // Back chevron on the left
-            ToolbarItem(placement: .navigationBarLeading) {
+        
+        // Custom navigation bar overlay
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                // Back button
                 Button(action: {
                     dismiss()
                 }) {
-                    HStack(spacing: 0) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(themeManager.primaryTextColor)
-                    }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .frame(width: 44, height: 44)
                 }
-                .buttonStyle(BorderlessButtonStyle())
-            }
-            
-            // Breadcrumb in the center
-            ToolbarItem(placement: .principal) {
+                
+                Spacer()
+                
+                // Breadcrumb
                 HStack(spacing: 4) {
                     Text(sessionName)
                         .font(.system(size: 14))
@@ -461,8 +474,22 @@ struct TaskOutputDetailView: View {
                         .foregroundColor(themeManager.primaryTextColor)
                         .lineLimit(1)
                 }
+                
+                Spacer()
+                
+                // Spacer for symmetry
+                Color.clear
+                    .frame(width: 44, height: 44)
             }
+            .padding(.horizontal, 16)
+            .frame(height: 60)
+            .background(themeManager.backgroundColor)
+            
+            Spacer()
         }
+        }
+        .navigationBarHidden(true)
+        .edgesIgnoringSafeArea(.top)
     }
 }
 
