@@ -470,6 +470,112 @@ def hello_world():
     .environmentObject(ThemeManager.shared)
 }
 
+// MARK: - Completed Tool Pill View
+struct CompletedToolPillView: View {
+    let completedCall: CompletedToolCall
+    @State private var isExpanded: Bool = false
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(themeManager.secondaryTextColor)
+                    
+                    Text(completedCall.toolCall.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(themeManager.secondaryTextColor)
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundColor(themeManager.secondaryTextColor)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                .cornerRadius(16)
+            }
+            .buttonStyle(.plain)
+            
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Show tool details
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Status:")
+                                .font(.caption)
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            Text(completedCall.result.status)
+                                .font(.caption)
+                                .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                                .fontWeight(.medium)
+                            
+                            Spacer()
+                            
+                            Text(String(format: "%.2fs", completedCall.duration))
+                                .font(.caption2)
+                                .foregroundColor(themeManager.secondaryTextColor)
+                        }
+                        
+                        if !completedCall.toolCall.arguments.isEmpty {
+                            Text("Arguments:")
+                                .font(.caption)
+                                .foregroundColor(themeManager.secondaryTextColor)
+                                .padding(.top, 4)
+                            
+                            ForEach(Array(completedCall.toolCall.arguments.keys.sorted()), id: \.self) { key in
+                                HStack(alignment: .top, spacing: 4) {
+                                    Text("\(key):")
+                                        .font(.caption2)
+                                        .foregroundColor(themeManager.secondaryTextColor)
+                                    let valueString = String(describing: completedCall.toolCall.arguments[key]?.value ?? "")
+                                    Text(valueString.count > 100 ? String(valueString.prefix(100)) + "..." : valueString)
+                                        .font(.caption2)
+                                        .foregroundColor(themeManager.primaryTextColor)
+                                        .lineLimit(3)
+                                }
+                            }
+                        }
+                        
+                        if let error = completedCall.result.error {
+                            Text("Error:")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.top, 4)
+                            Text(error.count > 200 ? String(error.prefix(200)) + "..." : error)
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                                .lineLimit(3)
+                        } else if let value = completedCall.result.value {
+                            Text("Result:")
+                                .font(.caption)
+                                .foregroundColor(themeManager.secondaryTextColor)
+                                .padding(.top, 4)
+                            let valueString = String(describing: value.value)
+                            Text(valueString.count > 200 ? String(valueString.prefix(200)) + "..." : valueString)
+                                .font(.caption2)
+                                .foregroundColor(themeManager.primaryTextColor)
+                                .lineLimit(5)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(themeManager.chatInputBackgroundColor.opacity(0.3))
+                    .cornerRadius(12)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
 // MARK: - Tool Call Progress View
 struct ToolCallProgressView: View {
     let toolCall: ToolCall
