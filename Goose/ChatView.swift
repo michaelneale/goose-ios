@@ -235,7 +235,7 @@ struct ChatView: View {
                             }
                             .buttonStyle(.plain)
                             
-                            // Send button - white/black background based on theme
+                            // Send button - always solid with inverted arrow
                             Button(action: {
                                 if isLoading {
                                     stopStreaming()
@@ -245,9 +245,9 @@ struct ChatView: View {
                             }) {
                                 Image(systemName: isLoading ? "stop.fill" : "arrow.up")
                                     .font(.system(size: 17, weight: .medium))
-                                    .foregroundColor(themeManager.chatInputIconColor)
+                                    .foregroundColor(isLoading ? .white : (themeManager.isDarkMode ? .black : .white))
                                     .frame(width: 32, height: 32)
-                                    .background(isLoading ? Color.red : (inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray.opacity(0.3) : (themeManager.isDarkMode ? Color.white : Color.black)))
+                                    .background(isLoading ? Color.red : (themeManager.isDarkMode ? Color.white : Color.black))
                                     .cornerRadius(16)
                             }
                             .buttonStyle(.plain)

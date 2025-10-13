@@ -280,7 +280,7 @@ struct WelcomeView: View {
                         }
                         .buttonStyle(.plain)
                         
-                        // Send button - white/black background based on theme
+                        // Send button - always solid with inverted arrow
                         Button(action: {
                             if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 onStartChat(inputText)
@@ -288,9 +288,9 @@ struct WelcomeView: View {
                         }) {
                             Image(systemName: "arrow.up")
                                 .font(.system(size: 17, weight: .medium))
-                                .foregroundColor(themeManager.chatInputIconColor)
+                                .foregroundColor(themeManager.isDarkMode ? .black : .white)
                                 .frame(width: 32, height: 32)
-                                .background(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.white.opacity(0.3) : (themeManager.isDarkMode ? Color.white : Color.black))
+                                .background(themeManager.isDarkMode ? Color.white : Color.black)
                                 .cornerRadius(16)
                         }
                         .buttonStyle(.plain)
