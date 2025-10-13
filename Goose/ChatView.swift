@@ -42,7 +42,8 @@ struct ChatView: View {
                             ForEach(messages) { message in
                                 MessageBubbleView(
                                     message: message,
-                                    completedTasks: getCompletedTasksForMessage(message.id)
+                                    completedTasks: getCompletedTasksForMessage(message.id),
+                                    sessionName: sessionName
                                 )
                                     .environmentObject(themeManager)
                                     .id(message.id)

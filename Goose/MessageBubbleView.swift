@@ -4,6 +4,7 @@ import Markdown
 struct MessageBubbleView: View {
     let message: Message
     let completedTasks: [CompletedToolCall]
+    let sessionName: String
     @State private var showFullText = false
     @State private var isTruncated = false
     @EnvironmentObject var themeManager: ThemeManager
@@ -33,10 +34,51 @@ struct MessageBubbleView: View {
             
             // Show consolidated task completion pill if there are completed tasks
             if !completedTasks.isEmpty {
-                // Show all completed tools as collapsible items
-                ForEach(completedTasks, id: \.toolCall.name) { completedTask in
-                    CompletedToolPillView(completedCall: completedTask)
-                        .environmentObject(themeManager)
+                // For single task, go directly to output; for multiple, show combined view
+                if completedTasks.count == 1 {
+                    // Single task - go directly to output
+                    NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(themeManager)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Text(completedTasks[0].toolCall.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Multiple tasks - show all outputs in one view
+                    NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(themeManager)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Text("\(completedTasks.count) Tasks completed")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(themeManager.chatInputBackgroundColor.opacity(0.85))
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -414,8 +456,8 @@ struct ToolConfirmationView: View {
     ScrollView {
         VStack(spacing: 16) {
             // Basic message examples
-            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [])
-            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [])
+            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [], sessionName: "Test Session")
+            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [], sessionName: "Test Session")
             
             // Comprehensive markdown test examples
             MessageBubbleView(message: Message(role: .assistant, text: """
@@ -445,7 +487,7 @@ Visit [Apple](https://apple.com) for more info.
 • Third `code` item
 
 *This tests comprehensive markdown rendering.*
-"""), completedTasks: [])
+"""), completedTasks: [], sessionName: "Test Session")
             
             MessageBubbleView(message: Message(role: .user, text: """
 Testing more complex markdown:
@@ -463,117 +505,11 @@ def hello_world():
 ```
 
 **Note**: This should all render properly.
-"""), completedTasks: [])
+"""), completedTasks: [], sessionName: "Test Session")
         }
         .padding()
     }
     .environmentObject(ThemeManager.shared)
-}
-
-// MARK: - Completed Tool Pill View
-struct CompletedToolPillView: View {
-    let completedCall: CompletedToolCall
-    @State private var isExpanded: Bool = false
-    @EnvironmentObject var themeManager: ThemeManager
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(themeManager.secondaryTextColor)
-                    
-                    Text(completedCall.toolCall.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(themeManager.secondaryTextColor)
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                        .foregroundColor(themeManager.secondaryTextColor)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(themeManager.chatInputBackgroundColor.opacity(0.85))
-                .cornerRadius(16)
-            }
-            .buttonStyle(.plain)
-            
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 8) {
-                    // Show tool details
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Status:")
-                                .font(.caption)
-                                .foregroundColor(themeManager.secondaryTextColor)
-                            Text(completedCall.result.status)
-                                .font(.caption)
-                                .foregroundColor(completedCall.result.status == "success" ? .green : .red)
-                                .fontWeight(.medium)
-                            
-                            Spacer()
-                            
-                            Text(String(format: "%.2fs", completedCall.duration))
-                                .font(.caption2)
-                                .foregroundColor(themeManager.secondaryTextColor)
-                        }
-                        
-                        if !completedCall.toolCall.arguments.isEmpty {
-                            Text("Arguments:")
-                                .font(.caption)
-                                .foregroundColor(themeManager.secondaryTextColor)
-                                .padding(.top, 4)
-                            
-                            ForEach(Array(completedCall.toolCall.arguments.keys.sorted()), id: \.self) { key in
-                                HStack(alignment: .top, spacing: 4) {
-                                    Text("\(key):")
-                                        .font(.caption2)
-                                        .foregroundColor(themeManager.secondaryTextColor)
-                                    let valueString = String(describing: completedCall.toolCall.arguments[key]?.value ?? "")
-                                    Text(valueString.count > 100 ? String(valueString.prefix(100)) + "..." : valueString)
-                                        .font(.caption2)
-                                        .foregroundColor(themeManager.primaryTextColor)
-                                        .lineLimit(3)
-                                }
-                            }
-                        }
-                        
-                        if let error = completedCall.result.error {
-                            Text("Error:")
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .padding(.top, 4)
-                            Text(error.count > 200 ? String(error.prefix(200)) + "..." : error)
-                                .font(.caption2)
-                                .foregroundColor(.red)
-                                .lineLimit(3)
-                        } else if let value = completedCall.result.value {
-                            Text("Result:")
-                                .font(.caption)
-                                .foregroundColor(themeManager.secondaryTextColor)
-                                .padding(.top, 4)
-                            let valueString = String(describing: value.value)
-                            Text(valueString.count > 200 ? String(valueString.prefix(200)) + "..." : valueString)
-                                .font(.caption2)
-                                .foregroundColor(themeManager.primaryTextColor)
-                                .lineLimit(5)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(themeManager.chatInputBackgroundColor.opacity(0.3))
-                    .cornerRadius(12)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-    }
 }
 
 // MARK: - Tool Call Progress View
