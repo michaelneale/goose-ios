@@ -306,7 +306,7 @@ struct ChatView: View {
                     Rectangle()
                         .fill(.ultraThinMaterial)
                     Rectangle()
-                        .fill(themeManager.backgroundColor.opacity(0.5))
+                        .fill(themeManager.backgroundColor.opacity(0.95))
                 }
                 .ignoresSafeArea()
             )
