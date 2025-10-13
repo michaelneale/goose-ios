@@ -3,57 +3,43 @@ import Markdown
 
 struct MessageBubbleView: View {
     let message: Message
+    let completedTasks: [CompletedToolCall]
     @State private var showFullText = false
     @State private var isTruncated = false
     
-    // Reasonable preview size - roughly 6-8 lines of text
-    private let maxHeight: CGFloat = 160 // Approximately 6-8 lines of normal text
+    // Maximum height for truncation - about 70% of screen like PR #11
+    private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7
     
     var body: some View {
-        HStack {
-            if message.role == .user {
-                Spacer()
+        VStack(alignment: .leading, spacing: 8) {
+            // Message content - filter out tool responses AND tool requests (we'll show them as pills)
+            let filteredContent = message.content.filter { 
+                !isToolResponse($0) && !isToolRequest($0)
             }
             
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                // Message content - only show if there's non-tool-response content
-                let filteredContent = message.content.filter { !isToolResponse($0) }
-                
-                if !filteredContent.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
-                            TruncatableMessageContentView(
-                                content: content,
-                                maxHeight: maxHeight,
-                                showFullText: $showFullText,
-                                isTruncated: $isTruncated
-                            )
-                        }
+            if !filteredContent.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
+                        TruncatableMessageContentView(
+                            content: content,
+                            maxHeight: maxHeight,
+                            showFullText: $showFullText,
+                            isTruncated: $isTruncated,
+                            isUserMessage: message.role == .user
+                        )
                     }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(message.role == .user ? Color.blue : Color(.systemGray6))
-                    )
-                    .foregroundColor(message.role == .user ? .white : .primary)
-                    .onTapGesture {
-                        if isTruncated {
-                            showFullText = true
-                        }
-                    }
-                    
-                    // Timestamp
-                    Text(formatTimestamp(message.created))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
                 }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.role == .user ? .trailing : .leading)
             
-            if message.role == .assistant {
-                Spacer()
+            // Show consolidated task completion pill if there are completed tasks (PR #11 style)
+            if !completedTasks.isEmpty {
+                // Show all completed tools as collapsible items (they were actually expandable in PR #11)
+                ForEach(completedTasks, id: \.toolCall.name) { completedTask in
+                    CompletedToolPillView(completedCall: completedTask)
+                }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
@@ -68,6 +54,13 @@ struct MessageBubbleView: View {
     
     private func isToolResponse(_ content: MessageContent) -> Bool {
         if case .toolResponse = content {
+            return true
+        }
+        return false
+    }
+    
+    private func isToolRequest(_ content: MessageContent) -> Bool {
+        if case .toolRequest = content {
             return true
         }
         return false
@@ -215,21 +208,36 @@ private struct MarkdownParser {
 // MARK: - Cached Markdown Text View
 struct MarkdownText: View {
     let text: String
+    var isUserMessage: Bool = false
     @State private var cachedAttributedText: AttributedString?
+    @State private var previousText = ""
     
     var body: some View {
         Text(cachedAttributedText ?? AttributedString(text))
+            .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
             .textSelection(.enabled)
             .onAppear {
                 if cachedAttributedText == nil {
                     cachedAttributedText = MarkdownParser.parse(text)
+                    previousText = text
                 }
             }
-            .onChange(of: text) {
+            .onChange(of: text) { newText in
                 // Only reparse if text changed significantly
-                if !text.hasPrefix(text) || text.count - text.count > 50 {
-                    cachedAttributedText = MarkdownParser.parse(text)
+                if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
+                    // Full reparse for significant changes
+                    cachedAttributedText = MarkdownParser.parse(newText)
+                } else if newText != previousText {
+                    // For streaming: just append the new part efficiently
+                    if let cached = cachedAttributedText {
+                        let newPart = String(newText.dropFirst(previousText.count))
+                        // Try to append without full reparse for efficiency
+                        cachedAttributedText = cached + AttributedString(newPart)
+                    } else {
+                        cachedAttributedText = MarkdownParser.parse(newText)
+                    }
                 }
+                previousText = newText
             }
     }
 }
@@ -488,8 +496,8 @@ struct ToolConfirmationView: View {
     ScrollView {
         VStack(spacing: 16) {
             // Basic message examples
-            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"))
-            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."))
+            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [])
+            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [])
             
             // Comprehensive markdown test examples
             MessageBubbleView(message: Message(role: .assistant, text: """
@@ -519,7 +527,7 @@ Visit [Apple](https://apple.com) for more info.
 • Third `code` item
 
 *This tests comprehensive markdown rendering.*
-"""))
+"""), completedTasks: [])
             
             MessageBubbleView(message: Message(role: .user, text: """
 Testing more complex markdown:
@@ -537,9 +545,112 @@ def hello_world():
 ```
 
 **Note**: This should all render properly.
-"""))
+"""), completedTasks: [])
         }
         .padding()
+    }
+}
+
+// MARK: - Completed Tool Pill View (PR #11 style - expandable)
+struct CompletedToolPillView: View {
+    let completedCall: CompletedToolCall
+    @State private var isExpanded: Bool = false
+    
+    var body: some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded.toggle()
+            }
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                
+                Text(completedCall.toolCall.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6).opacity(0.85))
+            .cornerRadius(16)
+        }
+        .buttonStyle(.plain)
+        
+        if isExpanded {
+            VStack(alignment: .leading, spacing: 8) {
+                // Show tool details
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Status:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(completedCall.result.status)
+                            .font(.caption)
+                            .foregroundColor(completedCall.result.status == "success" ? .green : .red)
+                            .fontWeight(.medium)
+                        
+                        Spacer()
+                        
+                        Text(String(format: "%.2fs", completedCall.duration))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if !completedCall.toolCall.arguments.isEmpty {
+                        Text("Arguments:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
+                        
+                        ForEach(Array(completedCall.toolCall.arguments.keys.sorted()), id: \.self) { key in
+                            HStack(alignment: .top, spacing: 4) {
+                                Text("\(key):")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                let valueString = String(describing: completedCall.toolCall.arguments[key]?.value ?? "")
+                                Text(valueString.count > 100 ? String(valueString.prefix(100)) + "..." : valueString)
+                                    .font(.caption2)
+                                    .foregroundColor(.primary)
+                                    .lineLimit(3)
+                            }
+                        }
+                    }
+                    
+                    if let error = completedCall.result.error {
+                        Text("Error:")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.top, 4)
+                        Text(error.count > 200 ? String(error.prefix(200)) + "..." : error)
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                            .lineLimit(3)
+                    } else if let value = completedCall.result.value {
+                        Text("Result:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
+                        let valueString = String(describing: value.value)
+                        Text(valueString.count > 200 ? String(valueString.prefix(200)) + "..." : valueString)
+                            .font(.caption2)
+                            .foregroundColor(.primary)
+                            .lineLimit(5)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(.systemGray6).opacity(0.3))
+                .cornerRadius(12)
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
     }
 }
 
@@ -599,225 +710,7 @@ struct ToolCallProgressView: View {
     }
 }
 
-// MARK: - Completed Tool Call View
-struct CollapsibleToolCallView: View {
-    let completedCall: CompletedToolCall
-    @State private var isExpanded: Bool = false
-    
-    var body: some View {
-        VStack(alignment: .center, spacing: 4) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 12)
-                    
-                    Image(systemName: completedCall.result.status == "success" ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(completedCall.result.status == "success" ? .green : .red)
-                        .font(.caption)
-                    
-                    Text(completedCall.toolCall.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text("•")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    
-                    Text(String(format: "%.2fs", completedCall.duration))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    Text(completedCall.result.status)
-                        .font(.caption2)
-                        .foregroundColor(completedCall.result.status == "success" ? .green : .red)
-                        .fontWeight(.medium)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.systemGray6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(completedCall.result.status == "success" ? Color.green.opacity(0.2) : Color.red.opacity(0.2), lineWidth: 0.5)
-                        )
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let firstArgument = getFirstArgument() {
-                        Text("Arguments:")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-                        
-                        Text(firstArgument)
-                            .font(.caption2)
-                            .monospaced()
-                            .foregroundStyle(.secondary)
-                            .lineLimit(nil)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(.systemGray5))
-                            )
-                    }
-                    
-                    if completedCall.result.status == "error", let error = completedCall.result.error {
-                        Text("Error:")
-                            .font(.caption2)
-                            .foregroundColor(.red)
-                            .padding(.top, 4)
-                        
-                        Text(error.count > 200 ? String(error.prefix(200)) + "..." : error)
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                            .lineLimit(nil)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.red.opacity(0.1))
-                            )
-                    } else if let value = completedCall.result.value {
-                        Text("Result:")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-                        
-                        let valueString = String(describing: value.value)
-                        Text(valueString.count > 200 ? String(valueString.prefix(200)) + "..." : valueString)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(nil)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(.systemGray5))
-                            )
-                    }
-                    
-                    Text(formatCompletionTime(completedCall.completedAt))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 4)
-                }
-                .padding(.horizontal, 20)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
-    }
-    
-    private func getFirstArgument() -> String? {
-        guard !completedCall.toolCall.arguments.isEmpty else { return nil }
-        
-        var argumentStrings: [String] = []
-        for (key, value) in completedCall.toolCall.arguments.sorted(by: { $0.key < $1.key }) {
-            let valueString = String(describing: value.value)
-            argumentStrings.append("\(key): \(valueString)")
-        }
-        
-        let combined = argumentStrings.joined(separator: "\n")
-        return combined.count > 500 ? String(combined.prefix(500)) + "..." : combined
-    }
-    
-    private func formatCompletionTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return "completed \(formatter.string(from: date))"
-    }
-}
 
-struct CompletedToolCallView: View {
-    let completedCall: CompletedToolCall
-    
-    var body: some View {
-        VStack(alignment: .center, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: completedCall.result.status == "success" ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundColor(completedCall.result.status == "success" ? .green : .red)
-                    .font(.caption)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(completedCall.toolCall.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    if let firstArgument = getFirstArgument() {
-                        Text(firstArgument)
-                            .font(.caption2)
-                            .monospaced()
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    
-                    HStack(spacing: 4) {
-                        Text(String(format: "%.2fs", completedCall.duration))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        
-                        Text(completedCall.result.status)
-                            .font(.caption2)
-                            .foregroundColor(completedCall.result.status == "success" ? .green : .red)
-                            .fontWeight(.medium)
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(completedCall.result.status == "success" ? Color.green.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
-                    )
-            )
-            
-            Text(formatCompletionTime(completedCall.completedAt))
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
-    }
-    
-    private func getFirstArgument() -> String? {
-        guard let firstKey = completedCall.toolCall.arguments.keys.sorted().first,
-              let firstValue = completedCall.toolCall.arguments[firstKey] else {
-            return nil
-        }
-        
-        let valueString = String(describing: firstValue.value)
-        // Truncate if too long
-        return valueString.count > 50 ? String(valueString.prefix(50)) + "..." : valueString
-    }
-    
-    private func formatCompletionTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return "completed \(formatter.string(from: date))"
-    }
-}
 
 // MARK: - Truncatable Message Content View
 struct TruncatableMessageContentView: View {
@@ -825,19 +718,20 @@ struct TruncatableMessageContentView: View {
     let maxHeight: CGFloat
     @Binding var showFullText: Bool
     @Binding var isTruncated: Bool
+    let isUserMessage: Bool
     
     var body: some View {
         switch content {
         case .text(let textContent):
-            TruncatableMarkdownText(
-                text: textContent.text,
-                maxHeight: maxHeight,
-                isTruncated: $isTruncated
-            )
-            .textSelection(.enabled)
+            // Use MarkdownText for proper markdown rendering  
+            MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
+                .lineSpacing(8)
+                .foregroundColor(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
-        case .toolRequest(let toolContent):
-            ToolRequestView(toolContent: toolContent)
+        case .toolRequest(_):
+            // Hide tool requests - they'll be shown as consolidated pills
+            EmptyView()
             
         case .toolResponse(_):
             // Hide tool responses - user doesn't want to see them
