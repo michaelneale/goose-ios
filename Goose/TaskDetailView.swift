@@ -163,13 +163,15 @@ struct TaskDetailView: View {
                 Button(action: {
                     dismiss()
                 }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .contentShape(Rectangle())
+                    HStack(spacing: 0) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(themeManager.primaryTextColor)
+                    }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(PlainButtonStyle())
-                .background(Color.clear)
+                .buttonStyle(BorderlessButtonStyle())
             }
             
             // Breadcrumb in the center
@@ -430,13 +432,15 @@ struct TaskOutputDetailView: View {
                 Button(action: {
                     dismiss()
                 }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .contentShape(Rectangle())
+                    HStack(spacing: 0) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(themeManager.primaryTextColor)
+                    }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(PlainButtonStyle())
-                .background(Color.clear)
+                .buttonStyle(BorderlessButtonStyle())
             }
             
             // Breadcrumb in the center
