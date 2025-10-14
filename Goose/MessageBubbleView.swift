@@ -51,7 +51,7 @@ struct MessageBubbleView: View {
                                 .font(.system(size: 12))
                                 .foregroundColor(themeManager.secondaryTextColor)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 8)
                         .background(themeManager.chatInputBackgroundColor.opacity(0.85))
                         .cornerRadius(16)
@@ -73,7 +73,7 @@ struct MessageBubbleView: View {
                                 .font(.system(size: 12))
                                 .foregroundColor(themeManager.secondaryTextColor)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 8)
                         .background(themeManager.chatInputBackgroundColor.opacity(0.85))
                         .cornerRadius(16)
