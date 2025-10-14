@@ -15,8 +15,8 @@ struct ChatView: View {
     @State private var currentSessionId: String?
     @State private var isSettingsPresented = false
 
-    // Voice features
-    @StateObject private var voiceManager = EnhancedVoiceManager()
+    // Voice features - shared with WelcomeView
+    @ObservedObject var voiceManager: EnhancedVoiceManager
 
     // Memory management
     private let maxMessages = 50  // Limit messages to prevent memory issues
@@ -46,7 +46,8 @@ struct ChatView: View {
                             ForEach(messages) { message in
                                 MessageBubbleView(
                                     message: message,
-                                    completedTasks: getCompletedTasksForMessage(message.id)
+                                    completedTasks: getCompletedTasksForMessage(message.id),
+                                    sessionName: currentSessionId ?? "Current Session"
                                 )
                                 .id(message.id)
 
@@ -84,7 +85,7 @@ struct ChatView: View {
                                 .frame(height: 180)
                         }
                         .padding(.horizontal)
-                        .padding(.top, apiService.isTrialMode ? 130 : 82)  // Extra space for trial banner
+                        .padding(.top, apiService.isTrialMode ? 120 : 70)  // Matches PR #1 with simpler nav bar
                     }
                     .simultaneousGesture(
                         DragGesture()
@@ -136,166 +137,32 @@ struct ChatView: View {
                     gradient: Gradient(colors: [
                         Color.clear,
                         Color(UIColor.systemBackground).opacity(0.7),
-                        Color(UIColor.systemBackground).opacity(0.95),
+                        Color(UIColor.systemBackground),
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 100)
+                .frame(height: 180)
                 .allowsHitTesting(false)
             }
 
-            // Floating input area
+            // Floating input area - using shared ChatInputView
             VStack {
                 Spacer()
-
-                VStack(spacing: 0) {
-                    // Show transcribed text while in voice mode
-                    if voiceManager.voiceMode != .normal && !voiceManager.transcribedText.isEmpty {
-                        HStack {
-                            Text("Transcribing: \"\(voiceManager.transcribedText)\"")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(2)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .background(Color(UIColor.systemBackground).opacity(0.95))
+                
+                ChatInputView(
+                    text: $inputText,
+                    showPlusButton: true,
+                    isLoading: isLoading,
+                    voiceManager: voiceManager,
+                    onSubmit: {
+                        sendMessage()
+                    },
+                    onStop: {
+                        stopStreaming()
                     }
-
-                    // Input field with buttons
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Text field on top
-                        TextField("I want to...", text: $inputText, axis: .vertical)
-                            .font(.system(size: 16))
-                            .foregroundColor(.primary)
-                            .lineLimit(1...4)
-                            .padding(.vertical, 8)
-                            .disabled(voiceManager.voiceMode != .normal)
-                            .onSubmit {
-                                if !inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    .isEmpty
-                                {
-                                    sendMessage()
-                                }
-                            }
-
-                        // Buttons row at bottom
-                        HStack(spacing: 10) {
-                            // Plus button - file attachment
-                            Button(action: {
-                                print("File attachment tapped")
-                            }) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 32, height: 32)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .inset(by: 0.5)
-                                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-
-                            Spacer()
-
-                            HStack(spacing: 10) {
-                                // Voice mode indicator text
-                                if voiceManager.voiceMode != .normal {
-                                    Text(
-                                        voiceManager.voiceMode == .audio
-                                            ? "Transcribe" : "Full Audio"
-                                    )
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.blue)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(Color.blue.opacity(0.1))
-                                    )
-                                }
-
-                                // Audio/Voice button
-                                Button(action: {
-                                    // Cycle through voice modes
-                                    voiceManager.cycleVoiceMode()
-                                }) {
-                                    Image(
-                                        systemName: voiceManager.voiceMode == .normal
-                                            ? "waveform" : "waveform.circle.fill"
-                                    )
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(
-                                        voiceManager.voiceMode == .normal ? .primary : .blue
-                                    )
-                                    .frame(width: 32, height: 32)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .inset(by: 0.5)
-                                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-
-                                // Send/Stop button
-                                Button(action: {
-                                    if isLoading {
-                                        stopStreaming()
-                                    } else if !inputText.trimmingCharacters(
-                                        in: .whitespacesAndNewlines
-                                    ).isEmpty {
-                                        sendMessage()
-                                    }
-                                }) {
-                                    Image(systemName: isLoading ? "stop.fill" : "arrow.up")
-                                        .font(.system(size: 17, weight: .medium))
-                                        .foregroundColor(
-                                            isLoading
-                                                ? .white : (inputText.isEmpty ? .gray : .white)
-                                        )
-                                        .frame(width: 32, height: 32)
-                                        .background(
-                                            isLoading
-                                                ? Color.red
-                                                : (inputText.trimmingCharacters(
-                                                    in: .whitespacesAndNewlines
-                                                ).isEmpty
-                                                    ? Color.gray.opacity(0.3)
-                                                    : Color.blue)
-                                        )
-                                        .cornerRadius(16)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(
-                                    !isLoading
-                                        && inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                            .isEmpty
-                                )
-                            }
-                        }
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 21)
-                            .fill(.regularMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 21)
-                                    .fill(Color(UIColor.secondarySystemBackground).opacity(0.85))
-                            )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 21)
-                            .inset(by: 0.5)
-                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 0)
-                }
+                )
+                .padding(.bottom, 0)
             }
 
             // Custom navigation bar with background
@@ -317,11 +184,10 @@ struct ChatView: View {
                     .background(Color.orange)
                 }
 
-                // Navigation bar
+                // Navigation bar - PR #1 style with back button
                 HStack(spacing: 8) {
                     // Back button (navigates to welcome)
                     Button(action: {
-                        // Navigate back to welcome screen
                         onBackToWelcome()
                     }) {
                         Image(systemName: "chevron.left")
@@ -339,28 +205,21 @@ struct ChatView: View {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
                             .foregroundColor(.primary)
+                            .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Text("goose")
-                        .font(.headline)
+                    
+                    // Session name
+                    Text(currentSessionId != nil ? "Session" : "New Session")
+                        .font(.system(size: 16))
                         .foregroundColor(.primary)
-
+                        .lineLimit(1)
+                    
                     Spacer()
-
-                    // Empty space for visual balance - keeps title centered
-                    HStack(spacing: 8) {
-                        Color.clear
-                            .frame(width: 20, height: 22)
-                        Color.clear
-                            .frame(width: 22, height: 22)
-                    }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 50)  // Account for status bar
-                .padding(.bottom, 12)
+                .padding(.top, 4)  // Much smaller like PR #1
+                .padding(.bottom, 24)
                 .background(
                     Color(UIColor.systemBackground)
                         .opacity(0.95)
@@ -368,22 +227,17 @@ struct ChatView: View {
                 )
             }
 
-            // Sidebar overlay (this can stay in ZStack as it's a modal)
-            if showingSidebar {
-                SidebarView(
-                    isShowing: $showingSidebar,
-                    isSettingsPresented: $isSettingsPresented,
-                    onSessionSelect: { sessionId in
-                        loadSession(sessionId)
-                    },
-                    onNewSession: {
-                        createNewSession()
-                    })
-            }
+            // Sidebar is now rendered by ContentView
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
+        }
+        .onChange(of: voiceManager.transcribedText) { newText in
+            // Update input text with transcribed text in real-time
+            if !newText.isEmpty && voiceManager.voiceMode != .normal {
+                inputText = newText
+            }
         }
         .onAppear {
             // Set up voice manager callback
@@ -860,170 +714,6 @@ struct ChatView: View {
     }
 }
 
-// MARK: - Sidebar View
-struct SidebarView: View {
-    @Binding var isShowing: Bool
-    @Binding var isSettingsPresented: Bool
-    let onSessionSelect: (String) -> Void
-    let onNewSession: () -> Void
-    @State private var sessions: [ChatSession] = []
-
-    var body: some View {
-        ZStack {
-            // Background overlay
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isShowing = false
-                    }
-                }
-
-            // Sidebar panel
-            HStack {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Header with New Session button at top
-                    HStack {
-                        Button(action: {
-                            onNewSession()
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isShowing = false
-                            }
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.primary)
-                                .frame(width: 32, height: 32)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer()
-
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isShowing = false
-                            }
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-
-                    Divider()
-
-                    // Sessions list
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            // Sessions header
-                            HStack {
-                                Text("Sessions")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-
-                            ForEach(sessions) { session in
-                                SessionRowView(session: session)
-                                    .onTapGesture {
-                                        onSessionSelect(session.id)
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            isShowing = false
-                                        }
-                                    }
-                                Divider()
-                                    .padding(.leading)
-                            }
-                        }
-                    }
-
-                    Spacer()
-
-                    Divider()
-
-                    // Bottom row: Settings button (matching PR #11 style)
-                    Button(action: {
-                        // Close sidebar immediately
-                        isShowing = false
-                        // Open settings immediately (sheet will present after sidebar closes)
-                        isSettingsPresented = true
-                    }) {
-                        HStack {
-                            Image(systemName: "gear")
-                                .font(.system(size: 18))
-                                .foregroundColor(.primary)
-
-                            Text("Settings")
-                                .font(.system(size: 16))
-                                .foregroundColor(.primary)
-
-                            Spacer()
-                        }
-                        .padding()
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .background(Color(.systemBackground))
-                }
-                .frame(width: 280)
-                .background(Color(.systemBackground))
-                .offset(x: isShowing ? 0 : -280)
-
-                Spacer()
-            }
-        }
-        .onAppear {
-            Task {
-                await loadSessions()
-            }
-        }
-    }
-
-    private func loadSessions() async {
-        let fetchedSessions = await GooseAPIService.shared.fetchSessions()
-        await MainActor.run {
-            self.sessions = fetchedSessions
-        }
-    }
-}
-
-// MARK: - Session Row View
-struct SessionRowView: View {
-    let session: ChatSession
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(session.title)
-                .font(.headline)
-                .lineLimit(1)
-
-            Text(session.lastMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-
-            Text(formatDate(session.timestamp))
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-}
 // MARK: - Chat Session Model (matches goosed API)
 struct ChatSession: Identifiable, Codable {
     let id: String
@@ -1070,5 +760,5 @@ struct CompletedToolCall {
 }
 
 #Preview {
-    ChatView(showingSidebar: .constant(false), onBackToWelcome: {})
+    ChatView(showingSidebar: .constant(false), onBackToWelcome: {}, voiceManager: EnhancedVoiceManager())
 }

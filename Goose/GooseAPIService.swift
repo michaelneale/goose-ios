@@ -230,19 +230,21 @@ class GooseAPIService: ObservableObject {
             if isTrialMode {
                 // Demo mode prompt - limited functionality
                 iOSPrompt = """
-                    You are being accessed through the Goose iOS application from a mobile device.
 
-                    This is a trial mode with limited functionality.
+                    You are being accessed through the Goose iOS application from a mobile handset, in a trial mode with limited capability.
 
+                    Some extensions are builtin, such as Developer and Memory.
+                    When asked to code, write files, or run commands, IMMEDIATELY enable the Developer extension using platform__manage_extensions.
+
+                    it is critical you are always brief in your final replies so they can easily read on mobile handset.
 
                     You can:
                     - Answer questions and provide information
                     - Explain concepts and provide guidance
-                    - Show example code and solutions
-                    - If you wish to do any work, make a tmp directory and work in there
+                    - critical: If you wish to do any work, make a tmp directory and work in there
 
                     Be helpful and informative, but always remind them to connect their own agent for full functionality.
-                    Always be brief in your replies so they can easily read on mobile handset.
+
                     """
             } else {
                 // Full mode prompt - all features available
@@ -252,7 +254,8 @@ class GooseAPIService: ObservableObject {
                     Some extensions are builtin, such as Developer and Memory.
                     When asked to code, write files, or run commands, IMMEDIATELY enable the Developer extension using platform__manage_extensions.
                     DO NOT explain what you're going to do first - just enable Developer and start working.
-                    Always be brief in your final replies so they can easily read on mobile handset.
+
+                    it is critical you are always brief in your final replies so they can easily read on mobile handset.
                     """
             }
 
@@ -467,6 +470,43 @@ class GooseAPIService: ObservableObject {
     }
 
     // MARK: - Sessions Management
+    func fetchInsights() async -> SessionInsights? {
+        // In trial mode, return mock insights
+        if isTrialMode {
+            return SessionInsights(totalSessions: 5, totalTokens: 450_000_000)
+        }
+
+        guard let url = URL(string: "\(baseURL)/sessions/insights") else {
+            print("🚨 Invalid insights URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("🚨 Invalid response when fetching insights")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let insights = try JSONDecoder().decode(SessionInsights.self, from: data)
+                print("✅ Fetched insights: \(insights.totalSessions) sessions, \(insights.totalTokens) tokens")
+                return insights
+            } else {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                print("🚨 Failed to fetch insights: \(httpResponse.statusCode) - \(errorBody)")
+                return nil
+            }
+        } catch {
+            print("🚨 Error fetching insights: \(error)")
+            return nil
+        }
+    }
+    
     func fetchSessions() async -> [ChatSession] {
         // In trial mode, return mock sessions
         if isTrialMode {
@@ -616,6 +656,11 @@ struct AgentResponse: Codable {
 
 struct SessionsResponse: Codable {
     let sessions: [ChatSession]
+}
+
+struct SessionInsights: Codable {
+    let totalSessions: Int
+    let totalTokens: Int64
 }
 
 // MARK: - SSE Delegate

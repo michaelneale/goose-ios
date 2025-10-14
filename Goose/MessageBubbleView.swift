@@ -4,6 +4,7 @@ import Markdown
 struct MessageBubbleView: View {
     let message: Message
     let completedTasks: [CompletedToolCall]
+    let sessionName: String
     @State private var showFullText = false
     @State private var isTruncated = false
     
@@ -31,11 +32,11 @@ struct MessageBubbleView: View {
                 }
             }
             
-            // Show consolidated task completion pill if there are completed tasks (PR #11 style)
+            // Show consolidated task completion pill if there are completed tasks (PR #1 style)
             if !completedTasks.isEmpty {
-                // Show all completed tools as collapsible items (they were actually expandable in PR #11)
+                // Show all completed tools as navigable pills
                 ForEach(completedTasks, id: \.toolCall.name) { completedTask in
-                    CompletedToolPillView(completedCall: completedTask)
+                    CompletedToolPillView(completedCall: completedTask, message: message, sessionName: sessionName)
                 }
             }
         }
@@ -496,8 +497,8 @@ struct ToolConfirmationView: View {
     ScrollView {
         VStack(spacing: 16) {
             // Basic message examples
-            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [])
-            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [])
+            MessageBubbleView(message: Message(role: .user, text: "Hello, can you help me with **markdown** and `code`?"), completedTasks: [], sessionName: "Test Session")
+            MessageBubbleView(message: Message(role: .assistant, text: "Sure! I can help you with **bold text**, `inline code`, and other formatting."), completedTasks: [], sessionName: "Test Session")
             
             // Comprehensive markdown test examples
             MessageBubbleView(message: Message(role: .assistant, text: """
@@ -527,7 +528,7 @@ Visit [Apple](https://apple.com) for more info.
 • Third `code` item
 
 *This tests comprehensive markdown rendering.*
-"""), completedTasks: [])
+"""), completedTasks: [], sessionName: "Test Session")
             
             MessageBubbleView(message: Message(role: .user, text: """
 Testing more complex markdown:
@@ -545,23 +546,24 @@ def hello_world():
 ```
 
 **Note**: This should all render properly.
-"""), completedTasks: [])
+"""), completedTasks: [], sessionName: "Test Session")
         }
         .padding()
     }
 }
 
-// MARK: - Completed Tool Pill View (PR #11 style - expandable)
+// MARK: - Completed Tool Pill View (PR #1 style - navigable)
 struct CompletedToolPillView: View {
     let completedCall: CompletedToolCall
-    @State private var isExpanded: Bool = false
+    let message: Message
+    let sessionName: String
     
     var body: some View {
-        Button(action: {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isExpanded.toggle()
-            }
-        }) {
+        NavigationLink(destination: TaskDetailView(
+            message: message,
+            completedTasks: [completedCall],
+            sessionName: sessionName
+        ).environmentObject(ThemeManager.shared)) {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle")
                     .font(.system(size: 12, weight: .semibold))
@@ -574,7 +576,6 @@ struct CompletedToolPillView: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -582,75 +583,6 @@ struct CompletedToolPillView: View {
             .cornerRadius(16)
         }
         .buttonStyle(.plain)
-        
-        if isExpanded {
-            VStack(alignment: .leading, spacing: 8) {
-                // Show tool details
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Status:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(completedCall.result.status)
-                            .font(.caption)
-                            .foregroundColor(completedCall.result.status == "success" ? .green : .red)
-                            .fontWeight(.medium)
-                        
-                        Spacer()
-                        
-                        Text(String(format: "%.2fs", completedCall.duration))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    if !completedCall.toolCall.arguments.isEmpty {
-                        Text("Arguments:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-                        
-                        ForEach(Array(completedCall.toolCall.arguments.keys.sorted()), id: \.self) { key in
-                            HStack(alignment: .top, spacing: 4) {
-                                Text("\(key):")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                let valueString = String(describing: completedCall.toolCall.arguments[key]?.value ?? "")
-                                Text(valueString.count > 100 ? String(valueString.prefix(100)) + "..." : valueString)
-                                    .font(.caption2)
-                                    .foregroundColor(.primary)
-                                    .lineLimit(3)
-                            }
-                        }
-                    }
-                    
-                    if let error = completedCall.result.error {
-                        Text("Error:")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .padding(.top, 4)
-                        Text(error.count > 200 ? String(error.prefix(200)) + "..." : error)
-                            .font(.caption2)
-                            .foregroundColor(.red)
-                            .lineLimit(3)
-                    } else if let value = completedCall.result.value {
-                        Text("Result:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-                        let valueString = String(describing: value.value)
-                        Text(valueString.count > 200 ? String(valueString.prefix(200)) + "..." : valueString)
-                            .font(.caption2)
-                            .foregroundColor(.primary)
-                            .lineLimit(5)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6).opacity(0.3))
-                .cornerRadius(12)
-            }
-            .transition(.opacity.combined(with: .move(edge: .top)))
-        }
     }
 }
 

@@ -7,6 +7,9 @@ struct WelcomeView: View {
     var onStartChat: (String) -> Void
     var onSessionSelect: (String) -> Void
     
+    // Voice features - shared with ChatView
+    @ObservedObject var voiceManager: EnhancedVoiceManager
+    
     // States for welcome view
     @State private var recentSessions: [ChatSession] = []
     @State private var isLoadingSessions = true
@@ -17,6 +20,10 @@ struct WelcomeView: View {
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
     @State private var showLogo = false
+    @State private var showProgressSection = false
+    @State private var progressValue: CGFloat = 0.0
+    @State private var tokenCount: Int64 = 0
+    private let maxTokens: Int64 = 1_000_000_000 // 1 billion
     private let fullText = "Morning!\nWhat do you want to do?"
     
     var body: some View {
@@ -25,7 +32,9 @@ struct WelcomeView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Button(action: {
-                        isSettingsPresented = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSidebar.toggle()
+                        }
                     }) {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
@@ -65,6 +74,44 @@ struct WelcomeView: View {
                         }
                     }
                     .padding(.top, 32)
+                    
+                    // Progress Section
+                    if showProgressSection {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("TOKENS USED")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .tracking(1.02)
+                                    .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
+                                
+                                Spacer()
+                                
+                                Text("\(formatTokenCount(tokenCount)) of 1B")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            // Progress bar
+                            GeometryReader { geometry in
+                                ZStack(alignment: .leading) {
+                                    // Background
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(colorScheme == .dark ? 
+                                              Color(red: 0.10, green: 0.10, blue: 0.13) : 
+                                              Color(red: 0.95, green: 0.95, blue: 0.95))
+                                        .frame(height: 12)
+                                    
+                                    // Foreground (animated)
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(colorScheme == .dark ? Color.white : Color.black)
+                                        .frame(width: geometry.size.width * progressValue, height: 12)
+                                }
+                            }
+                            .frame(height: 12)
+                        }
+                        .padding(.top, 16)
+                        .transition(.opacity)
+                    }
                     
                     // Recent Sessions Section
                     VStack(alignment: .leading, spacing: 16) {
@@ -115,68 +162,54 @@ struct WelcomeView: View {
                 .padding(.horizontal, 16)
             }
             
-            // Bottom input area
-            VStack(alignment: .leading, spacing: 12) {
-                // Text field on top
-                TextField("I want to...", text: $inputText, axis: .vertical)
-                    .font(.system(size: 16))
-                    .foregroundColor(.primary)
-                    .lineLimit(1...4)
-                    .padding(.vertical, 8)
-                    .onSubmit {
-                        if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            onStartChat(inputText)
-                        }
-                    }
-                
-                // Buttons row at bottom
-                HStack(spacing: 10) {
-                    Spacer()
-                    
-                    // Send button
-                    Button(action: {
-                        if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            onStartChat(inputText)
-                        }
-                    }) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(colorScheme == .dark ? .black : .white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty 
-                                ? Color.gray.opacity(0.3) 
-                                : (colorScheme == .dark ? Color.white : Color.black)
-                            )
-                            .cornerRadius(16)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            // Bottom input area - using shared ChatInputView
+            ChatInputView(
+                text: $inputText,
+                voiceManager: voiceManager,
+                onSubmit: {
+                    onStartChat(inputText)
                 }
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(21)
-            .overlay(
-                RoundedRectangle(cornerRadius: 21)
-                    .inset(by: 0.5)
-                    .stroke(Color(UIColor.separator), lineWidth: 0.5)
             )
-            .padding(.horizontal, 16)
-            .padding(.bottom, 40)
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
         }
+        .onChange(of: voiceManager.transcribedText) { newText in
+            // Update input text with transcribed text in real-time
+            if !newText.isEmpty && voiceManager.voiceMode != .normal {
+                inputText = newText
+            }
+        }
         .onAppear {
+            // Set up voice manager callback for auto-sending messages
+            voiceManager.onSubmitMessage = { message in
+                inputText = message
+                // Auto-send the message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    onStartChat(inputText)
+                }
+            }
+            
             // Start typewriter animation
             startTypewriterEffect()
             
             // Load recent sessions
             Task {
                 await loadRecentSessions()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
+            // Refresh sessions when settings are saved
+            Task {
+                await loadRecentSessions()
+                // Update progress bar with new data
+                await MainActor.run {
+                    let percentage = Double(tokenCount) / Double(maxTokens)
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        progressValue = CGFloat(min(percentage, 1.0))
+                    }
+                }
             }
         }
     }
@@ -194,6 +227,21 @@ struct WelcomeView: View {
                 if displayedText == fullText {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         showLogo = true
+                    }
+                    
+                    // Show progress section
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            showProgressSection = true
+                        }
+                        
+                        // Animate progress bar
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            let percentage = Double(tokenCount) / Double(maxTokens)
+                            withAnimation(.easeOut(duration: 0.8)) {
+                                progressValue = CGFloat(min(percentage, 1.0))
+                            }
+                        }
                     }
                     
                     // Show sessions title
@@ -220,12 +268,26 @@ struct WelcomeView: View {
     private func loadRecentSessions() async {
         isLoadingSessions = true
         
-        // Simulate delay for loading animation
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        // Fetch insights and sessions in parallel
+        async let insightsTask = GooseAPIService.shared.fetchInsights()
+        async let sessionsTask = GooseAPIService.shared.fetchSessions()
         
-        let sessions = await GooseAPIService.shared.fetchSessions()
+        let (insights, sessions) = await (insightsTask, sessionsTask)
         
         await MainActor.run {
+            // Update token count from insights
+            if let insights = insights {
+                tokenCount = insights.totalTokens
+                
+                // If progress bar is already visible, update it immediately
+                if showProgressSection {
+                    let percentage = Double(tokenCount) / Double(maxTokens)
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        progressValue = CGFloat(min(percentage, 1.0))
+                    }
+                }
+            }
+            
             recentSessions = Array(sessions.prefix(3))
             isLoadingSessions = false
             
@@ -239,6 +301,18 @@ struct WelcomeView: View {
                     }
                 }
             }
+        }
+    }
+    
+    // Format token count for display (e.g., "450M")
+    private func formatTokenCount(_ count: Int64) -> String {
+        let million: Int64 = 1_000_000
+        if count >= million {
+            let millions = Double(count) / Double(million)
+            return String(format: "%.0fM", millions)
+        } else {
+            let thousands = Double(count) / 1000.0
+            return String(format: "%.0fK", thousands)
         }
     }
 }
@@ -299,6 +373,7 @@ struct WelcomeSessionRowView: View {
         },
         onSessionSelect: { sessionId in
             print("Selected session: \(sessionId)")
-        }
+        },
+        voiceManager: EnhancedVoiceManager()
     )
 }
