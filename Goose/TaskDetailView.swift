@@ -160,7 +160,7 @@ struct TaskDetailView: View {
         
             // Custom navigation bar overlay with frosted glass
             VStack(spacing: 0) {
-                HStack(spacing: 8) {
+                HStack(spacing: 0) {
                     // Back button
                     Button(action: {
                         dismiss()
@@ -170,8 +170,9 @@ struct TaskDetailView: View {
                             .foregroundColor(themeManager.primaryTextColor)
                             .frame(width: 44, height: 44)
                     }
+                    .padding(.leading, 4)
                     
-                    // Breadcrumb (left-aligned)
+                    // Breadcrumb (left-aligned) - positioned to match main chat session name at 48px
                     HStack(spacing: 4) {
                         Text(sessionName)
                             .font(.system(size: 14))
@@ -192,7 +193,7 @@ struct TaskDetailView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 38)
+                .padding(.top, 48)
                 .padding(.bottom, 24)
             }
             .background(
@@ -459,8 +460,9 @@ struct TaskOutputDetailView: View {
                             .foregroundColor(themeManager.primaryTextColor)
                             .frame(width: 44, height: 44)
                     }
+                    .padding(.leading, 4)
                     
-                    // Breadcrumb (left-aligned)
+                    // Breadcrumb (left-aligned) - positioned to match main chat session name at 48px
                     HStack(spacing: 4) {
                         Text(sessionName)
                             .font(.system(size: 14))
@@ -481,7 +483,7 @@ struct TaskOutputDetailView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 38)
+                .padding(.top, 48)
                 .padding(.bottom, 24)
             }
             .background(
