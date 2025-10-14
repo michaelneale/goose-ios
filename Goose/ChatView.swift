@@ -85,7 +85,7 @@ struct ChatView: View {
                                 .frame(height: 180)
                         }
                         .padding(.horizontal)
-                        .padding(.top, apiService.isTrialMode ? 130 : 82)  // Extra space for trial banner
+                        .padding(.top, apiService.isTrialMode ? 120 : 70)  // Matches PR #1 with simpler nav bar
                     }
                     .simultaneousGesture(
                         DragGesture()
@@ -314,11 +314,10 @@ struct ChatView: View {
                     .background(Color.orange)
                 }
 
-                // Navigation bar
+                // Navigation bar - PR #1 style with back button
                 HStack(spacing: 8) {
                     // Back button (navigates to welcome)
                     Button(action: {
-                        // Navigate back to welcome screen
                         onBackToWelcome()
                     }) {
                         Image(systemName: "chevron.left")
@@ -336,28 +335,21 @@ struct ChatView: View {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
                             .foregroundColor(.primary)
+                            .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Text("goose")
-                        .font(.headline)
+                    
+                    // Session name
+                    Text(currentSessionId != nil ? "Session" : "New Session")
+                        .font(.system(size: 16))
                         .foregroundColor(.primary)
-
+                        .lineLimit(1)
+                    
                     Spacer()
-
-                    // Empty space for visual balance - keeps title centered
-                    HStack(spacing: 8) {
-                        Color.clear
-                            .frame(width: 20, height: 22)
-                        Color.clear
-                            .frame(width: 22, height: 22)
-                    }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 50)  // Account for status bar
-                .padding(.bottom, 12)
+                .padding(.top, 4)  // Much smaller like PR #1
+                .padding(.bottom, 24)
                 .background(
                     Color(UIColor.systemBackground)
                         .opacity(0.95)

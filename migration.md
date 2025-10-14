@@ -34,14 +34,11 @@ PR cloned to /tmp/goose-ios-pr1 for reference.
 
 ### 📋 TODO
 
-3. **Tool Details Pane** - Next Priority
-   - CompletedToolCall data structure already exists ✓
-   - Need to create TaskDetailView.swift (summary view for multiple tasks)
-   - Add navigation from MessageBubbleView task pills
-   - Implement custom navigation bar with breadcrumbs
-   - Display tool name, duration, arguments, output
-   - Optional: Add search functionality for large outputs
-   - Note: Can defer ThemeManager integration
+3. **Navigation Bar Style** - ✅ COMPLETE
+   - ✅ Back button (chevron.left) - navigates to welcome
+   - ✅ Sidebar button (sidebar.left) - toggles sidebar
+   - ✅ "New Session"/"Session" title (not centered "goose")
+   - ✅ Smaller padding: 4pt top + 24pt bottom (vs old 50pt top + 12pt bottom)
 
 4. **Other Layout Improvements** - Review Needed
    - Review ContentView.swift changes
