@@ -146,153 +146,23 @@ struct ChatView: View {
                 .allowsHitTesting(false)
             }
 
-            // Floating input area
+            // Floating input area - using shared ChatInputView
             VStack {
                 Spacer()
-
-                VStack(spacing: 0) {
-                    // Show transcribed text while in voice mode
-                    if voiceManager.voiceMode != .normal && !voiceManager.transcribedText.isEmpty {
-                        HStack {
-                            Text("Transcribing: \"\(voiceManager.transcribedText)\"")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(2)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .background(Color(UIColor.systemBackground).opacity(0.95))
+                
+                ChatInputView(
+                    text: $inputText,
+                    showPlusButton: true,
+                    isLoading: isLoading,
+                    voiceManager: voiceManager,
+                    onSubmit: {
+                        sendMessage()
+                    },
+                    onStop: {
+                        stopStreaming()
                     }
-
-                    // Input field with buttons
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Text field on top
-                        TextField("I want to...", text: $inputText, axis: .vertical)
-                            .font(.system(size: 16))
-                            .foregroundColor(.primary)
-                            .lineLimit(1...4)
-                            .padding(.vertical, 8)
-                            .disabled(voiceManager.voiceMode != .normal)
-                            .onSubmit {
-                                sendMessage()
-                            }
-
-                        // Buttons row at bottom
-                        HStack(spacing: 10) {
-                            // Plus button - file attachment
-                            Button(action: {
-                                print("File attachment tapped")
-                            }) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 32, height: 32)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .inset(by: 0.5)
-                                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-
-                            Spacer()
-
-                            HStack(spacing: 10) {
-                                // Voice mode indicator text
-                                if voiceManager.voiceMode != .normal {
-                                    Text(
-                                        voiceManager.voiceMode == .audio
-                                            ? "Transcribe" : "Full Audio"
-                                    )
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.blue)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(Color.blue.opacity(0.1))
-                                    )
-                                }
-
-                                // Audio/Voice button
-                                Button(action: {
-                                    // Cycle through voice modes
-                                    voiceManager.cycleVoiceMode()
-                                }) {
-                                    Image(
-                                        systemName: voiceManager.voiceMode == .normal
-                                            ? "waveform" : "waveform.circle.fill"
-                                    )
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(
-                                        voiceManager.voiceMode == .normal ? .primary : .blue
-                                    )
-                                    .frame(width: 32, height: 32)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .inset(by: 0.5)
-                                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-
-                                // Send/Stop button
-                                Button(action: {
-                                    if isLoading {
-                                        stopStreaming()
-                                    } else if !inputText.trimmingCharacters(
-                                        in: .whitespacesAndNewlines
-                                    ).isEmpty {
-                                        sendMessage()
-                                    }
-                                }) {
-                                    Image(systemName: isLoading ? "stop.fill" : "arrow.up")
-                                        .font(.system(size: 17, weight: .medium))
-                                        .foregroundColor(
-                                            isLoading
-                                                ? .white : (inputText.isEmpty ? .gray : .white)
-                                        )
-                                        .frame(width: 32, height: 32)
-                                        .background(
-                                            isLoading
-                                                ? Color.red
-                                                : (inputText.trimmingCharacters(
-                                                    in: .whitespacesAndNewlines
-                                                ).isEmpty
-                                                    ? Color.gray.opacity(0.3)
-                                                    : Color.blue)
-                                        )
-                                        .cornerRadius(16)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(
-                                    !isLoading
-                                        && inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                            .isEmpty
-                                )
-                            }
-                        }
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 21)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 21)
-                                    .fill(Color(UIColor.secondarySystemBackground).opacity(0.85))
-                            )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 21)
-                            .inset(by: 0.5)
-                            .stroke(Color(UIColor.separator), lineWidth: 0.5)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 0)
-                }
+                )
+                .padding(.bottom, 0)
             }
 
             // Custom navigation bar with background

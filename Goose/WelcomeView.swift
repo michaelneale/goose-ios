@@ -7,6 +7,9 @@ struct WelcomeView: View {
     var onStartChat: (String) -> Void
     var onSessionSelect: (String) -> Void
     
+    // Voice features
+    @StateObject private var voiceManager = EnhancedVoiceManager()
+    
     // States for welcome view
     @State private var recentSessions: [ChatSession] = []
     @State private var isLoadingSessions = true
@@ -117,62 +120,33 @@ struct WelcomeView: View {
                 .padding(.horizontal, 16)
             }
             
-            // Bottom input area
-            VStack(alignment: .leading, spacing: 12) {
-                // Text field on top
-                TextField("I want to...", text: $inputText, axis: .vertical)
-                    .font(.system(size: 16))
-                    .foregroundColor(.primary)
-                    .lineLimit(1...4)
-                    .padding(.vertical, 8)
-                    .onSubmit {
-                        if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            onStartChat(inputText)
-                        }
+            // Bottom input area - using shared ChatInputView
+            ChatInputView(
+                text: $inputText,
+                voiceManager: voiceManager,
+                onSubmit: {
+                    if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onStartChat(inputText)
                     }
-                
-                // Buttons row at bottom
-                HStack(spacing: 10) {
-                    Spacer()
-                    
-                    // Send button
-                    Button(action: {
-                        if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            onStartChat(inputText)
-                        }
-                    }) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(colorScheme == .dark ? .black : .white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty 
-                                ? Color.gray.opacity(0.3) 
-                                : (colorScheme == .dark ? Color.white : Color.black)
-                            )
-                            .cornerRadius(16)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(21)
-            .overlay(
-                RoundedRectangle(cornerRadius: 21)
-                    .inset(by: 0.5)
-                    .stroke(Color(UIColor.separator), lineWidth: 0.5)
             )
-            .padding(.horizontal, 16)
-            .padding(.bottom, 40)
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
         }
         .onAppear {
+            // Set up voice manager callback for auto-sending messages
+            voiceManager.onSubmitMessage = { message in
+                inputText = message
+                // Auto-send the message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onStartChat(inputText)
+                    }
+                }
+            }
+            
             // Start typewriter animation
             startTypewriterEffect()
             
