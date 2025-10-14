@@ -7,8 +7,8 @@ struct WelcomeView: View {
     var onStartChat: (String) -> Void
     var onSessionSelect: (String) -> Void
     
-    // Voice features
-    @StateObject private var voiceManager = EnhancedVoiceManager()
+    // Voice features - shared with ChatView
+    @ObservedObject var voiceManager: EnhancedVoiceManager
     
     // States for welcome view
     @State private var recentSessions: [ChatSession] = []
@@ -132,6 +132,12 @@ struct WelcomeView: View {
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
+        }
+        .onChange(of: voiceManager.transcribedText) { newText in
+            // Update input text with transcribed text in real-time
+            if !newText.isEmpty && voiceManager.voiceMode != .normal {
+                inputText = newText
+            }
         }
         .onAppear {
             // Set up voice manager callback for auto-sending messages
@@ -271,6 +277,7 @@ struct WelcomeSessionRowView: View {
         },
         onSessionSelect: { sessionId in
             print("Selected session: \(sessionId)")
-        }
+        },
+        voiceManager: EnhancedVoiceManager()
     )
 }

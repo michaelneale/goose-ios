@@ -11,6 +11,9 @@ struct ContentView: View {
     @State private var sessionName: String = "New Session"
     @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
     @EnvironmentObject var configurationHandler: ConfigurationHandler
+    
+    // Shared voice manager across WelcomeView and ChatView
+    @StateObject private var sharedVoiceManager = EnhancedVoiceManager()
 
     var body: some View {
         if showingSplash {
@@ -32,7 +35,9 @@ struct ContentView: View {
                     NavigationStack {
                         if !hasActiveChat {
                             // Welcome View when no active chat
-                            WelcomeView(showingSidebar: $showingSidebar, onStartChat: { message in
+                            WelcomeView(
+                                showingSidebar: $showingSidebar,
+                                onStartChat: { message in
                                 // Start new chat with the message
                                 initialMessage = message
                                 shouldSendInitialMessage = !message.isEmpty
@@ -46,12 +51,15 @@ struct ContentView: View {
                                 withAnimation {
                                     hasActiveChat = true
                                 }
-                            })
+                            },
+                                voiceManager: sharedVoiceManager
+                            )
                             .navigationBarHidden(true)
                         } else {
                             // Chat View when there's an active chat
                             ChatViewWithInitialMessage(
                                 showingSidebar: $showingSidebar,
+                                voiceManager: sharedVoiceManager,
                                 initialMessage: initialMessage,
                                 shouldSendMessage: shouldSendInitialMessage,
                                 selectedSessionId: selectedSessionId,
@@ -224,6 +232,7 @@ struct ConfigurationStatusView: View {
 // Wrapper to handle initial message and session loading
 struct ChatViewWithInitialMessage: View {
     @Binding var showingSidebar: Bool
+    @ObservedObject var voiceManager: EnhancedVoiceManager
     let initialMessage: String
     let shouldSendMessage: Bool
     let selectedSessionId: String?
@@ -231,7 +240,7 @@ struct ChatViewWithInitialMessage: View {
     let onBackToWelcome: () -> Void
     
     var body: some View {
-        ChatView(showingSidebar: $showingSidebar, onBackToWelcome: onBackToWelcome)
+        ChatView(showingSidebar: $showingSidebar, onBackToWelcome: onBackToWelcome, voiceManager: voiceManager)
             .onAppear {
                 // Load session if one was selected
                 if let sessionId = selectedSessionId {

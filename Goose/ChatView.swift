@@ -15,8 +15,8 @@ struct ChatView: View {
     @State private var currentSessionId: String?
     @State private var isSettingsPresented = false
 
-    // Voice features
-    @StateObject private var voiceManager = EnhancedVoiceManager()
+    // Voice features - shared with WelcomeView
+    @ObservedObject var voiceManager: EnhancedVoiceManager
 
     // Memory management
     private let maxMessages = 50  // Limit messages to prevent memory issues
@@ -232,6 +232,12 @@ struct ChatView: View {
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
+        }
+        .onChange(of: voiceManager.transcribedText) { newText in
+            // Update input text with transcribed text in real-time
+            if !newText.isEmpty && voiceManager.voiceMode != .normal {
+                inputText = newText
+            }
         }
         .onAppear {
             // Set up voice manager callback
@@ -754,5 +760,5 @@ struct CompletedToolCall {
 }
 
 #Preview {
-    ChatView(showingSidebar: .constant(false), onBackToWelcome: {})
+    ChatView(showingSidebar: .constant(false), onBackToWelcome: {}, voiceManager: EnhancedVoiceManager())
 }
