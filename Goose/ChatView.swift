@@ -46,7 +46,8 @@ struct ChatView: View {
                             ForEach(messages) { message in
                                 MessageBubbleView(
                                     message: message,
-                                    completedTasks: getCompletedTasksForMessage(message.id)
+                                    completedTasks: getCompletedTasksForMessage(message.id),
+                                    sessionName: currentSessionId ?? "Current Session"
                                 )
                                 .id(message.id)
 
@@ -136,12 +137,12 @@ struct ChatView: View {
                     gradient: Gradient(colors: [
                         Color.clear,
                         Color(UIColor.systemBackground).opacity(0.7),
-                        Color(UIColor.systemBackground).opacity(0.95),
+                        Color(UIColor.systemBackground),
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 100)
+                .frame(height: 180)
                 .allowsHitTesting(false)
             }
 
@@ -174,11 +175,7 @@ struct ChatView: View {
                             .padding(.vertical, 8)
                             .disabled(voiceManager.voiceMode != .normal)
                             .onSubmit {
-                                if !inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    .isEmpty
-                                {
-                                    sendMessage()
-                                }
+                                sendMessage()
                             }
 
                         // Buttons row at bottom
@@ -282,7 +279,7 @@ struct ChatView: View {
                     .frame(maxWidth: .infinity)
                     .background(
                         RoundedRectangle(cornerRadius: 21)
-                            .fill(.regularMaterial)
+                            .fill(.ultraThinMaterial)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 21)
                                     .fill(Color(UIColor.secondarySystemBackground).opacity(0.85))

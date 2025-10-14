@@ -19,7 +19,7 @@ struct ContentView: View {
                     warmUpServer()
                 }
         } else {
-            NavigationView {
+            NavigationStack {
                 if !hasActiveChat {
                     // Welcome View when no active chat
                     WelcomeView(showingSidebar: $showingSidebar, onStartChat: { message in
