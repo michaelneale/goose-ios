@@ -48,6 +48,16 @@ PR cloned to /tmp/goose-ios-pr1 for reference.
    - ✅ Build successful - ready for testing
    - 📝 Details: `notes/FEATURE_NOTES_Sidebar_Extraction.md`
 
+6. **Dynamic Session Refresh** - ✅ COMPLETE
+   - ✅ Added "RefreshSessions" notification system
+   - ✅ Sessions refresh when URL changes in settings
+   - ✅ Sessions refresh when sidebar opens
+   - ✅ Sessions refresh when WelcomeView appears
+   - ✅ Modified SettingsView to post notification on save
+   - ✅ Modified ContentView to listen and refresh on notification + sidebar open
+   - ✅ Modified WelcomeView to listen and refresh on notification
+   - ✅ Build tested successfully
+
 ### 📋 TODO
 
 4. **Other Layout Improvements** - Review Needed

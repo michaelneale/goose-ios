@@ -157,6 +157,12 @@ struct WelcomeView: View {
                 await loadRecentSessions()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
+            // Refresh sessions when settings are saved
+            Task {
+                await loadRecentSessions()
+            }
+        }
     }
     
     // Typewriter effect for greeting text

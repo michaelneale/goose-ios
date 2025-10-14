@@ -111,6 +111,12 @@ struct ContentView: View {
                         }
                     )
                     .transition(.move(edge: .leading))
+                    .onAppear {
+                        // Refresh sessions when sidebar opens
+                        Task {
+                            await preloadSessions()
+                        }
+                    }
                 }
             }
             .overlay(alignment: .top) {
@@ -123,6 +129,12 @@ struct ContentView: View {
                         .onTapGesture {
                             configurationHandler.clearError()
                         }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
+                // Refresh sessions when settings are saved
+                Task {
+                    await preloadSessions()
                 }
             }
         }

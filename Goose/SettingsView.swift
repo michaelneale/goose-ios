@@ -144,6 +144,9 @@ struct SettingsView: View {
     private func saveSettings() {
         UserDefaults.standard.set(baseURL, forKey: "goose_base_url")
         UserDefaults.standard.set(secretKey, forKey: "goose_secret_key")
+        
+        // Post notification to refresh sessions when URL changes
+        NotificationCenter.default.post(name: Notification.Name("RefreshSessions"), object: nil)
     }
 
     private func testConnection() {
