@@ -50,6 +50,12 @@ struct ContentView: View {
                             initialMessage = ""
                             shouldSendInitialMessage = false
                             selectedSessionId = nil
+                        },
+                        onBackToWelcome: {
+                            // Return to welcome screen
+                            withAnimation {
+                                hasActiveChat = false
+                            }
                         }
                     )
                     .navigationBarHidden(true)
@@ -154,9 +160,10 @@ struct ChatViewWithInitialMessage: View {
     let shouldSendMessage: Bool
     let selectedSessionId: String?
     let onMessageSent: () -> Void
+    let onBackToWelcome: () -> Void
     
     var body: some View {
-        ChatView(showingSidebar: $showingSidebar)
+        ChatView(showingSidebar: $showingSidebar, onBackToWelcome: onBackToWelcome)
             .onAppear {
                 // Load session if one was selected
                 if let sessionId = selectedSessionId {
