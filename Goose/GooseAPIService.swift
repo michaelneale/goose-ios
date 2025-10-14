@@ -225,13 +225,36 @@ class GooseAPIService: ObservableObject {
                 throw APIError.invalidURL
             }
 
-            let iOSPrompt = """
-                You are being accessed through the Goose iOS application from a mobile device.
+            let iOSPrompt: String
 
-                Some extensions are builtin, such as Developer and Memory.
-                When asked to code, write files, or run commands, IMMEDIATELY enable the Developer extension using platform__manage_extensions.
-                DO NOT explain what you're going to do first - just enable Developer and start working.
-                """
+            if isTrialMode {
+                // Demo mode prompt - limited functionality
+                iOSPrompt = """
+                    You are being accessed through the Goose iOS application from a mobile device.
+
+                    This is a trial mode with limited functionality.
+
+
+                    You can:
+                    - Answer questions and provide information
+                    - Explain concepts and provide guidance
+                    - Show example code and solutions
+                    - If you wish to do any work, make a tmp directory and work in there
+
+                    Be helpful and informative, but always remind them to connect their own agent for full functionality.
+                    Always be brief in your replies so they can easily read on mobile handset.
+                    """
+            } else {
+                // Full mode prompt - all features available
+                iOSPrompt = """
+                    You are being accessed through the Goose iOS application from a mobile handset.
+
+                    Some extensions are builtin, such as Developer and Memory.
+                    When asked to code, write files, or run commands, IMMEDIATELY enable the Developer extension using platform__manage_extensions.
+                    DO NOT explain what you're going to do first - just enable Developer and start working.
+                    Always be brief in your final replies so they can easily read on mobile handset.
+                    """
+            }
 
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
