@@ -79,7 +79,7 @@ struct ChatView: View {
                                 .frame(height: 120)
                         }
                         .padding(.horizontal)
-                        .padding(.top, 90)
+                        .padding(.top, 70)
                     }
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                         // Only scroll when app comes to foreground, not on every update
