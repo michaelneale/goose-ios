@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var initialMessage = ""
     @State private var shouldSendInitialMessage = false
     @State private var selectedSessionId: String?
+    @State private var sessionName: String = "New Session"
+    @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
     @EnvironmentObject var configurationHandler: ConfigurationHandler
 
     var body: some View {
@@ -17,52 +19,103 @@ struct ContentView: View {
                 .onAppear {
                     // Warm up the demo server if in trial mode (non-blocking)
                     warmUpServer()
+                    // Preload sessions on app launch
+                    Task {
+                        await preloadSessions()
+                    }
                 }
         } else {
-            NavigationStack {
-                if !hasActiveChat {
-                    // Welcome View when no active chat
-                    WelcomeView(showingSidebar: $showingSidebar, onStartChat: { message in
-                        // Start new chat with the message
-                        initialMessage = message
-                        shouldSendInitialMessage = !message.isEmpty
-                        selectedSessionId = nil // Clear session ID for new chat
-                        withAnimation {
-                            hasActiveChat = true
+            // Main content with sidebar (following PR pattern)
+            ZStack(alignment: .leading) {
+                // Main content - full height
+                GeometryReader { geometry in
+                    NavigationStack {
+                        if !hasActiveChat {
+                            // Welcome View when no active chat
+                            WelcomeView(showingSidebar: $showingSidebar, onStartChat: { message in
+                                // Start new chat with the message
+                                initialMessage = message
+                                shouldSendInitialMessage = !message.isEmpty
+                                selectedSessionId = nil // Clear session ID for new chat
+                                withAnimation {
+                                    hasActiveChat = true
+                                }
+                            }, onSessionSelect: { sessionId in
+                                // Load existing session
+                                selectedSessionId = sessionId
+                                withAnimation {
+                                    hasActiveChat = true
+                                }
+                            })
+                            .navigationBarHidden(true)
+                        } else {
+                            // Chat View when there's an active chat
+                            ChatViewWithInitialMessage(
+                                showingSidebar: $showingSidebar,
+                                initialMessage: initialMessage,
+                                shouldSendMessage: shouldSendInitialMessage,
+                                selectedSessionId: selectedSessionId,
+                                onMessageSent: {
+                                    // Clear the initial message after sending
+                                    initialMessage = ""
+                                    shouldSendInitialMessage = false
+                                    selectedSessionId = nil
+                                },
+                                onBackToWelcome: {
+                                    // Return to welcome screen
+                                    withAnimation {
+                                        hasActiveChat = false
+                                    }
+                                }
+                            )
+                            .navigationBarHidden(true)
                         }
-                    }, onSessionSelect: { sessionId in
-                        // Load existing session
-                        selectedSessionId = sessionId
-                        withAnimation {
-                            hasActiveChat = true
-                        }
-                    })
-                    .navigationBarHidden(true)
-                } else {
-                    // Chat View when there's an active chat
-                    ChatViewWithInitialMessage(
-                        showingSidebar: $showingSidebar,
-                        initialMessage: initialMessage,
-                        shouldSendMessage: shouldSendInitialMessage,
-                        selectedSessionId: selectedSessionId,
-                        onMessageSent: {
-                            // Clear the initial message after sending
-                            initialMessage = ""
-                            shouldSendInitialMessage = false
-                            selectedSessionId = nil
-                        },
-                        onBackToWelcome: {
-                            // Return to welcome screen
-                            withAnimation {
-                                hasActiveChat = false
-                            }
-                        }
-                    )
-                    .navigationBarHidden(true)
+                    }
                     .sheet(isPresented: $isSettingsPresented) {
                         SettingsView()
                             .environmentObject(configurationHandler)
                     }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .background(Color(UIColor.systemBackground))
+                    .offset(x: showingSidebar ? 280 : 0) // Offset content when sidebar shows
+                    .animation(.easeInOut(duration: 0.3), value: showingSidebar)
+                }
+                .edgesIgnoringSafeArea(.all)
+                
+                // Sidebar overlay
+                if showingSidebar {
+                    SidebarView(
+                        isShowing: $showingSidebar,
+                        isSettingsPresented: $isSettingsPresented,
+                        cachedSessions: $cachedSessions,
+                        onSessionSelect: { sessionId in
+                            // Find session to get its name
+                            if let session = cachedSessions.first(where: { $0.id == sessionId }) {
+                                sessionName = session.description.isEmpty ? "Untitled Session" : session.description
+                            }
+                            selectedSessionId = sessionId
+                            initialMessage = ""
+                            shouldSendInitialMessage = false
+                            withAnimation {
+                                showingSidebar = false
+                                hasActiveChat = true
+                            }
+                        },
+                        onNewSession: {
+                            selectedSessionId = nil
+                            sessionName = "New Session"
+                            initialMessage = ""
+                            shouldSendInitialMessage = false
+                            withAnimation {
+                                showingSidebar = false
+                                hasActiveChat = true
+                            }
+                            Task {
+                                await preloadSessions()
+                            }
+                        }
+                    )
+                    .transition(.move(edge: .leading))
                 }
             }
             .overlay(alignment: .top) {
@@ -76,6 +129,20 @@ struct ContentView: View {
                             configurationHandler.clearError()
                         }
                 }
+            }
+        }
+    }
+    
+    // Preload sessions in background
+    private func preloadSessions() async {
+        print("📥 Attempting to preload sessions...")
+        let fetchedSessions = await GooseAPIService.shared.fetchSessions()
+        await MainActor.run {
+            // Limit to first 10 sessions for performance
+            self.cachedSessions = Array(fetchedSessions.prefix(10))
+            print("✅ Preloaded \(self.cachedSessions.count) sessions")
+            if self.cachedSessions.isEmpty {
+                print("⚠️ No sessions preloaded - server may not be connected or no sessions exist")
             }
         }
     }

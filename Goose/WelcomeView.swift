@@ -25,7 +25,9 @@ struct WelcomeView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Button(action: {
-                        isSettingsPresented = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSidebar.toggle()
+                        }
                     }) {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))

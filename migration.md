@@ -32,13 +32,23 @@ PR cloned to /tmp/goose-ios-pr1 for reference.
    - ✅ Added ThemeManager.swift and TaskDetailView.swift to Xcode project
    - ✅ Build successful - ready for testing
 
-### 📋 TODO
-
-3. **Navigation Bar Style** - ✅ COMPLETE
+4. **Navigation Bar Style** - ✅ COMPLETE
    - ✅ Back button (chevron.left) - navigates to welcome
    - ✅ Sidebar button (sidebar.left) - toggles sidebar
    - ✅ "New Session"/"Session" title (not centered "goose")
    - ✅ Smaller padding: 4pt top + 24pt bottom (vs old 50pt top + 12pt bottom)
+
+5. **Sidebar Unification** - ✅ COMPLETE
+   - ✅ Extracted SidebarView to separate file (SidebarView.swift)
+   - ✅ Moved sidebar rendering to ContentView level (following PR pattern)
+   - ✅ WelcomeView now uses same sliding sidebar as ChatView
+   - ✅ Removed duplicate SidebarView code from ChatView (164 lines deleted)
+   - ✅ Added session preloading on app launch
+   - ✅ Content slides with .offset() animation when sidebar opens
+   - ✅ Build successful - ready for testing
+   - 📝 Details: `notes/FEATURE_NOTES_Sidebar_Extraction.md`
+
+### 📋 TODO
 
 4. **Other Layout Improvements** - Review Needed
    - Review ContentView.swift changes
