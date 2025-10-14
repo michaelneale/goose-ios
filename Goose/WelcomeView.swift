@@ -125,9 +125,7 @@ struct WelcomeView: View {
                 text: $inputText,
                 voiceManager: voiceManager,
                 onSubmit: {
-                    if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        onStartChat(inputText)
-                    }
+                    onStartChat(inputText)
                 }
             )
         }
@@ -141,9 +139,7 @@ struct WelcomeView: View {
                 inputText = message
                 // Auto-send the message
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        onStartChat(inputText)
-                    }
+                    onStartChat(inputText)
                 }
             }
             

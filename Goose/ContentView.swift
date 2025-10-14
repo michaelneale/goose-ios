@@ -91,25 +91,12 @@ struct ContentView: View {
                         onSessionSelect: { sessionId in
                             // Find session to get its name
                             if let session = cachedSessions.first(where: { $0.id == sessionId }) {
-                                sessionName = session.description.isEmpty ? "Untitled Session" : session.description
-                            }
-                            selectedSessionId = sessionId
-                            initialMessage = ""
-                            shouldSendInitialMessage = false
-                            withAnimation {
-                                showingSidebar = false
-                                hasActiveChat = true
+                                let name = session.description.isEmpty ? "Untitled Session" : session.description
+                                navigateToSession(sessionId: sessionId, sessionName: name)
                             }
                         },
                         onNewSession: {
-                            selectedSessionId = nil
-                            sessionName = "New Session"
-                            initialMessage = ""
-                            shouldSendInitialMessage = false
-                            withAnimation {
-                                showingSidebar = false
-                                hasActiveChat = true
-                            }
+                            navigateToSession(sessionId: nil)
                             Task {
                                 await preloadSessions()
                             }
@@ -130,6 +117,20 @@ struct ContentView: View {
                         }
                 }
             }
+        }
+    }
+    
+    // MARK: - Navigation Helpers
+    
+    /// Navigate to a session (existing or new)
+    private func navigateToSession(sessionId: String?, sessionName: String = "New Session") {
+        self.selectedSessionId = sessionId
+        self.sessionName = sessionName
+        self.initialMessage = ""
+        self.shouldSendInitialMessage = false
+        withAnimation {
+            self.showingSidebar = false
+            self.hasActiveChat = true
         }
     }
     
