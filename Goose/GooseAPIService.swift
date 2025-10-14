@@ -470,6 +470,43 @@ class GooseAPIService: ObservableObject {
     }
 
     // MARK: - Sessions Management
+    func fetchInsights() async -> SessionInsights? {
+        // In trial mode, return mock insights
+        if isTrialMode {
+            return SessionInsights(totalSessions: 5, totalTokens: 450_000_000)
+        }
+
+        guard let url = URL(string: "\(baseURL)/sessions/insights") else {
+            print("🚨 Invalid insights URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("🚨 Invalid response when fetching insights")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let insights = try JSONDecoder().decode(SessionInsights.self, from: data)
+                print("✅ Fetched insights: \(insights.totalSessions) sessions, \(insights.totalTokens) tokens")
+                return insights
+            } else {
+                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                print("🚨 Failed to fetch insights: \(httpResponse.statusCode) - \(errorBody)")
+                return nil
+            }
+        } catch {
+            print("🚨 Error fetching insights: \(error)")
+            return nil
+        }
+    }
+    
     func fetchSessions() async -> [ChatSession] {
         // In trial mode, return mock sessions
         if isTrialMode {
@@ -619,6 +656,11 @@ struct AgentResponse: Codable {
 
 struct SessionsResponse: Codable {
     let sessions: [ChatSession]
+}
+
+struct SessionInsights: Codable {
+    let totalSessions: Int
+    let totalTokens: Int64
 }
 
 // MARK: - SSE Delegate
