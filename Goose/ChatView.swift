@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatView: View {
     @Binding var showingSidebar: Bool
+    let onBackToWelcome: () -> Void
     @StateObject private var apiService = GooseAPIService.shared
     @State private var messages: [Message] = []
     @State private var inputText = ""
@@ -318,6 +319,18 @@ struct ChatView: View {
 
                 // Navigation bar
                 HStack(spacing: 8) {
+                    // Back button (navigates to welcome)
+                    Button(action: {
+                        // Navigate back to welcome screen
+                        onBackToWelcome()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // Sidebar button
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSidebar.toggle()
@@ -337,9 +350,13 @@ struct ChatView: View {
 
                     Spacer()
 
-                    // Empty space where settings was - keeps title centered
-                    Color.clear
-                        .frame(width: 22, height: 22)
+                    // Empty space for visual balance - keeps title centered
+                    HStack(spacing: 8) {
+                        Color.clear
+                            .frame(width: 20, height: 22)
+                        Color.clear
+                            .frame(width: 22, height: 22)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 50)  // Account for status bar
@@ -1053,5 +1070,5 @@ struct CompletedToolCall {
 }
 
 #Preview {
-    ChatView(showingSidebar: .constant(false))
+    ChatView(showingSidebar: .constant(false), onBackToWelcome: {})
 }
