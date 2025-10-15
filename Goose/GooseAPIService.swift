@@ -532,6 +532,18 @@ class GooseAPIService: ObservableObject {
             if httpResponse.statusCode == 200 {
                 let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
                 print("✅ Fetched \(sessionsResponse.sessions.count) sessions")
+                
+                // Debug: Print session details
+                for (index, session) in sessionsResponse.sessions.prefix(5).enumerated() {
+                    print("  Session \(index + 1): ID=\(session.id.prefix(8))... Title='\(session.title)' Updated=\(session.updatedAt)")
+                }
+                
+                // Check for duplicates
+                let uniqueIds = Set(sessionsResponse.sessions.map { $0.id })
+                if uniqueIds.count != sessionsResponse.sessions.count {
+                    print("⚠️ WARNING: Found \(sessionsResponse.sessions.count - uniqueIds.count) duplicate session IDs!")
+                }
+                
                 return sessionsResponse.sessions
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"

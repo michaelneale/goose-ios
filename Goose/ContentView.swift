@@ -208,12 +208,26 @@ struct ContentView: View {
         print("📥 Attempting to preload sessions...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
         await MainActor.run {
-            // Limit to first 10 sessions for performance
-            let sorted = fetchedSessions.sorted { $0.timestamp > $1.timestamp }
+            // Deduplicate sessions by ID (in case backend returns duplicates)
+            var seenIds = Set<String>()
+            let uniqueSessions = fetchedSessions.filter { session in
+                if seenIds.contains(session.id) {
+                    print("⚠️ Skipping duplicate session ID: \(session.id)")
+                    return false
+                }
+                seenIds.insert(session.id)
+                return true
+            }
+            
+            // Sort by timestamp descending (most recent first) and limit to first 10
+            let sorted = uniqueSessions.sorted { $0.timestamp > $1.timestamp }
             self.cachedSessions = Array(sorted.prefix(10))
-            print("✅ Preloaded \(self.cachedSessions.count) sessions")
+            
+            print("✅ Preloaded \(self.cachedSessions.count) unique sessions (from \(fetchedSessions.count) fetched)")
             if self.cachedSessions.isEmpty {
                 print("⚠️ No sessions preloaded - server may not be connected or no sessions exist")
+            } else {
+                print("📋 Most recent session: '\(self.cachedSessions.first?.title ?? "Unknown")'")
             }
         }
     }
