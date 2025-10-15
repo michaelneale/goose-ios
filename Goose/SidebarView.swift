@@ -12,8 +12,9 @@ struct SidebarView: View {
     @Binding var isShowing: Bool
     @Binding var isSettingsPresented: Bool
     @Binding var cachedSessions: [ChatSession]
-    let onSessionSelect: (String) -> Void
+    let onSessionSelect: (String, String) -> Void
     let onNewSession: () -> Void
+    let onOverview: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -63,6 +64,56 @@ struct SidebarView: View {
 
                     Divider()
 
+                    // Menu Categories
+                    VStack(spacing: 0) {
+                        if let onOverview = onOverview {
+                            Button(action: {
+                                onOverview()
+                            }) {
+                                HStack {
+                                    Text("Overview")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                }
+                                .padding()
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        Button(action: {
+                            // TODO: Implement Extensions navigation
+                        }) {
+                            HStack {
+                                Text("Extensions")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                            .padding()
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: {
+                            // TODO: Implement Recipes navigation
+                        }) {
+                            HStack {
+                                Text("Recipes")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                            .padding()
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .background(Color(.systemBackground))
+
+                    Divider()
+
                     // Sessions list
                     ScrollView {
                         LazyVStack(spacing: 0) {
@@ -81,7 +132,7 @@ struct SidebarView: View {
                             ForEach(cachedSessions) { session in
                                 SessionRowView(session: session)
                                     .onTapGesture {
-                                        onSessionSelect(session.id)
+                                        onSessionSelect(session.id, session.title)
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             isShowing = false
                                         }
