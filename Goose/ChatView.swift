@@ -113,13 +113,13 @@ struct ChatView: View {
                             scrollToBottom(proxy)
                         }
                     }
-                    .onChange(of: scrollRefreshTrigger) { _ in
+                    .onChange(of: scrollRefreshTrigger) { oldValue, newValue in
                         // Force scroll when session is loaded
                         if shouldAutoScroll && !messages.isEmpty {
                             scrollToBottom(proxy)
                         }
                     }
-                    .onChange(of: messages.count) { _ in
+                    .onChange(of: messages.count) { oldValue, newValue in
                         // Only auto-scroll for new messages if we're actively loading/streaming
                         // This prevents jumping back to bottom when user scrolls up after streaming is done
                         if isLoading && shouldAutoScroll {
@@ -239,7 +239,7 @@ struct ChatView: View {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
         }
-        .onChange(of: voiceManager.transcribedText) { newText in
+        .onChange(of: voiceManager.transcribedText) { oldValue, newText in
             // Update input text with transcribed text in real-time
             if !newText.isEmpty && voiceManager.voiceMode != .normal {
                 inputText = newText
@@ -767,4 +767,5 @@ struct CompletedToolCall {
 
 #Preview {
     ChatView(showingSidebar: .constant(false), onBackToWelcome: {}, voiceManager: EnhancedVoiceManager())
+        .environmentObject(ThemeManager.shared)
 }

@@ -149,14 +149,42 @@ enum MessageContent: Codable {
 }
 
 struct TextContent: Codable {
-    let type = "text"
+    let type: String
     let text: String
+    
+    init(text: String) {
+        self.type = "text"
+        self.text = text
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.text = try container.decode(String.self, forKey: .text)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type, text
+    }
 }
 
 struct ToolRequestContent: Codable {
-    let type = "toolRequest"
+    let type: String
     let id: String
     let toolCall: ToolCall
+    
+    init(id: String, toolCall: ToolCall) {
+        self.type = "toolRequest"
+        self.id = id
+        self.toolCall = toolCall
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.toolCall = try container.decode(ToolCall.self, forKey: .toolCall)
+    }
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -166,9 +194,22 @@ struct ToolRequestContent: Codable {
 }
 
 struct ToolResponseContent: Codable {
-    let type = "toolResponse"
+    let type: String
     let id: String
     let toolResult: ToolResult
+    
+    init(id: String, toolResult: ToolResult) {
+        self.type = "toolResponse"
+        self.id = id
+        self.toolResult = toolResult
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.toolResult = try container.decode(ToolResult.self, forKey: .toolResult)
+    }
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -178,16 +219,46 @@ struct ToolResponseContent: Codable {
 }
 
 struct ToolConfirmationRequestContent: Codable {
-    let type = "toolConfirmationRequest"
+    let type: String
     let id: String
     let toolName: String
     let arguments: [String: AnyCodable]
+    
+    init(id: String, toolName: String, arguments: [String: AnyCodable]) {
+        self.type = "toolConfirmationRequest"
+        self.id = id
+        self.toolName = toolName
+        self.arguments = arguments
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.toolName = try container.decode(String.self, forKey: .toolName)
+        self.arguments = try container.decode([String: AnyCodable].self, forKey: .arguments)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type, id, toolName, arguments
+    }
 }
 
 struct SummarizationRequestedContent: Codable {
-    let type = "summarizationRequested"
-    // Add any fields that might be in the summarization request
-    // For now, keeping it minimal since we don't know the exact structure
+    let type: String
+    
+    init() {
+        self.type = "summarizationRequested"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type
+    }
 }
 
 struct ToolCall: Codable {
@@ -377,28 +448,103 @@ enum SSEEvent: Codable {
 }
 
 struct MessageEvent: Codable {
-    let type = "Message"
+    let type: String
     let message: Message
+    
+    init(message: Message) {
+        self.type = "Message"
+        self.message = message
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.message = try container.decode(Message.self, forKey: .message)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type, message
+    }
 }
 
 struct ErrorEvent: Codable {
-    let type = "Error"
+    let type: String
     let error: String
+    
+    init(error: String) {
+        self.type = "Error"
+        self.error = error
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.error = try container.decode(String.self, forKey: .error)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type, error
+    }
 }
 
 struct FinishEvent: Codable {
-    let type = "Finish"
+    let type: String
     let reason: String
+    
+    init(reason: String) {
+        self.type = "Finish"
+        self.reason = reason
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.reason = try container.decode(String.self, forKey: .reason)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type, reason
+    }
 }
 
 struct ModelChangeEvent: Codable {
-    let type = "ModelChange"
+    let type: String
     let model: String
     let mode: String
+    
+    init(model: String, mode: String) {
+        self.type = "ModelChange"
+        self.model = model
+        self.mode = mode
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.model = try container.decode(String.self, forKey: .model)
+        self.mode = try container.decode(String.self, forKey: .mode)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type, model, mode
+    }
 }
 
 struct PingEvent: Codable {
-    let type = "Ping"
+    let type: String
+    
+    init() {
+        self.type = "Ping"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(String.self, forKey: .type)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type
+    }
 }
 
 struct NotificationEvent: Codable {

@@ -402,7 +402,7 @@ struct TaskOutputDetailView: View {
                     TextField("Search output...", text: $searchText)
                         .font(.system(size: 16))
                         .foregroundColor(themeManager.primaryTextColor)
-                        .onChange(of: searchText) { _ in
+                        .onChange(of: searchText) { oldValue, newValue in
                             performSearch()
                         }
                     

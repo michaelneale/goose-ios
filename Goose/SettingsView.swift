@@ -128,7 +128,7 @@ struct SettingsView: View {
         .onAppear {
             loadSettings()
         }
-        .onChange(of: configurationHandler.configurationSuccess) { success in
+        .onChange(of: configurationHandler.configurationSuccess) { oldValue, success in
             if success {
                 // Reload settings when configuration is successful
                 loadSettings()
@@ -181,4 +181,6 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
+        .environmentObject(ConfigurationHandler.shared)
+        .environmentObject(ThemeManager.shared)
 }

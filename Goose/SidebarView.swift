@@ -12,216 +12,150 @@ struct SidebarView: View {
     @Binding var isShowing: Bool
     @Binding var isSettingsPresented: Bool
     @Binding var cachedSessions: [ChatSession]
-    let onSessionSelect: (String, String) -> Void
+    let onSessionSelect: (String) -> Void
     let onNewSession: () -> Void
-    let onOverview: () -> Void
-    @EnvironmentObject var themeManager: ThemeManager
-    
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Top section: Search + New Session button
-            HStack(alignment: .center, spacing: 8) {
-                // Search field
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14))
-                        .foregroundColor(themeManager.secondaryTextColor)
-                    
-                    TextField("Search", text: .constant(""))
-                        .font(.system(size: 14))
-                        .foregroundColor(themeManager.primaryTextColor)
-                }
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(themeManager.chatInputBackgroundColor.opacity(0.85))
-                .cornerRadius(8)
-                
-                // New session button (+ icon)
-                Button(action: {
-                    onNewSession()
+        ZStack {
+            // Background overlay
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isShowing = false
                     }
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .frame(width: 32, height: 32)  // Match search bar height for alignment
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(themeManager.primaryTextColor, lineWidth: 2)
-                                .frame(width: 20, height: 20)  // Keep visual size smaller
-                        )
                 }
-                .buttonStyle(.plain)
-            }
-            .frame(height: 44)  // Match drawer icon tap area height
-            .padding(.horizontal, 16)
-            .padding(.top, 8) // Minimal top padding to move search UP toward the top
-            .padding(.bottom, 20)
-            
-            // Scrollable content: Categories + Sessions
-            ScrollView(showsIndicators: true) {
+
+            // Sidebar panel
+            HStack {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Categories section
-                    VStack(alignment: .leading, spacing: 16) {
-                        CategoryButton(icon: "square.grid.2x2", title: "Overview") {
-                            onOverview()
-                        }
-                        CategoryButton(icon: "puzzlepiece.extension", title: "Extensions")
-                        CategoryButton(icon: "book.closed", title: "Recipes")
-                    }
-                    .padding(.leading, 20)
-                    .padding(.trailing, 16)
-                    .padding(.top, 32)
-                    .padding(.bottom, 32)
-                    
-                    // Sessions list
-                    LazyVStack(spacing: 0) {
-                        if cachedSessions.isEmpty {
-                            // Show empty state
-                            VStack(spacing: 12) {
-                                Image(systemName: "tray")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(themeManager.secondaryTextColor.opacity(0.5))
-                                
-                                Text("No sessions yet")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(themeManager.secondaryTextColor)
-                                
-                                Text("Start a new conversation")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(themeManager.secondaryTextColor.opacity(0.7))
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
+                    // Header with New Session button at top
+                    HStack {
+                        Button(action: {
+                            onNewSession()
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isShowing = false
                             }
-                            .padding(.vertical, 32)
-                            .frame(maxWidth: .infinity)
-                        } else {
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.primary)
+                                .frame(width: 32, height: 32)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isShowing = false
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.title3)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+
+                    Divider()
+
+                    // Sessions list
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            // Sessions header
+                            HStack {
+                                Text("Sessions")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                Spacer()
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+
                             ForEach(cachedSessions) { session in
                                 SessionRowView(session: session)
-                                    .environmentObject(themeManager)
                                     .onTapGesture {
-                                        onSessionSelect(session.id, session.description)
+                                        onSessionSelect(session.id)
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             isShowing = false
                                         }
                                     }
+                                Divider()
+                                    .padding(.leading)
                             }
                         }
                     }
-                }
-            }
-            
-            // Bottom row: Settings and Theme icons
-            HStack(spacing: 24) {
-                // Settings button
-                Button(action: {
-                    print("⚙️ Settings button tapped")
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isShowing = false
-                    }
-                    // Small delay to let sidebar close before showing sheet
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        isSettingsPresented = true
-                        print("⚙️ isSettingsPresented set to: \(isSettingsPresented)")
-                    }
-                }) {
-                    Image(systemName: "gear")
-                        .font(.system(size: 20))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                
-                // Theme toggle
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        themeManager.isDarkMode.toggle()
-                    }
-                }) {
-                    Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(themeManager.backgroundColor)
-        }
-        .frame(width: 360)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(themeManager.backgroundColor)
-        .onChange(of: isShowing) { newValue in
-            if newValue {
-                // Refresh sessions in background when drawer opens
-                Task {
-                    await refreshSessions()
-                }
-            }
-        }
-    }
-    
-    // Refresh sessions in background when drawer opens
-    private func refreshSessions() async {
-        print("🔄 Attempting to refresh sessions...")
-        let fetchedSessions = await GooseAPIService.shared.fetchSessions()
-        await MainActor.run {
-            // Update cached sessions with latest data (limit to 10)
-            cachedSessions = Array(fetchedSessions.prefix(10))
-            print("🔄 Refreshed \(cachedSessions.count) sessions from API")
-            if cachedSessions.isEmpty {
-                print("⚠️ No sessions found - make sure server is connected and has sessions")
-            }
-        }
-    }
-}
 
-// MARK: - Category Button
-struct CategoryButton: View {
-    let icon: String
-    let title: String
-    var action: (() -> Void)? = nil
-    @EnvironmentObject var themeManager: ThemeManager
-    
-    var body: some View {
-        Button(action: {
-            action?()
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(themeManager.primaryTextColor)
-                    .frame(width: 20)
-                
-                Text(title)
-                    .font(.system(size: 18))
-                    .foregroundColor(themeManager.primaryTextColor)
-                
+                    Spacer()
+
+                    Divider()
+
+                    // Bottom row: Settings button
+                    Button(action: {
+                        // Close sidebar immediately
+                        isShowing = false
+                        // Open settings immediately (sheet will present after sidebar closes)
+                        isSettingsPresented = true
+                    }) {
+                        HStack {
+                            Image(systemName: "gear")
+                                .font(.system(size: 18))
+                                .foregroundColor(.primary)
+
+                            Text("Settings")
+                                .font(.system(size: 16))
+                                .foregroundColor(.primary)
+
+                            Spacer()
+                        }
+                        .padding()
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color(.systemBackground))
+                }
+                .frame(width: 280)
+                .background(Color(.systemBackground))
+                .offset(x: isShowing ? 0 : -280)
+
                 Spacer()
             }
         }
-        .buttonStyle(.plain)
     }
 }
 
 // MARK: - Session Row View
 struct SessionRowView: View {
     let session: ChatSession
-    @EnvironmentObject var themeManager: ThemeManager
-    
+
     var body: some View {
-        Text(session.description.isEmpty ? "Session \(session.id.prefix(8))" : session.description)
-            .font(.system(size: 16, weight: .medium))
-            .foregroundColor(themeManager.primaryTextColor)
-            .lineLimit(1)
-            .padding(.leading, 20)
-            .padding(.trailing, 16)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(session.title)
+                .font(.headline)
+                .lineLimit(1)
+
+            Text(session.lastMessage)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+
+            Text(formatDate(session.timestamp))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }

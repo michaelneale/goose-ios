@@ -209,7 +209,8 @@ struct ContentView: View {
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
         await MainActor.run {
             // Limit to first 10 sessions for performance
-            self.cachedSessions = Array(fetchedSessions.prefix(10))
+            let sorted = fetchedSessions.sorted { $0.timestamp > $1.timestamp }
+            self.cachedSessions = Array(sorted.prefix(10))
             print("✅ Preloaded \(self.cachedSessions.count) sessions")
             if self.cachedSessions.isEmpty {
                 print("⚠️ No sessions preloaded - server may not be connected or no sessions exist")

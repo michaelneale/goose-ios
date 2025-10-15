@@ -207,7 +207,7 @@ struct WelcomeView: View {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
         }
-        .onChange(of: voiceManager.transcribedText) { newText in
+        .onChange(of: voiceManager.transcribedText) { oldValue, newText in
             // Update input text with transcribed text in real-time
             if !newText.isEmpty && voiceManager.voiceMode != .normal {
                 inputText = newText
@@ -307,7 +307,7 @@ struct WelcomeView: View {
         async let insightsTask = GooseAPIService.shared.fetchInsights()
         async let sessionsTask = GooseAPIService.shared.fetchSessions()
         
-        let (insights, sessions) = await (insightsTask, sessionsTask)
+        let (insights, sessionsRaw) = await (insightsTask, sessionsTask)
         
         await MainActor.run {
             // Update token count from insights
@@ -322,7 +322,8 @@ struct WelcomeView: View {
                     }
                 }
             }
-            
+            // Sort sessions by last update descending to get the most recent
+            let sessions = sessionsRaw.sorted { $0.timestamp > $1.timestamp }
             recentSessions = Array(sessions.prefix(3))
             isLoadingSessions = false
             
@@ -386,7 +387,7 @@ struct WelcomeSessionRowView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(session.description.isEmpty ? "Session \(session.id.prefix(8))" : session.description)
+            Text(session.title)
                 .font(.system(size: 16))
                 .foregroundColor(themeManager.primaryTextColor)
                 .lineLimit(1)

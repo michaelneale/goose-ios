@@ -223,7 +223,7 @@ struct MarkdownText: View {
                     previousText = text
                 }
             }
-            .onChange(of: text) { newText in
+            .onChange(of: text) { oldValue, newText in
                 // Only reparse if text changed significantly
                 if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
                     // Full reparse for significant changes
@@ -701,11 +701,11 @@ struct TruncatableMarkdownText: View {
                             fullHeight = geometry.size.height
                             updateTruncation()
                         }
-                        .onChange(of: geometry.size.height) {
+                        .onChange(of: geometry.size.height) { oldValue, newValue in
                             fullHeight = geometry.size.height
                             updateTruncation()
                         }
-                        .onChange(of: text) {
+                        .onChange(of: text) { oldValue, newValue in
                             updateTruncation()
                         }
                 }

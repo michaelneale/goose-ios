@@ -193,4 +193,5 @@ struct ChatInputView: View {
         
         Spacer()
     }
+    .environmentObject(ThemeManager.shared)
 }
