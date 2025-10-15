@@ -32,11 +32,53 @@ struct MessageBubbleView: View {
                 }
             }
             
-            // Show consolidated task completion pill if there are completed tasks (PR #1 style)
+            // Show consolidated task completion pill if there are completed tasks
             if !completedTasks.isEmpty {
-                // Show all completed tools as navigable pills
-                ForEach(completedTasks, id: \.toolCall.name) { completedTask in
-                    CompletedToolPillView(completedCall: completedTask, message: message, sessionName: sessionName)
+                // For single task, go directly to output; for multiple, show combined view
+                if completedTasks.count == 1 {
+                    // Single task - go directly to output
+                    NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(ThemeManager.shared)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            
+                            Text(completedTasks[0].toolCall.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemGray6).opacity(0.85))
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Multiple tasks - show all outputs in one view
+                    NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(ThemeManager.shared)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            
+                            Text("\(completedTasks.count) Tasks completed")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemGray6).opacity(0.85))
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
