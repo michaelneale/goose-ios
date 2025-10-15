@@ -556,21 +556,45 @@ class GooseAPIService: ObservableObject {
                 description: "📝 Debugging my python app",
                 messageCount: 8,
                 createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 24)),
-                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 2))
+                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 2)),
+                workingDir: "/tmp/demo-1",
+                totalTokens: nil,
+                inputTokens: nil,
+                outputTokens: nil,
+                accumulatedTotalTokens: 1234,
+                accumulatedInputTokens: 800,
+                accumulatedOutputTokens: 434,
+                scheduleId: nil
             ),
             ChatSession(
                 id: "trial-demo-2",
                 description: "🚀 Deploy my home server",
                 messageCount: 15,
                 createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 48)),
-                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 12))
+                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 12)),
+                workingDir: "/tmp/demo-2",
+                totalTokens: nil,
+                inputTokens: nil,
+                outputTokens: nil,
+                accumulatedTotalTokens: 2567,
+                accumulatedInputTokens: 1600,
+                accumulatedOutputTokens: 967,
+                scheduleId: nil
             ),
             ChatSession(
                 id: "trial-demo-3",
                 description: "🔍 Transcribe the latest podcast",
                 messageCount: 23,
                 createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 72)),
-                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 24))
+                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 24)),
+                workingDir: "/tmp/demo-3",
+                totalTokens: nil,
+                inputTokens: nil,
+                outputTokens: nil,
+                accumulatedTotalTokens: 4532,
+                accumulatedInputTokens: 3000,
+                accumulatedOutputTokens: 1532,
+                scheduleId: nil
             ),
         ]
     }

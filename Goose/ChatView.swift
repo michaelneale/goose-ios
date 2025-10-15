@@ -715,37 +715,6 @@ struct ChatView: View {
 }
 
 // MARK: - Chat Session Model (matches goosed API)
-struct ChatSession: Identifiable, Codable {
-    let id: String
-    let description: String
-    let messageCount: Int
-    let createdAt: String
-    let updatedAt: String
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case description
-        case messageCount = "message_count"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-
-    // Computed properties for UI display
-    var title: String {
-        return description.isEmpty ? "Untitled Session" : description
-    }
-
-    var lastMessage: String {
-        return "\(messageCount) message\(messageCount == 1 ? "" : "s")"
-    }
-
-    var timestamp: Date {
-        // Parse the ISO 8601 date string
-        let formatter = ISO8601DateFormatter()
-        return formatter.date(from: updatedAt) ?? Date()
-    }
-}
-
 // MARK: - Tool Call Data Structures
 struct ToolCallWithTiming {
     let toolCall: ToolCall

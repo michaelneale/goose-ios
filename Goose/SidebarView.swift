@@ -133,24 +133,85 @@ struct SidebarView: View {
 // MARK: - Session Row View
 struct SessionRowView: View {
     let session: ChatSession
+    @State private var status: SessionStatus = .idle
+    @State private var isLoadingStatus = true
+    
+    private let detector = SessionActivityDetector()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(session.title)
-                .font(.headline)
-                .lineLimit(1)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(session.title)
+                    .font(.headline)
+                    .lineLimit(1)
 
-            Text(session.lastMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
+                Text(session.lastMessage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
 
-            Text(formatDate(session.timestamp))
-                .font(.caption2)
-                .foregroundColor(.secondary)
+                if let date = session.updatedDate {
+                    Text(formatDate(date))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            // Status indicator
+            if isLoadingStatus {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    .frame(width: 20, height: 20)
+            } else {
+                VStack(spacing: 2) {
+                    Image(systemName: status.icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(statusColor)
+                    
+                    Text(status.displayText)
+                        .font(.system(size: 9))
+                        .foregroundColor(statusColor)
+                }
+                .frame(width: 60)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task {
+            await loadStatus()
+        }
+    }
+    
+    private var statusColor: Color {
+        switch status {
+        case .active:
+            return .green
+        case .idle:
+            return .orange
+        case .finished:
+            return .gray
+        }
+    }
+    
+    private func loadStatus() async {
+        isLoadingStatus = true
+        
+        // Quick timestamp-based detection first (instant)
+        let quickStatus = detector.detectStatusFromTimestamp(session)
+        await MainActor.run {
+            self.status = quickStatus
+            self.isLoadingStatus = false
+        }
+        
+        // Only refine idle sessions with SSE check in background
+        if quickStatus == .idle {
+            let refinedStatus = await detector.detectStatus(for: session, useSSE: true)
+            await MainActor.run {
+                self.status = refinedStatus
+            }
+        }
     }
 
     private func formatDate(_ date: Date) -> String {

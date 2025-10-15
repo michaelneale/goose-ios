@@ -16,6 +16,8 @@
 		838F2DEC2E9E1CF700E2FC48 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838F2DE92E9E1CF700E2FC48 /* TaskDetailView.swift */; };
 		838F2DEE2E9E24E200E2FC48 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838F2DED2E9E24E200E2FC48 /* SidebarView.swift */; };
 		838F2DF02E9E270300E2FC48 /* ChatInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838F2DEF2E9E270300E2FC48 /* ChatInputView.swift */; };
+		838F2DF52E9F752B00E2FC48 /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838F2DF32E9F752B00E2FC48 /* SessionModels.swift */; };
+		838F2DF62E9F752B00E2FC48 /* SessionStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838F2DF42E9F752B00E2FC48 /* SessionStatusView.swift */; };
 		83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */; };
 		A1234567890ABCDEF001 /* GooseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF000 /* GooseApp.swift */; };
 		A1234567890ABCDEF003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF002 /* ContentView.swift */; };
@@ -40,6 +42,8 @@
 		838F2DEA2E9E1CF700E2FC48 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ThemeManager.swift; path = Goose/ThemeManager.swift; sourceTree = "<group>"; };
 		838F2DED2E9E24E200E2FC48 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		838F2DEF2E9E270300E2FC48 /* ChatInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInputView.swift; sourceTree = "<group>"; };
+		838F2DF32E9F752B00E2FC48 /* SessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionModels.swift; sourceTree = "<group>"; };
+		838F2DF42E9F752B00E2FC48 /* SessionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStatusView.swift; sourceTree = "<group>"; };
 		83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationHandler.swift; sourceTree = "<group>"; };
 		83ACD8A92E827DB500379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		83ACD8AC2E827FAE00379D0E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -90,6 +94,8 @@
 		A1234567890ABCDEF991 /* Goose */ = {
 			isa = PBXGroup;
 			children = (
+				838F2DF32E9F752B00E2FC48 /* SessionModels.swift */,
+				838F2DF42E9F752B00E2FC48 /* SessionStatusView.swift */,
 				838F2DEF2E9E270300E2FC48 /* ChatInputView.swift */,
 				838F2DED2E9E24E200E2FC48 /* SidebarView.swift */,
 				838F2DE32E9CA43D00E2FC48 /* SplashScreenView.swift */,
@@ -212,6 +218,8 @@
 				834A2CB92E98D93B00D15D6A /* EnhancedVoiceManager.swift in Sources */,
 				A1234567890ABCDEF014 /* GooseAPIService.swift in Sources */,
 				A1234567890ABCDEF016 /* MessageBubbleView.swift in Sources */,
+				838F2DF52E9F752B00E2FC48 /* SessionModels.swift in Sources */,
+				838F2DF62E9F752B00E2FC48 /* SessionStatusView.swift in Sources */,
 				838F2DEE2E9E24E200E2FC48 /* SidebarView.swift in Sources */,
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,
 				A1234567890ABCDEF001 /* GooseApp.swift in Sources */,
