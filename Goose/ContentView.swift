@@ -14,6 +14,9 @@ struct ContentView: View {
     
     // Shared voice manager across WelcomeView and ChatView
     @StateObject private var sharedVoiceManager = EnhancedVoiceManager()
+    
+    // Keep sidebar width consistent across offsets/overlays
+    private let sidebarWidth: CGFloat = 360
 
     var body: some View {
         if showingSplash {
@@ -85,7 +88,7 @@ struct ContentView: View {
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .background(Color(UIColor.systemBackground))
-                    .offset(x: showingSidebar ? 360 : 0) // Offset content when sidebar shows
+                    .offset(x: showingSidebar ? sidebarWidth : 0) // Offset content when sidebar shows
                     .animation(.easeInOut(duration: 0.3), value: showingSidebar)
                 }
                 .edgesIgnoringSafeArea(.all)
@@ -94,6 +97,8 @@ struct ContentView: View {
                 Color.black
                     .opacity(showingSidebar ? 0.5 : 0.0)
                     .ignoresSafeArea()
+                    // Move overlay with the content to avoid briefly dimming the entire screen
+                    .offset(x: showingSidebar ? sidebarWidth : 0)
                     .animation(.easeInOut(duration: 0.3), value: showingSidebar)
                     .allowsHitTesting(showingSidebar) // Only intercept taps when visible
                     .onTapGesture {
