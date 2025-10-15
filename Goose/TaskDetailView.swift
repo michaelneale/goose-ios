@@ -320,7 +320,7 @@ struct TaskOutputDetailView: View {
                         .padding(.bottom, 8)
                     }
                     
-                    // Full output/result - displayed directly as code with line numbers
+                    // Full output/result - formatted based on type
                     if let value = task.result.value {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Output")
@@ -328,44 +328,14 @@ struct TaskOutputDetailView: View {
                                 .foregroundColor(themeManager.primaryTextColor)
                                 .padding(.bottom, 4)
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    ForEach(Array(outputLines.enumerated()), id: \.offset) { index, line in
-                                        HStack(alignment: .top, spacing: 12) {
-                                            // Line number
-                                            Text("\(index + 1)")
-                                                .font(.system(size: 12, design: .monospaced))
-                                                .foregroundColor(themeManager.secondaryTextColor.opacity(0.5))
-                                                .frame(minWidth: 40, alignment: .trailing)
-                                            
-                                            // Line content with search highlight
-                                            if searchMatches.contains(index) {
-                                                Text(line)
-                                                    .font(.system(size: 12, design: .monospaced))
-                                                    .foregroundColor(themeManager.primaryTextColor)
-                                                    .background(
-                                                        searchMatches[safe: currentMatchIndex] == index ?
-                                                            Color.orange.opacity(0.4) : Color.yellow.opacity(0.3)
-                                                    )
-                                                    .id("line-\(index)")
-                                            } else {
-                                                Text(line)
-                                                    .font(.system(size: 12, design: .monospaced))
-                                                    .foregroundColor(themeManager.primaryTextColor)
-                                            }
-                                            
-                                            Spacer()
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                }
-                                .textSelection(.enabled)
-                            }
-                        }
-                        .onAppear {
-                            // Split output into lines
-                            let outputString = String(describing: value.value)
-                            outputLines = outputString.components(separatedBy: .newlines)
+                            FormattedOutputView(
+                                value: value.value,
+                                searchText: searchText,
+                                searchMatches: $searchMatches,
+                                currentMatchIndex: $currentMatchIndex,
+                                outputLines: $outputLines
+                            )
+                            .environmentObject(themeManager)
                         }
                     }
                     
@@ -384,7 +354,7 @@ struct TaskOutputDetailView: View {
                     }
                     }
                     .padding()
-                    .padding(.top, 0) // Padding for nav bar (matches main chat)
+                    .padding(.top, 80) // Padding for nav bar (56pt top + 24pt bottom = 80pt total height)
                     .padding(.bottom, 100) // Padding for search bar
                 }
             }
@@ -500,6 +470,265 @@ struct TaskOutputDetailView: View {
         }
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .top)
+    }
+}
+
+// MARK: - Formatted Output View
+struct FormattedOutputView: View {
+    let value: Any
+    let searchText: String
+    @Binding var searchMatches: [Int]
+    @Binding var currentMatchIndex: Int
+    @Binding var outputLines: [String]
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
+        Group {
+            if let stringValue = value as? String {
+                // String: display with line numbers (good for command output, logs, etc.)
+                StringOutputView(
+                    text: stringValue,
+                    searchMatches: searchMatches,
+                    currentMatchIndex: currentMatchIndex,
+                    outputLines: $outputLines
+                )
+            } else if let arrayValue = value as? [Any] {
+                // Array: display as numbered list
+                ArrayOutputView(array: arrayValue)
+            } else if let dictValue = value as? [String: Any] {
+                // Dictionary: display as key-value pairs
+                DictionaryOutputView(dictionary: dictValue)
+            } else {
+                // Fallback: convert to string
+                StringOutputView(
+                    text: String(describing: value),
+                    searchMatches: searchMatches,
+                    currentMatchIndex: currentMatchIndex,
+                    outputLines: $outputLines
+                )
+            }
+        }
+        .onAppear {
+            // Initialize outputLines based on value type
+            if let stringValue = value as? String {
+                outputLines = stringValue.components(separatedBy: .newlines)
+            } else {
+                outputLines = formatValue(value, indent: 0).components(separatedBy: .newlines)
+            }
+        }
+    }
+    
+    // Helper to format any value with proper indentation
+    private func formatValue(_ value: Any, indent: Int) -> String {
+        let indentation = String(repeating: "  ", count: indent)
+        
+        if let stringValue = value as? String {
+            return stringValue
+        } else if let arrayValue = value as? [Any] {
+            if arrayValue.isEmpty { return "[]" }
+            var result = "[\n"
+            for (index, item) in arrayValue.enumerated() {
+                result += "\(indentation)  \(index): \(formatValue(item, indent: indent + 1))\n"
+            }
+            result += "\(indentation)]"
+            return result
+        } else if let dictValue = value as? [String: Any] {
+            if dictValue.isEmpty { return "{}" }
+            var result = "{\n"
+            for (key, val) in dictValue.sorted(by: { $0.key < $1.key }) {
+                result += "\(indentation)  \(key): \(formatValue(val, indent: indent + 1))\n"
+            }
+            result += "\(indentation)}"
+            return result
+        } else {
+            return String(describing: value)
+        }
+    }
+}
+
+// String output with line numbers
+struct StringOutputView: View {
+    let text: String
+    let searchMatches: [Int]
+    let currentMatchIndex: Int
+    @Binding var outputLines: [String]
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(outputLines.enumerated()), id: \.offset) { index, line in
+                    HStack(alignment: .top, spacing: 12) {
+                        // Line number
+                        Text("\(index + 1)")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(themeManager.secondaryTextColor.opacity(0.5))
+                            .frame(minWidth: 40, alignment: .trailing)
+                        
+                        // Line content with search highlight
+                        if searchMatches.contains(index) {
+                            Text(line)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(themeManager.primaryTextColor)
+                                .background(
+                                    searchMatches[safe: currentMatchIndex] == index ?
+                                        Color.orange.opacity(0.4) : Color.yellow.opacity(0.3)
+                                )
+                                .id("line-\(index)")
+                        } else {
+                            Text(line)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(themeManager.primaryTextColor)
+                        }
+                        
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .textSelection(.enabled)
+        }
+    }
+}
+
+// Array output as numbered list
+struct ArrayOutputView: View {
+    let array: [Any]
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(array.enumerated()), id: \.offset) { index, item in
+                HStack(alignment: .top, spacing: 12) {
+                    // Row number
+                    Text("\(index + 1).")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(themeManager.secondaryTextColor)
+                        .frame(minWidth: 30, alignment: .trailing)
+                    
+                    // Item value
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let dictItem = item as? [String: Any] {
+                            // Nested dictionary
+                            ForEach(Array(dictItem.keys.sorted()), id: \.self) { key in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("\(key):")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(themeManager.secondaryTextColor)
+                                    Text(formatSimpleValue(dictItem[key]))
+                                        .font(.system(size: 13))
+                                        .foregroundColor(themeManager.primaryTextColor)
+                                }
+                            }
+                        } else {
+                            Text(formatSimpleValue(item))
+                                .font(.system(size: 13))
+                                .foregroundColor(themeManager.primaryTextColor)
+                        }
+                    }
+                    
+                    Spacer()
+                }
+            }
+        }
+        .textSelection(.enabled)
+    }
+    
+    private func formatSimpleValue(_ value: Any?) -> String {
+        guard let value = value else { return "null" }
+        
+        if let stringValue = value as? String {
+            return stringValue
+        } else if let numberValue = value as? NSNumber {
+            return numberValue.stringValue
+        } else if let boolValue = value as? Bool {
+            return boolValue ? "true" : "false"
+        } else if let arrayValue = value as? [Any] {
+            return "[\(arrayValue.count) items]"
+        } else if let dictValue = value as? [String: Any] {
+            return "{\(dictValue.count) keys}"
+        } else {
+            return String(describing: value)
+        }
+    }
+}
+
+// Dictionary output as key-value pairs
+struct DictionaryOutputView: View {
+    let dictionary: [String: Any]
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(dictionary.keys.sorted()), id: \.self) { key in
+                VStack(alignment: .leading, spacing: 4) {
+                    // Key
+                    Text(key)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(themeManager.secondaryTextColor)
+                    
+                    // Value
+                    Group {
+                        if let stringValue = dictionary[key] as? String {
+                            Text(stringValue)
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundColor(themeManager.primaryTextColor)
+                        } else if let arrayValue = dictionary[key] as? [Any] {
+                            Text("[\(arrayValue.count) items]")
+                                .font(.system(size: 13))
+                                .foregroundColor(themeManager.primaryTextColor.opacity(0.7))
+                            // Show array items indented
+                            ForEach(Array(arrayValue.enumerated()), id: \.offset) { index, item in
+                                Text("  \(index + 1). \(formatSimpleValue(item))")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(themeManager.primaryTextColor)
+                                    .padding(.leading, 8)
+                            }
+                        } else if let dictValue = dictionary[key] as? [String: Any] {
+                            Text("{\(dictValue.count) keys}")
+                                .font(.system(size: 13))
+                                .foregroundColor(themeManager.primaryTextColor.opacity(0.7))
+                            // Show nested keys
+                            ForEach(Array(dictValue.keys.sorted()), id: \.self) { nestedKey in
+                                Text("  \(nestedKey): \(formatSimpleValue(dictValue[nestedKey]))")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(themeManager.primaryTextColor)
+                                    .padding(.leading, 8)
+                            }
+                        } else {
+                            Text(formatSimpleValue(dictionary[key]))
+                                .font(.system(size: 13))
+                                .foregroundColor(themeManager.primaryTextColor)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                if key != dictionary.keys.sorted().last {
+                    Divider()
+                        .padding(.vertical, 4)
+                }
+            }
+        }
+        .textSelection(.enabled)
+    }
+    
+    private func formatSimpleValue(_ value: Any?) -> String {
+        guard let value = value else { return "null" }
+        
+        if let stringValue = value as? String {
+            return stringValue
+        } else if let numberValue = value as? NSNumber {
+            return numberValue.stringValue
+        } else if let boolValue = value as? Bool {
+            return boolValue ? "true" : "false"
+        } else if let arrayValue = value as? [Any] {
+            return "[\(arrayValue.count) items]"
+        } else if let dictValue = value as? [String: Any] {
+            return "{\(dictValue.count) keys}"
+        } else {
+            return String(describing: value)
+        }
     }
 }
 

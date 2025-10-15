@@ -218,7 +218,7 @@ struct ChatView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 4)  // Much smaller like PR #1
+                .padding(.top, 12)  // Slightly lower than before
                 .padding(.bottom, 24)
                 .background(
                     Color(UIColor.systemBackground)
