@@ -24,7 +24,25 @@ struct WelcomeView: View {
     @State private var progressValue: CGFloat = 0.0
     @State private var tokenCount: Int64 = 0
     private let maxTokens: Int64 = 1_000_000_000 // 1 billion
-    private let fullText = "Morning!\nWhat do you want to do?"
+    
+    // Computed property for time-aware greeting
+    private var fullText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let greeting: String
+        
+        switch hour {
+        case 0..<12:
+            greeting = "Good morning!"
+        case 12..<17:
+            greeting = "Good afternoon!"
+        case 17..<21:
+            greeting = "Good evening!"
+        default:
+            greeting = "Good night!"
+        }
+        
+        return "\(greeting)\nWhat do you want to do?"
+    }
     
     var body: some View {
         VStack(spacing: 0) {
