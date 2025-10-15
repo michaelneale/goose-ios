@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var sessionName: String = "New Session"
     @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
     @EnvironmentObject var configurationHandler: ConfigurationHandler
+    @EnvironmentObject var themeManager: ThemeManager
     
     // Shared voice manager across WelcomeView and ChatView
     @StateObject private var sharedVoiceManager = EnhancedVoiceManager()
@@ -87,25 +88,54 @@ struct ContentView: View {
                             .environmentObject(configurationHandler)
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .background(Color(UIColor.systemBackground))
+                    .background(themeManager.backgroundColor)
+                    // Lighten content slightly in dark mode when sidebar is open (matches design-explorations-main)
+                    .overlay(
+                        Group {
+                            if themeManager.colorScheme == .dark {
+                                // Keep this overlay stationary so when the content shifts right,
+                                // a clear vertical divide forms between the dimmed content and
+                                // the slightly lightened background on the right side.
+                                Color(white: 0.15)
+                                    .opacity(showingSidebar ? 1.0 : 0.0)
+                                    .ignoresSafeArea()
+                                    .animation(.easeInOut(duration: 0.3), value: showingSidebar)
+                            }
+                        }
+                    )
                     .offset(x: showingSidebar ? sidebarWidth : 0) // Offset content when sidebar shows
                     .animation(.easeInOut(duration: 0.3), value: showingSidebar)
                 }
                 .edgesIgnoringSafeArea(.all)
                 
-                // Dimming overlay - placed here so it's above the main content but below sidebar  
-                Color.black
-                    .opacity(showingSidebar ? 0.5 : 0.0)
-                    .ignoresSafeArea()
-                    // Move overlay with the content to avoid briefly dimming the entire screen
-                    .offset(x: showingSidebar ? sidebarWidth : 0)
-                    .animation(.easeInOut(duration: 0.3), value: showingSidebar)
-                    .allowsHitTesting(showingSidebar) // Only intercept taps when visible
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar = false
+                // Dimming overlay + interactive cover. We render the visual dim below,
+                // then a full-screen transparent tap target (to close on tap), and finally
+                // a visible sidebar button clone on top so it's always accessible.
+                ZStack(alignment: .topLeading) {
+                    // Full-screen dim (design-explorations-main style)
+                    Color.black
+                        .opacity(showingSidebar ? 0.5 : 0.0)
+                        .ignoresSafeArea()
+                        .animation(.easeInOut(duration: 0.3), value: showingSidebar)
+
+                    // Tap anywhere to close (except the nav button region)
+                    Color.clear
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .allowsHitTesting(showingSidebar)
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSidebar = false
+                            }
                         }
-                    }
+
+                    // Nav button passthrough region (top-left)
+                    Color.clear
+                        .frame(width: 80, height: 100)
+                        .allowsHitTesting(false)
+                        .offset(x: 0, y: 56)
+                }
+                .zIndex(0) // below the sidebar sheet so the menu stays visible
                 
                 // Sidebar overlay
                 if showingSidebar {
@@ -150,6 +180,7 @@ struct ContentView: View {
                         }
                 }
             }
+            // No explicit close button overlay; placed inside SidebarView for precise alignment
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
                 // Refresh sessions when settings are saved
                 Task {

@@ -3,19 +3,19 @@ import SwiftUI
 struct SplashScreenView: View {
     @Binding var isActive: Bool
     @State private var logoOpacity: Double = 0.0
-    @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
         ZStack {
-            // Use system background color
-            Color(UIColor.systemBackground)
+            // Use themed background color so dark mode matches app
+            themeManager.backgroundColor
                 .ignoresSafeArea()
             
             // Goose logo centered
             Image("GooseLogo")
                 .resizable()
                 .renderingMode(.template)
-                .foregroundColor(colorScheme == .dark ? .white : .black)
+                .foregroundColor(themeManager.primaryTextColor)
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 96, height: 96)
                 .opacity(logoOpacity)
@@ -56,4 +56,5 @@ struct SplashScreenView: View {
 
 #Preview {
     SplashScreenView(isActive: .constant(true))
+        .environmentObject(ThemeManager.shared)
 }

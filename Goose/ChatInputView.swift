@@ -33,7 +33,7 @@ struct ChatInputView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
-                .background(Color(UIColor.systemBackground).opacity(0.95))
+                .background(themeManager.backgroundColor.opacity(0.75))
             }
             
             VStack(alignment: .leading, spacing: 12) {

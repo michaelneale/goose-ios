@@ -29,9 +29,10 @@ struct WelcomeView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top navigation bar
+            // Top navigation bar with drawer button
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
+                    // Sidebar button (left side)
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSidebar.toggle()
@@ -66,6 +67,7 @@ struct WelcomeView: View {
                     }
                 }
             )
+            .zIndex(2)
             
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {

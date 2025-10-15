@@ -15,6 +15,7 @@ struct GooseApp: App {
             ContentView()
                 .environmentObject(configurationHandler)
                 .environmentObject(themeManager)
+                .preferredColorScheme(themeManager.colorScheme)
                 .onOpenURL { url in
                     print("📱 App received URL: \(url)")
                     _ = configurationHandler.handleURL(url)

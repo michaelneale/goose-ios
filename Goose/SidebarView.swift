@@ -53,9 +53,23 @@ struct SidebarView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                
+                // Close drawer button (right side)
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isShowing = false
+                    }
+                }) {
+                    Image(systemName: "sidebar.right")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(themeManager.primaryTextColor)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 0)
+            .padding(.top, 8) // slight top spacing to align visually with search and safe area
             .padding(.bottom, 20)
             
             // Scrollable content: Categories + Sessions

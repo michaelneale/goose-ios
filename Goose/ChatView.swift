@@ -17,6 +17,7 @@ struct ChatView: View {
 
     // Voice features - shared with WelcomeView
     @ObservedObject var voiceManager: EnhancedVoiceManager
+    @EnvironmentObject var themeManager: ThemeManager
 
     // Memory management
     private let maxMessages = 50  // Limit messages to prevent memory issues
@@ -33,8 +34,8 @@ struct ChatView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Background color
-            Color(UIColor.systemBackground)
+            // Background color (use theme manager for consistent dark mode)
+            themeManager.backgroundColor
                 .ignoresSafeArea()
 
             // Main content that stops before input area
@@ -136,15 +137,17 @@ struct ChatView: View {
                 LinearGradient(
                     gradient: Gradient(colors: [
                         Color.clear,
-                        Color(UIColor.systemBackground).opacity(0.7),
-                        Color(UIColor.systemBackground),
+                        Color.black.opacity(themeManager.isDarkMode ? 0.3 : 0.1),
+                        Color.black.opacity(themeManager.isDarkMode ? 0.6 : 0.3),
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .frame(height: 180)
                 .allowsHitTesting(false)
+                .blendMode(.multiply) // Darkens content underneath
             }
+            .zIndex(1)
 
             // Floating input area - using shared ChatInputView
             VStack {
@@ -164,6 +167,7 @@ struct ChatView: View {
                 )
                 .padding(.bottom, 0)
             }
+            .zIndex(2)
 
             // Custom navigation bar with background
             VStack(spacing: 0) {
@@ -184,19 +188,9 @@ struct ChatView: View {
                     .background(Color.orange)
                 }
 
-                // Navigation bar - PR #1 style with back button
+                // Navigation bar — matches design-explorations-main
                 HStack(spacing: 8) {
-                    // Back button (navigates to welcome)
-                    Button(action: {
-                        onBackToWelcome()
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.blue)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    // Sidebar button
+                    // Sidebar button (left side)
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSidebar.toggle()
@@ -204,7 +198,7 @@ struct ChatView: View {
                     }) {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
-                            .foregroundColor(.primary)
+                            .foregroundColor(themeManager.primaryTextColor)
                             .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
@@ -212,20 +206,32 @@ struct ChatView: View {
                     // Session name
                     Text(currentSessionId != nil ? "Session" : "New Session")
                         .font(.system(size: 16))
-                        .foregroundColor(.primary)
+                        .foregroundColor(themeManager.primaryTextColor)
                         .lineLimit(1)
                     
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 4)  // Much smaller like PR #1
+                .padding(.top, 4)
                 .padding(.bottom, 24)
                 .background(
-                    Color(UIColor.systemBackground)
-                        .opacity(0.95)
-                        .background(.regularMaterial)
+                    Group {
+                        if showingSidebar {
+                            Color.clear
+                                .ignoresSafeArea()
+                        } else {
+                            ZStack {
+                                Rectangle()
+                                    .fill(.ultraThinMaterial)
+                                Rectangle()
+                                    .fill(themeManager.backgroundColor.opacity(0.95))
+                            }
+                            .ignoresSafeArea()
+                        }
+                    }
                 )
             }
+            .zIndex(3)
 
             // Sidebar is now rendered by ContentView
         }
