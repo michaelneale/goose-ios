@@ -32,7 +32,7 @@ struct WelcomeView: View {
             // Top navigation bar with drawer button
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    // Sidebar button (left side)
+                    // Sidebar button (left side) - ALWAYS visible, moves with content
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSidebar.toggle()
@@ -48,7 +48,7 @@ struct WelcomeView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 20)  // Push drawer icon DOWN to align with search/plus button in sidebar
                 .padding(.bottom, 8)
             }
             .background(

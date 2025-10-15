@@ -88,15 +88,14 @@ struct ContentView: View {
                             .environmentObject(configurationHandler)
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .background(themeManager.backgroundColor)
-                    // Lighten content slightly in dark mode when sidebar is open (matches design-explorations-main)
-                    .overlay(
-                        Group {
+                    .background(
+                        ZStack {
+                            // Base background color
+                            themeManager.backgroundColor
+                            
+                            // Lightening layer for dark mode - UNDER the content, not over it
                             if themeManager.colorScheme == .dark {
-                                // Keep this overlay stationary so when the content shifts right,
-                                // a clear vertical divide forms between the dimmed content and
-                                // the slightly lightened background on the right side.
-                                Color(white: 0.15)
+                                Color(white: 0.25)  // Lighter gray to create visible divide
                                     .opacity(showingSidebar ? 1.0 : 0.0)
                                     .ignoresSafeArea()
                                     .animation(.easeInOut(duration: 0.3), value: showingSidebar)
@@ -332,4 +331,5 @@ struct ChatViewWithInitialMessage: View {
 #Preview {
     ContentView()
         .environmentObject(ConfigurationHandler.shared)
+        .environmentObject(ThemeManager.shared)
 }

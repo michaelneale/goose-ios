@@ -20,7 +20,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Top section: Search + New Session button
-            HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 // Search field
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -46,30 +46,18 @@ struct SidebarView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(themeManager.primaryTextColor)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 32, height: 32)  // Match search bar height for alignment
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
                                 .stroke(themeManager.primaryTextColor, lineWidth: 2)
+                                .frame(width: 20, height: 20)  // Keep visual size smaller
                         )
                 }
                 .buttonStyle(.plain)
-                
-                // Close drawer button (right side)
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isShowing = false
-                    }
-                }) {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(themeManager.primaryTextColor)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
+            .frame(height: 44)  // Match drawer icon tap area height
             .padding(.horizontal, 16)
-            .padding(.top, 8) // slight top spacing to align visually with search and safe area
+            .padding(.top, 8) // Minimal top padding to move search UP toward the top
             .padding(.bottom, 20)
             
             // Scrollable content: Categories + Sessions
