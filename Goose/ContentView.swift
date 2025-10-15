@@ -85,8 +85,36 @@ struct ContentView: View {
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .background(Color(UIColor.systemBackground))
-                    .offset(x: showingSidebar ? 280 : 0) // Offset content when sidebar shows
+                    .overlay(
+                        // Dimming overlay when sidebar is open
+                        Group {
+                            if showingSidebar {
+                                ZStack(alignment: .topLeading) {
+                                    Color.black.opacity(0.5)
+                                        .ignoresSafeArea()
+                                    
+                                    // Invisible tap area to close sidebar except for button area
+                                    Color.clear
+                                        .ignoresSafeArea()
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            withAnimation(.easeInOut(duration: 0.3)) {
+                                                showingSidebar = false
+                                            }
+                                        }
+                                    
+                                    // Clear area for the sidebar button (top-left corner)
+                                    Color.clear
+                                        .frame(width: 80, height: 100)
+                                        .allowsHitTesting(false) // Let taps pass through to the button
+                                        .offset(x: 0, y: 56) // Position at button location
+                                }
+                            }
+                        }
+                    )
+                    .offset(x: showingSidebar ? 360 : 0) // Offset content when sidebar shows
                     .animation(.easeInOut(duration: 0.3), value: showingSidebar)
+                    .allowsHitTesting(!showingSidebar) // Disable interaction when sidebar is open
                 }
                 .edgesIgnoringSafeArea(.all)
                 
