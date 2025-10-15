@@ -354,7 +354,7 @@ struct TaskOutputDetailView: View {
                     }
                     }
                     .padding()
-                    .padding(.top, 0) // Padding for nav bar (matches main chat)
+                    .padding(.top, 80) // Padding for nav bar (56pt top + 24pt bottom = 80pt total height)
                     .padding(.bottom, 100) // Padding for search bar
                 }
             }
