@@ -21,9 +21,13 @@ struct WelcomeView: View {
     @State private var visibleSessionsCount = 0
     @State private var showLogo = false
     @State private var showProgressSection = false
+    @State private var showTrialModeCard = false
     @State private var progressValue: CGFloat = 0.0
     @State private var tokenCount: Int64 = 0
     private let maxTokens: Int64 = 1_000_000_000 // 1 billion
+    
+    // Access API service for trial mode check
+    @StateObject private var apiService = GooseAPIService.shared
     
     // Computed property for time-aware greeting
     private var fullText: String {
@@ -92,6 +96,57 @@ struct WelcomeView: View {
                         }
                     }
                     .padding(.top, 32)
+                    
+                    // Trial Mode Indicator Card
+                    if showTrialModeCard && apiService.isTrialMode {
+                        Button(action: {
+                            // TODO: Navigate to connection settings
+                            print("Connect to personal agent tapped")
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.blue)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Trial Mode")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.primary)
+                                    
+                                    Text("Connect to your personal goose agent for the full experience")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(2)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(colorScheme == .dark ?
+                                          Color(red: 0.15, green: 0.15, blue: 0.18) :
+                                          Color(red: 0.96, green: 0.96, blue: 0.98))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(
+                                        colorScheme == .dark ?
+                                        Color(red: 0.25, green: 0.25, blue: 0.28) :
+                                        Color(red: 0.88, green: 0.88, blue: 0.90),
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .padding(.top, 8)
+                    }
                     
                     // Progress Section
                     if showProgressSection {
@@ -245,6 +300,15 @@ struct WelcomeView: View {
                 if displayedText == fullText {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         showLogo = true
+                    }
+                    
+                    // Show trial mode card if in trial mode
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if apiService.isTrialMode {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                showTrialModeCard = true
+                            }
+                        }
                     }
                     
                     // Show progress section

@@ -55,12 +55,8 @@ struct ChatView: View {
                                 ForEach(getToolCallsForMessage(message.id), id: \.self) {
                                     toolCallId in
                                     if let activeCall = activeToolCalls[toolCallId] {
-                                        HStack {
-                                            Spacer()
-                                            ToolCallProgressView(toolCall: activeCall.toolCall)
-                                            Spacer()
-                                        }
-                                        .id("tool-\(toolCallId)")
+                                        ToolCallProgressView(toolCall: activeCall.toolCall)
+                                            .id("tool-\(toolCallId)")
                                     }
                                 }
                             }
@@ -85,7 +81,7 @@ struct ChatView: View {
                                 .frame(height: 180)
                         }
                         .padding(.horizontal)
-                        .padding(.top, apiService.isTrialMode ? 120 : 70)  // Matches PR #1 with simpler nav bar
+                        .padding(.top, 70)  // Matches PR #1 with simpler nav bar
                     }
                     .simultaneousGesture(
                         DragGesture()
@@ -167,23 +163,6 @@ struct ChatView: View {
 
             // Custom navigation bar with background
             VStack(spacing: 0) {
-                // Trial mode banner if applicable
-                if apiService.isTrialMode {
-                    HStack {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundColor(.white)
-                        Text(
-                            "Trial Mode: connect to your own Goose agent for the full personal experience"
-                        )
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.orange)
-                }
-
                 // Navigation bar - PR #1 style with back button
                 HStack(spacing: 8) {
                     // Back button (navigates to welcome)
