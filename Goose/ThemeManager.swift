@@ -17,9 +17,14 @@ class ThemeManager: ObservableObject {
     static let shared = ThemeManager()
     
     init() {
-        // Force light mode for now (override saved preference)
-        self.isDarkMode = false
-        UserDefaults.standard.set(false, forKey: "isDarkMode")
+        // Check if isDarkMode has been set before
+        if UserDefaults.standard.object(forKey: "isDarkMode") == nil {
+            // First launch - default to light mode
+            self.isDarkMode = false
+            UserDefaults.standard.set(false, forKey: "isDarkMode")
+        } else {
+            self.isDarkMode = UserDefaults.standard.bool(forKey: "isDarkMode")
+        }
     }
     
     var colorScheme: ColorScheme {

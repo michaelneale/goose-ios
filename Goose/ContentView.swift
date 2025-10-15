@@ -96,17 +96,19 @@ struct ContentView: View {
                         isShowing: $showingSidebar,
                         isSettingsPresented: $isSettingsPresented,
                         cachedSessions: $cachedSessions,
-                        onSessionSelect: { sessionId in
-                            // Find session to get its name
-                            if let session = cachedSessions.first(where: { $0.id == sessionId }) {
-                                let name = session.description.isEmpty ? "Untitled Session" : session.description
-                                navigateToSession(sessionId: sessionId, sessionName: name)
-                            }
+                        onSessionSelect: { sessionId, sessionName in
+                            navigateToSession(sessionId: sessionId, sessionName: sessionName)
                         },
                         onNewSession: {
                             navigateToSession(sessionId: nil)
                             Task {
                                 await preloadSessions()
+                            }
+                        },
+                        onOverview: {
+                            withAnimation {
+                                showingSidebar = false
+                                hasActiveChat = false
                             }
                         }
                     )
