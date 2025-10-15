@@ -91,15 +91,16 @@ struct ContentView: View {
                 .edgesIgnoringSafeArea(.all)
                 
                 // Dimming overlay - placed here so it's above the main content but below sidebar  
-                if showingSidebar {
-                    Color.black.opacity(0.5)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingSidebar = false
-                            }
+                Color.black
+                    .opacity(showingSidebar ? 0.5 : 0.0)
+                    .ignoresSafeArea()
+                    .animation(.easeInOut(duration: 0.3), value: showingSidebar)
+                    .allowsHitTesting(showingSidebar) // Only intercept taps when visible
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSidebar = false
                         }
-                }
+                    }
                 
                 // Sidebar overlay
                 if showingSidebar {
