@@ -3,9 +3,9 @@ import SwiftUI
 struct WelcomeView: View {
     @Binding var showingSidebar: Bool
     @State private var inputText = ""
-    @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject var themeManager: ThemeManager
     var onStartChat: (String) -> Void
-    var onSessionSelect: (String) -> Void
+    var onSessionSelect: (String, String) -> Void
     
     // Voice features - shared with ChatView
     @ObservedObject var voiceManager: EnhancedVoiceManager
@@ -20,11 +20,12 @@ struct WelcomeView: View {
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
     @State private var showLogo = false
+    @State private var hasPlayedAnimation = false // Track if animation has been played
     @State private var showProgressSection = false
     @State private var progressValue: CGFloat = 0.0
     @State private var tokenCount: Int64 = 0
     private let maxTokens: Int64 = 1_000_000_000 // 1 billion
-    private let fullText = "Morning!\nWhat do you want to do?"
+    private let fullText = "Morning Spence!\nWhat do you want to do?"
     
     var body: some View {
         VStack(spacing: 0) {
@@ -38,7 +39,7 @@ struct WelcomeView: View {
                     }) {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
-                            .foregroundColor(.primary)
+                            .foregroundColor(themeManager.primaryTextColor)
                             .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
@@ -46,20 +47,48 @@ struct WelcomeView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 66)
+                .padding(.top, 8)
                 .padding(.bottom, 8)
             }
-            .background(Color(UIColor.systemBackground).opacity(0.95))
-            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
+            .background(
+                Group {
+                    if showingSidebar {
+                        Color.clear
+                            .ignoresSafeArea()
+                    } else {
+                        ZStack {
+                            Rectangle()
+                                .fill(.ultraThinMaterial)
+                            Rectangle()
+                                .fill(themeManager.backgroundColor.opacity(0.95))
+                        }
+                        .ignoresSafeArea()
+                    }
+                }
+            )
             
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     // Greeting text with goose logo
                     HStack(alignment: .top, spacing: 16) {
-                        Text(displayedText)
-                            .font(.system(size: 20, weight: .medium))
-                            .lineSpacing(6)
-                            .foregroundColor(.primary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            // Split the text to apply different sizes
+                            if displayedText.contains("\n") {
+                                let lines = displayedText.components(separatedBy: "\n")
+                                Text(lines[0])
+                                    .font(.system(size: 32, weight: .medium))
+                                    .foregroundColor(themeManager.primaryTextColor)
+                                if lines.count > 1 {
+                                    Text(lines[1])
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(themeManager.primaryTextColor)
+                                }
+                            } else {
+                                Text(displayedText)
+                                    .font(.system(size: 32, weight: .medium))
+                                    .foregroundColor(themeManager.primaryTextColor)
+                            }
+                        }
                         
                         Spacer()
                         
@@ -67,7 +96,7 @@ struct WelcomeView: View {
                             Image("GooseLogo")
                                 .resizable()
                                 .renderingMode(.template)
-                                .foregroundColor(.primary)
+                                .foregroundColor(themeManager.primaryTextColor)
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 48, height: 48)
                                 .transition(.scale.combined(with: .opacity))
@@ -88,7 +117,7 @@ struct WelcomeView: View {
                                 
                                 Text("\(formatTokenCount(tokenCount)) of 1B")
                                     .font(.system(size: 12))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(themeManager.secondaryTextColor)
                             }
                             
                             // Progress bar
@@ -96,14 +125,14 @@ struct WelcomeView: View {
                                 ZStack(alignment: .leading) {
                                     // Background
                                     RoundedRectangle(cornerRadius: 6)
-                                        .fill(colorScheme == .dark ? 
+                                        .fill(themeManager.isDarkMode ? 
                                               Color(red: 0.10, green: 0.10, blue: 0.13) : 
                                               Color(red: 0.95, green: 0.95, blue: 0.95))
                                         .frame(height: 12)
                                     
                                     // Foreground (animated)
                                     RoundedRectangle(cornerRadius: 6)
-                                        .fill(colorScheme == .dark ? Color.white : Color.black)
+                                        .fill(themeManager.isDarkMode ? Color.white : Color.black)
                                         .frame(width: geometry.size.width * progressValue, height: 12)
                                 }
                             }
@@ -119,7 +148,7 @@ struct WelcomeView: View {
                             Text("RECENT SESSIONS")
                                 .font(.system(size: 12, weight: .semibold))
                                 .tracking(1.02)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
                                 .padding(.top, 16)
                         }
                         
@@ -129,7 +158,7 @@ struct WelcomeView: View {
                                 Spacer()
                                 ProgressView()
                                     .scaleEffect(0.8)
-                                    .tint(.secondary)
+                                    .tint(themeManager.secondaryTextColor)
                                 Spacer()
                             }
                             .frame(height: 100)
@@ -137,7 +166,7 @@ struct WelcomeView: View {
                             // Empty state
                             Text("No recent sessions")
                                 .font(.system(size: 14))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(themeManager.secondaryTextColor)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 32)
                         } else {
@@ -146,10 +175,11 @@ struct WelcomeView: View {
                                 ForEach(Array(recentSessions.prefix(3).enumerated()), id: \.element.id) { index, session in
                                     if index < visibleSessionsCount {
                                         WelcomeSessionRowView(session: session)
+                                            .environmentObject(themeManager)
                                             .transition(.opacity)
                                             .onTapGesture {
                                                 // Load the session when tapped
-                                                onSessionSelect(session.id)
+                                                onSessionSelect(session.id, session.description)
                                             }
                                     }
                                 }
@@ -191,8 +221,11 @@ struct WelcomeView: View {
                 }
             }
             
-            // Start typewriter animation
-            startTypewriterEffect()
+            // Only start typewriter animation if it hasn't been played yet
+            if !hasPlayedAnimation {
+                startTypewriterEffect()
+                hasPlayedAnimation = true
+            }
             
             // Load recent sessions
             Task {
@@ -320,7 +353,7 @@ struct WelcomeView: View {
 // MARK: - Welcome Session Row View
 struct WelcomeSessionRowView: View {
     let session: ChatSession
-    @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject var themeManager: ThemeManager
     
     var formattedTimestamp: String {
         // Parse the ISO8601 date string
@@ -353,13 +386,13 @@ struct WelcomeSessionRowView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(session.description.isEmpty ? "Session \(session.id.prefix(8))" : session.description)
                 .font(.system(size: 16))
-                .foregroundColor(.primary)
+                .foregroundColor(themeManager.primaryTextColor)
                 .lineLimit(1)
             
             Text(formattedTimestamp)
                 .font(.system(size: 12))
                 .tracking(0.06)
-                .foregroundColor(.secondary)
+                .foregroundColor(themeManager.primaryTextColor)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -371,9 +404,10 @@ struct WelcomeSessionRowView: View {
         onStartChat: { text in
             print("Starting chat with: \(text)")
         },
-        onSessionSelect: { sessionId in
-            print("Selected session: \(sessionId)")
+        onSessionSelect: { sessionId, sessionName in
+            print("Selected session: \(sessionId) - \(sessionName)")
         },
         voiceManager: EnhancedVoiceManager()
     )
+    .environmentObject(ThemeManager.shared)
 }

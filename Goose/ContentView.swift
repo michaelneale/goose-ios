@@ -45,7 +45,7 @@ struct ContentView: View {
                                 withAnimation {
                                     hasActiveChat = true
                                 }
-                            }, onSessionSelect: { sessionId in
+                            }, onSessionSelect: { sessionId, sessionName in
                                 // Load existing session
                                 selectedSessionId = sessionId
                                 withAnimation {
