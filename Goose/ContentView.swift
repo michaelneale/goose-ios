@@ -146,6 +146,7 @@ struct ContentView: View {
                             navigateToSession(sessionId: sessionId, sessionName: sessionName)
                         },
                         onNewSession: {
+                            print("➕ New session button clicked")
                             navigateToSession(sessionId: nil)
                             Task {
                                 await preloadSessions()
@@ -193,6 +194,7 @@ struct ContentView: View {
     
     /// Navigate to a session (existing or new)
     private func navigateToSession(sessionId: String?, sessionName: String = "New Session") {
+        print("🧭 Navigating to session: \(sessionId ?? "NEW SESSION")")
         self.selectedSessionId = sessionId
         self.sessionName = sessionName
         self.initialMessage = ""
@@ -201,6 +203,7 @@ struct ContentView: View {
             self.showingSidebar = false
             self.hasActiveChat = true
         }
+        print("✅ Navigation complete - hasActiveChat: \(self.hasActiveChat), selectedSessionId: \(self.selectedSessionId ?? "nil")")
     }
     
     // Preload sessions in background

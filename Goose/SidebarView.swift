@@ -38,6 +38,7 @@ struct SidebarView: View {
                 
                 // New session button (+ icon)
                 Button(action: {
+                    print("🔘 Plus button tapped in sidebar")
                     onNewSession()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isShowing = false
