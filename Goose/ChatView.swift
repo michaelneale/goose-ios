@@ -358,7 +358,6 @@ struct ChatView: View {
                 currentStreamTask = await apiService.startChatStreamWithSSE(
                     messages: messages,
                     sessionId: sessionId,
-                    workingDirectory: "/tmp",
                     onEvent: { event in
                         handleSSEEvent(event)
                     },
@@ -368,6 +367,12 @@ struct ChatView: View {
                     },
                     onError: { error in
                         print("🚨 SSE Stream Error: \(error)")
+                        
+                        // For debugging, show more detail for HTTP errors
+                        if case APIError.httpError(let code, let body) = error {
+                            print("🚨 HTTP Error \(code) - Full response body:")
+                            print(body)
+                        }
                         
                         // Don't retry SSE - switch to polling mode instead
                         // This avoids duplicate work and handles network failures gracefully
@@ -540,6 +545,21 @@ struct ChatView: View {
             // Just ignore notifications silently - they're too verbose for shell output
             break
 
+        case .updateConversation(let updateEvent):
+            // Replace the entire conversation with the compacted version
+            DispatchQueue.main.async {
+                print("📚 Updating conversation with \(updateEvent.conversation.count) messages")
+                self.messages = updateEvent.conversation
+                // Clear tool call tracking since we have a new conversation history
+                self.activeToolCalls.removeAll()
+                self.completedToolCalls.removeAll()
+                self.toolCallMessageMap.removeAll()
+                // Rebuild tool call state from the new messages
+                self.rebuildToolCallState(from: updateEvent.conversation)
+                // Trigger a UI refresh
+                self.scrollRefreshTrigger = UUID()
+            }
+
         case .ping:
             break
         }
@@ -688,6 +708,7 @@ struct ChatView: View {
                 case .toolResponse(let tr): return "tres:\(tr.id):\(tr.toolResult.status)"
                 case .summarizationRequested: return "sum"
                 case .toolConfirmationRequest(let tcr): return "tconf:\(tcr.id)"
+                case .conversationCompacted(let cc): return "compact:\(cc.msg)"
                 }
             }.joined(separator: "|")
             return "\(msg.id):\(msg.role):\(contentStr)"

@@ -132,6 +132,11 @@ struct MessageContentView: View {
         case .summarizationRequested(_):
             // Hide summarization requests for now
             EmptyView()
+            
+        case .conversationCompacted(let content):
+            // Show compacted conversation message
+            MarkdownText(text: "📝 \(content.msg)")
+                .textSelection(.enabled)
         }
     }
 }
@@ -717,6 +722,13 @@ struct TruncatableMessageContentView: View {
         case .summarizationRequested(_):
             // Hide summarization requests for now
             EmptyView()
+            
+        case .conversationCompacted(let content):
+            // Show compacted conversation message  
+            MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
+                .lineSpacing(8)
+                .foregroundColor(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

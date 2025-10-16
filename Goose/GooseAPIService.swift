@@ -27,7 +27,6 @@ class GooseAPIService: ObservableObject {
     func startChatStreamWithSSE(
         messages: [Message],
         sessionId: String? = nil,
-        workingDirectory: String = "/tmp",
         onEvent: @escaping (SSEEvent) -> Void,
         onComplete: @escaping () -> Void,
         onError: @escaping (Error) -> Void
@@ -38,11 +37,15 @@ class GooseAPIService: ObservableObject {
             return nil
         }
 
+        // Log the sessionId we're about to use
+        let actualSessionId = sessionId ?? ""
+        print("🔍 Creating ChatRequest with sessionId: '\(actualSessionId)' (was: \(sessionId ?? "nil"))")
+        
         let request = ChatRequest(
             messages: messages,
-            sessionId: sessionId,
-            sessionWorkingDir: workingDirectory,
-            scheduledJobId: nil
+            sessionId: actualSessionId,  // Provide empty string if nil since server requires it
+            recipeName: nil,
+            recipeVersion: nil
         )
 
         var urlRequest = URLRequest(url: url)
@@ -674,6 +677,7 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
     private let onError: (Error) -> Void
     private var buffer = ""
     private let maxBufferSize = 10000  // Prevent buffer overflow
+    private var errorStatusCode: Int? = nil  // Track error status codes
 
     init(
         onEvent: @escaping (SSEEvent) -> Void, onComplete: @escaping () -> Void,
@@ -700,11 +704,10 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
         print("🚀 SSE Response Headers: \(httpResponse.allHeaderFields)")
 
         guard httpResponse.statusCode == 200 else {
-            DispatchQueue.main.async {
-                self.onError(
-                    APIError.httpError(httpResponse.statusCode, "HTTP \(httpResponse.statusCode)"))
-            }
-            completionHandler(.cancel)
+            // Store error status for later
+            errorStatusCode = httpResponse.statusCode
+            // Let it continue so we can capture the error body
+            completionHandler(.allow)
             return
         }
 
@@ -740,6 +743,12 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
         if let error = error {
             DispatchQueue.main.async {
                 self.onError(error)
+            }
+        } else if let statusCode = errorStatusCode {
+            // We had an HTTP error - report it with the collected buffer as the error body
+            print("🚨 HTTP Error \(statusCode) with body: \(buffer)")
+            DispatchQueue.main.async {
+                self.onError(APIError.httpError(statusCode, self.buffer))
             }
         } else {
             DispatchQueue.main.async {
