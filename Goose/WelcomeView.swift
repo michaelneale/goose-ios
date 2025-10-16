@@ -150,7 +150,6 @@ struct WelcomeView: View {
             VStack {
                 WelcomeCard(
                     showingSidebar: $showingSidebar,
-                    tokenCount: tokenCount,
                     onAnimationComplete: {
                         // Show trial mode card if in trial mode
                         if apiService.isTrialMode {

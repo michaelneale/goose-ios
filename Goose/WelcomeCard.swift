@@ -13,8 +13,8 @@ struct WelcomeCard: View {
     @State private var progressValue: CGFloat = 0.0
     @State private var showActionsSection = false
     
-    // Token data
-    let tokenCount: Int64
+    // Token data - managed internally
+    @State private var tokenCount: Int64 = 0
     private let maxTokens: Int64 = 1_000_000_000 // 1 billion
     
     // Callbacks for animation completion
@@ -25,6 +25,18 @@ struct WelcomeCard: View {
         colorScheme == .dark ?
         Color(red: 0.15, green: 0.15, blue: 0.18) :
         Color(red: 0.98, green: 0.98, blue: 0.99)
+    }
+    
+    // Progress bar colors with better contrast
+    private var progressBackgroundColor: Color {
+        colorScheme == .dark ?
+        Color.white.opacity(0.15) :
+        Color.black.opacity(0.1)
+    }
+    
+    private var progressForegroundColor: Color {
+        // Use blue for better visibility
+        Color.blue
     }
     
     // Computed property for time-aware greeting
@@ -119,21 +131,21 @@ struct WelcomeCard: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // Progress bar
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(colorScheme == .dark ? 
-                                  Color(red: 0.10, green: 0.10, blue: 0.13) : 
-                                  Color(red: 0.95, green: 0.95, blue: 0.95))
-                            .frame(height: 12)
-                        
-                        GeometryReader { geometry in
+                    // Progress bar with better visibility
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(colorScheme == .dark ? Color.white : Color.black)
-                                .frame(width: geometry.size.width * progressValue, height: 12)
+                                .fill(progressBackgroundColor)
+                                .frame(width: geometry.size.width, height: 4)
+                            
+                            // Foreground (animated) - BLUE for testing
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(progressForegroundColor)
+                                .frame(width: geometry.size.width * progressValue, height: 4)
                         }
                     }
-                    .frame(height: 12)
+                    .frame(height: 4)
                 }
                 .transition(.opacity)
             }
@@ -169,6 +181,30 @@ struct WelcomeCard: View {
         )
         .onAppear {
             startTypewriterEffect()
+            // Fetch token count
+            Task {
+                await fetchTokenCount()
+            }
+        }
+    }
+    
+    // Fetch token count from API
+    private func fetchTokenCount() async {
+        let insights = await GooseAPIService.shared.fetchInsights()
+        
+        await MainActor.run {
+            if let insights = insights {
+                tokenCount = insights.totalTokens
+                print("Fetched token count: \(tokenCount)")
+                
+                // Update progress bar if it's already visible
+                if showProgressSection {
+                    let percentage = Double(tokenCount) / Double(maxTokens)
+                    withAnimation(.easeOut(duration: 0.8)) {
+                        progressValue = CGFloat(min(percentage, 1.0))
+                    }
+                }
+            }
         }
     }
     
@@ -201,9 +237,10 @@ struct WelcomeCard: View {
                             showProgressSection = true
                         }
                         
-                        // Animate progress bar
+                        // Animate progress bar with current token count
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                             let percentage = Double(tokenCount) / Double(maxTokens)
+                            print("Animating progress bar: tokenCount=\(tokenCount), percentage=\(percentage)")
                             withAnimation(.easeOut(duration: 0.8)) {
                                 progressValue = CGFloat(min(percentage, 1.0))
                             }
@@ -216,14 +253,6 @@ struct WelcomeCard: View {
                     }
                 }
             }
-        }
-    }
-    
-    // Update progress bar value (for external updates)
-    func updateProgress() {
-        let percentage = Double(tokenCount) / Double(maxTokens)
-        withAnimation(.easeOut(duration: 0.5)) {
-            progressValue = CGFloat(min(percentage, 1.0))
         }
     }
     
@@ -247,8 +276,7 @@ struct WelcomeCard: View {
         
         VStack(spacing: 0) {
             WelcomeCard(
-                showingSidebar: .constant(false),
-                tokenCount: 450_000_000
+                showingSidebar: .constant(false)
             )
             
             Spacer()
