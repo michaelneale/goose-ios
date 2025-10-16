@@ -20,7 +20,6 @@ struct WelcomeView: View {
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
     @State private var showTrialModeCard = false
-    @State private var tokenCount: Int64 = 0
     
     // Access API service for trial mode check
     @StateObject private var apiService = GooseAPIService.shared
@@ -34,55 +33,6 @@ struct WelcomeView: View {
                         // Spacer for the card (dynamic based on card height)
                         Color.clear
                             .frame(height: 300) // Approximate height, adjust if needed
-                        
-                        // Trial Mode Indicator Card - Always show if in trial mode
-                        if apiService.isTrialMode && showTrialModeCard {
-                            Button(action: {
-                                showTrialInstructions = true
-                            }) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "info.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.blue)
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Trial Mode")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(.primary)
-                                        
-                                        Text("Connect to your personal goose agent for the full experience")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(2)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(colorScheme == .dark ?
-                                              Color(red: 0.15, green: 0.15, blue: 0.18) :
-                                              Color(red: 0.96, green: 0.96, blue: 0.98))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .strokeBorder(
-                                            colorScheme == .dark ?
-                                            Color(red: 0.25, green: 0.25, blue: 0.28) :
-                                            Color(red: 0.88, green: 0.88, blue: 0.90),
-                                            lineWidth: 1
-                                        )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                        }
                         
                         // Recent Sessions Section
                         VStack(alignment: .leading, spacing: 16) {
@@ -136,12 +86,16 @@ struct WelcomeView: View {
                     await loadRecentSessions()
                 }
                 
-                // Bottom input area - using shared ChatInputView
+                // Chat input with trial banner
                 ChatInputView(
                     text: $inputText,
                     voiceManager: voiceManager,
                     onSubmit: {
                         onStartChat(inputText)
+                    },
+                    showTrialBanner: apiService.isTrialMode && showTrialModeCard,
+                    onTrialBannerTap: {
+                        showTrialInstructions = true
                     }
                 )
             }
@@ -232,11 +186,6 @@ struct WelcomeView: View {
         let (insights, sessions) = await (insightsTask, sessionsTask)
         
         await MainActor.run {
-            // Update token count from insights
-            if let insights = insights {
-                tokenCount = insights.totalTokens
-            }
-            
             recentSessions = Array(sessions.prefix(3))
             isLoadingSessions = false
             
