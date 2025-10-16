@@ -30,8 +30,7 @@ class GooseAPIService: ObservableObject {
         workingDirectory: String = "/tmp",
         onEvent: @escaping (SSEEvent) -> Void,
         onComplete: @escaping () -> Void,
-        onError: @escaping (Error) -> Void,
-        retryAttempt: Int = 0
+        onError: @escaping (Error) -> Void
     ) async -> URLSessionDataTask? {
 
         guard let url = URL(string: "\(baseURL)/reply") else {
@@ -58,7 +57,7 @@ class GooseAPIService: ObservableObject {
             urlRequest.httpBody = requestData
 
             // Debug logging
-            print("🚀 Starting SSE stream to: \(url)\(retryAttempt > 0 ? " (RETRY #\(retryAttempt))" : "")")
+            print("🚀 Starting SSE stream to: \(url)")
             print("🚀 Session ID: \(sessionId ?? "nil")")
             print("🚀 Number of messages: \(messages.count)")
             print("🚀 Headers: \(urlRequest.allHTTPHeaderFields ?? [:])")
@@ -80,45 +79,12 @@ class GooseAPIService: ObservableObject {
             return nil
         }
 
-        // Retry handler with exponential backoff (indefinite retries until user leaves screen)
-        let retryHandler: (Error) -> Void = { [weak self] error in
-            guard let self = self else { return }
-            
-            // Check error type - only retry network errors and server errors
-            let shouldRetry = self.isRetryableError(error)
-            guard shouldRetry else {
-                print("🚨 Error is not retryable: \(error.localizedDescription)")
-                onError(error)
-                return
-            }
-            
-            // Exponential backoff: 1s, 2s, 4s, 8s, 16s, then cap at 30s
-            // This prevents extremely long waits while still backing off
-            let baseDelay = pow(2.0, Double(retryAttempt))
-            let delay = min(baseDelay, 30.0) // Cap at 30 seconds
-            print("⚠️ Stream failed, retrying in \(delay)s (attempt #\(retryAttempt + 1))")
-            print("   Error: \(error.localizedDescription)")
-            
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                
-                _ = await self.startChatStreamWithSSE(
-                    messages: messages,
-                    sessionId: sessionId,
-                    workingDirectory: workingDirectory,
-                    onEvent: onEvent,
-                    onComplete: onComplete,
-                    onError: onError,
-                    retryAttempt: retryAttempt + 1
-                )
-            }
-        }
-
         // Create a custom URLSessionDataDelegate to handle streaming
+        // Errors are handled by ChatView which switches to polling mode
         let delegate = SSEDelegate(
             onEvent: onEvent,
             onComplete: onComplete,
-            onError: retryHandler
+            onError: onError
         )
 
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
@@ -232,6 +198,13 @@ class GooseAPIService: ObservableObject {
 
             let body: [String: Any] = ["session_id": sessionId]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            // Debug logging
+            print("📤 Resuming session: '\(sessionId)'")
+            print("📤 URL: \(url)")
+            if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
+                print("📤 Request body: \(bodyString)")
+            }
 
             let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -835,34 +808,5 @@ enum APIError: Error, LocalizedError {
         case .decodingError(let error):
             return "Decoding error: \(error.localizedDescription)"
         }
-    }
-}
-
-// MARK: - Network Retry Helper
-extension GooseAPIService {
-    /// Determines if an error is retryable (network issues, server errors)
-    func isRetryableError(_ error: Error) -> Bool {
-        // Network errors: connection lost, timeout, etc.
-        if let urlError = error as? URLError {
-            switch urlError.code {
-            case .notConnectedToInternet,
-                 .networkConnectionLost,
-                 .timedOut,
-                 .cannotConnectToHost,
-                 .cannotFindHost,
-                 .dnsLookupFailed,
-                 .dataNotAllowed:
-                return true
-            default:
-                return false
-            }
-        }
-        
-        // HTTP 5xx errors (server errors)
-        if case let APIError.httpError(code, _) = error {
-            return code >= 500
-        }
-        
-        return false
     }
 }

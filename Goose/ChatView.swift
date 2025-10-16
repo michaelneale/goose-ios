@@ -14,7 +14,7 @@ struct ChatView: View {
     @State private var toolCallMessageMap: [String: String] = [:]
     @State private var currentSessionId: String?
     @State private var isSettingsPresented = false
-    
+
     // Session polling for live updates
     @State private var isPollingForUpdates = false
     @State private var pollingTask: Task<Void, Never>?
@@ -81,7 +81,7 @@ struct ChatView: View {
                                 HStack {
                                     ProgressView()
                                         .scaleEffect(0.8)
-                                    Text("🔄 Catching up...")
+                                    Text("🔄 Following along...")
                                         .font(.caption)
                                         .foregroundColor(.orange)
                                     Spacer()
@@ -160,7 +160,7 @@ struct ChatView: View {
             // Floating input area - using shared ChatInputView
             VStack {
                 Spacer()
-                
+
                 ChatInputView(
                     text: $inputText,
                     showPlusButton: true,
@@ -189,7 +189,7 @@ struct ChatView: View {
                             .foregroundColor(.blue)
                     }
                     .buttonStyle(.plain)
-                    
+
                     // Sidebar button
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -202,13 +202,13 @@ struct ChatView: View {
                             .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
-                    
+
                     // Session name
                     Text(currentSessionId != nil ? "Session" : "New Session")
                         .font(.system(size: 16))
                         .foregroundColor(.primary)
                         .lineLimit(1)
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -256,7 +256,7 @@ struct ChatView: View {
                     sendMessage()
                 }
             }
-            
+
             // Listen for session load from WelcomeView
             NotificationCenter.default.addObserver(
                 forName: Notification.Name("LoadSession"),
@@ -300,7 +300,7 @@ struct ChatView: View {
 
         // Re-enable auto-scroll when user sends a new message
         shouldAutoScroll = true
-        
+
         // Stop polling and switch to real-time streaming
         stopPollingForUpdates()
 
@@ -364,16 +364,26 @@ struct ChatView: View {
                         currentStreamTask = nil
                     },
                     onError: { error in
-                        isLoading = false
+                        print("🚨 SSE Stream Error: \(error)")
+                        
+                        // Don't retry SSE - switch to polling mode instead
+                        // This avoids duplicate work and handles network failures gracefully
                         currentStreamTask = nil
-
-                        print("🚨 Chat Error: \(error)")
-
-                        let errorMessage = Message(
-                            role: .assistant,
-                            text: "❌ Error: \(error.localizedDescription)"
-                        )
-                        messages.append(errorMessage)
+                        
+                        print("🔄 SSE failed, switching to polling mode to check for response...")
+                        
+                        // Start polling to check if response completed server-side
+                        if let pollingSessionId = currentSessionId {
+                            startPollingForUpdates(sessionId: pollingSessionId)
+                        } else {
+                            // No session ID, can't poll - show error
+                            isLoading = false
+                            let errorMessage = Message(
+                                role: .assistant,
+                                text: "❌ Connection failed: \(error.localizedDescription)"
+                            )
+                            messages.append(errorMessage)
+                        }
                     }
                 )
             } catch {
@@ -536,37 +546,37 @@ struct ChatView: View {
         currentStreamTask?.cancel()
         currentStreamTask = nil
         isLoading = false
-        stopPollingForUpdates() // Also stop polling if any
+        stopPollingForUpdates()  // Also stop polling if any
     }
-    
+
     // MARK: - Session Polling for Live Updates
-    
+
     /// Check if we should poll for updates based on message state
     private func shouldPollForUpdates(_ messages: [Message]) -> Bool {
         guard let lastMessage = messages.last else {
             print("🔍 No messages, no polling")
             return false
         }
-        
+
         // created timestamp - detect if it's in seconds or milliseconds
         // If > year 2100 in seconds (4102444800), it's probably milliseconds
         let createdTimestamp = lastMessage.created
         let createdDate: Date
-        if createdTimestamp > 4102444800 {
+        if createdTimestamp > 4_102_444_800 {
             // Likely milliseconds
             createdDate = Date(timeIntervalSince1970: TimeInterval(createdTimestamp) / 1000.0)
         } else {
             // Likely seconds
             createdDate = Date(timeIntervalSince1970: TimeInterval(createdTimestamp))
         }
-        
+
         let age = Date().timeIntervalSince(createdDate)
-        
+
         print("🔍 Last message role: \(lastMessage.role), age: \(Int(age))s")
-        
+
         // Always poll if last message is recent (< 5 minutes)
         // This catches both waiting-for-response and mid-response scenarios
-        let shouldPoll = age < 300 && age > -60 // 5 minutes, but also check for future dates
+        let shouldPoll = age < 300 && age > -60  // 5 minutes, but also check for future dates
         if shouldPoll {
             print("🔍 ✅ Will start polling")
         } else {
@@ -574,56 +584,56 @@ struct ChatView: View {
         }
         return shouldPoll
     }
-    
+
     /// Start polling for new messages in resumed session
     private func startPollingForUpdates(sessionId: String) {
-        stopPollingForUpdates() // Cancel any existing polling
-        
+        stopPollingForUpdates()  // Cancel any existing polling
+
         print("📡 Starting polling for session: \(sessionId)")
         isPollingForUpdates = true
-        
+
         // Store a hash of current messages for comparison
         let initialHash = messagesHash(messages)
-        
+
         pollingTask = Task {
             var noChangeCount = 0
-            var pollInterval: TimeInterval = 2.0 // Start at 2 seconds for faster detection
-            let maxNoChangeChecks = 10 // 10 checks with no change = ~20 seconds
+            var pollInterval: TimeInterval = 2.0  // Start at 2 seconds for faster detection
+            let maxNoChangeChecks = 10  // 10 checks with no change = ~20 seconds
             var lastHash = initialHash
-            
+
             while !Task.isCancelled && noChangeCount < maxNoChangeChecks {
                 // Wait before next poll
                 try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
-                
+
                 guard !Task.isCancelled else { break }
-                
+
                 do {
                     // Fetch latest messages from server
                     let (_, newMessages) = try await apiService.resumeAgent(sessionId: sessionId)
                     let newHash = messagesHash(newMessages)
-                    
+
                     await MainActor.run {
                         if newHash != lastHash {
                             // Content changed!
                             print("📡 Polling detected changes (hash: \(lastHash) -> \(newHash))")
-                            
+
                             // Update messages
                             messages = newMessages
-                            
+
                             // Rebuild tool call state from messages
                             rebuildToolCallState(from: newMessages)
-                            
+
                             noChangeCount = 0
                             lastHash = newHash
                             scrollRefreshTrigger = UUID()
-                            
+
                             // Reset poll interval when we find changes
                             pollInterval = 2.0
                         } else {
                             // No changes
                             noChangeCount += 1
                             print("📡 Poll check \(noChangeCount)/\(maxNoChangeChecks): no changes")
-                            
+
                             // Exponential backoff up to 5 seconds
                             if noChangeCount > 3 {
                                 pollInterval = min(pollInterval * 1.3, 5.0)
@@ -633,17 +643,19 @@ struct ChatView: View {
                 } catch {
                     // Check if it's a 404 - session might have been deleted
                     if case APIError.httpError(let code, let message) = error, code == 404 {
-                        print("⚠️ Polling got 404 for session \(sessionId) - session no longer exists, stopping polling")
+                        print(
+                            "⚠️ Polling got 404 for session \(sessionId) - session no longer exists, stopping polling"
+                        )
                         await MainActor.run {
                             isPollingForUpdates = false
                         }
-                        break // Stop polling completely
+                        break  // Stop polling completely
                     }
-                    
+
                     print("⚠️ Polling error for session \(sessionId): \(error)")
                     // Don't stop on other errors, but increment no-change count
                     noChangeCount += 1
-                    
+
                     // If we get too many errors, stop polling
                     if noChangeCount >= maxNoChangeChecks {
                         print("⚠️ Too many polling errors, stopping")
@@ -651,15 +663,17 @@ struct ChatView: View {
                     }
                 }
             }
-            
+
             // Polling finished
             await MainActor.run {
                 isPollingForUpdates = false
-                print("✅ Polling stopped after \(noChangeCount >= maxNoChangeChecks ? "timeout" : "cancellation")")
+                print(
+                    "✅ Polling stopped after \(noChangeCount >= maxNoChangeChecks ? "timeout" : "cancellation")"
+                )
             }
         }
     }
-    
+
     /// Generate hash of messages for change detection
     private func messagesHash(_ messages: [Message]) -> String {
         // Create a string representation of key message properties
@@ -675,25 +689,25 @@ struct ChatView: View {
             }.joined(separator: "|")
             return "\(msg.id):\(msg.role):\(contentStr)"
         }.joined(separator: ";")
-        
+
         // Simple hash - just use count + first 100 chars
         let preview = String(content.prefix(100))
         return "\(messages.count):\(content.count):\(preview)"
     }
-    
+
     /// Rebuild activeToolCalls and completedToolCalls from messages
     private func rebuildToolCallState(from messages: [Message]) {
         print("🔧 Rebuilding tool call state from \(messages.count) messages")
-        
+
         // Clear existing state
         var newActiveToolCalls: [String: ToolCallWithTiming] = [:]
         var newCompletedToolCalls: [String: CompletedToolCall] = [:]
         var newToolCallMessageMap: [String: String] = [:]
-        
+
         // Track which tool requests have responses
         var toolRequestIds = Set<String>()
         var toolResponseIds = Set<String>()
-        
+
         // First pass: collect all IDs
         for message in messages {
             for content in message.content {
@@ -707,22 +721,23 @@ struct ChatView: View {
                 }
             }
         }
-        
+
         // Second pass: categorize as active or completed
         for message in messages {
             for content in message.content {
                 switch content {
                 case .toolRequest(let toolRequest):
                     newToolCallMessageMap[toolRequest.id] = message.id
-                    
+
                     if !toolResponseIds.contains(toolRequest.id) {
                         // No response yet - this is active
                         newActiveToolCalls[toolRequest.id] = ToolCallWithTiming(
                             toolCall: toolRequest.toolCall,
-                            startTime: Date(timeIntervalSince1970: TimeInterval(message.created) / 1000.0)
+                            startTime: Date(
+                                timeIntervalSince1970: TimeInterval(message.created) / 1000.0)
                         )
                     }
-                    
+
                 case .toolResponse(let toolResponse):
                     // Find the corresponding request
                     if let requestMessage = messages.first(where: { msg in
@@ -740,12 +755,16 @@ struct ChatView: View {
                             }
                             return false
                         }),
-                           case .toolRequest(let toolRequest) = requestContent {
-                            
-                            let startTime = Date(timeIntervalSince1970: TimeInterval(requestMessage.created) / 1000.0)
-                            let endTime = Date(timeIntervalSince1970: TimeInterval(message.created) / 1000.0)
+                            case .toolRequest(let toolRequest) = requestContent
+                        {
+
+                            let startTime = Date(
+                                timeIntervalSince1970: TimeInterval(requestMessage.created) / 1000.0
+                            )
+                            let endTime = Date(
+                                timeIntervalSince1970: TimeInterval(message.created) / 1000.0)
                             let duration = endTime.timeIntervalSince(startTime)
-                            
+
                             newCompletedToolCalls[toolResponse.id] = CompletedToolCall(
                                 toolCall: toolRequest.toolCall,
                                 result: toolResponse.toolResult,
@@ -754,21 +773,23 @@ struct ChatView: View {
                             )
                         }
                     }
-                    
+
                 default:
                     break
                 }
             }
         }
-        
+
         // Update state
         activeToolCalls = newActiveToolCalls
         completedToolCalls = newCompletedToolCalls
         toolCallMessageMap = newToolCallMessageMap
-        
-        print("🔧 Rebuilt: \(newActiveToolCalls.count) active, \(newCompletedToolCalls.count) completed")
+
+        print(
+            "🔧 Rebuilt: \(newActiveToolCalls.count) active, \(newCompletedToolCalls.count) completed"
+        )
     }
-    
+
     /// Stop polling for updates
     private func stopPollingForUpdates() {
         if let task = pollingTask {
@@ -918,7 +939,7 @@ struct ChatView: View {
                         shouldAutoScroll = true
                         scrollRefreshTrigger = UUID()  // Force UI refresh and scroll
                     }
-                    
+
                     // Check if we should start polling for live updates
                     if shouldPollForUpdates(sessionMessages) {
                         print("🔄 Session appears to be waiting for response, starting polling...")
@@ -1004,5 +1025,6 @@ struct CompletedToolCall {
 }
 
 #Preview {
-    ChatView(showingSidebar: .constant(false), onBackToWelcome: {}, voiceManager: EnhancedVoiceManager())
+    ChatView(
+        showingSidebar: .constant(false), onBackToWelcome: {}, voiceManager: EnhancedVoiceManager())
 }
