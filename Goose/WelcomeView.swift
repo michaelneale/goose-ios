@@ -14,6 +14,7 @@ struct WelcomeView: View {
     @State private var recentSessions: [ChatSession] = []
     @State private var isLoadingSessions = true
     @State private var isSettingsPresented = false
+    @State private var showTrialInstructions = false
     
     // Animation states
     @State private var displayedText = ""
@@ -97,11 +98,10 @@ struct WelcomeView: View {
                     }
                     .padding(.top, 32)
                     
-                    // Trial Mode Indicator Card
-                    if showTrialModeCard && apiService.isTrialMode {
+                    // Trial Mode Indicator Card - Always show if in trial mode
+                    if apiService.isTrialMode {
                         Button(action: {
-                            // TODO: Navigate to connection settings
-                            print("Connect to personal agent tapped")
+                            showTrialInstructions = true
                         }) {
                             HStack(spacing: 12) {
                                 Image(systemName: "info.circle.fill")
@@ -234,6 +234,9 @@ struct WelcomeView: View {
                 }
                 .padding(.horizontal, 16)
             }
+            .refreshable {
+                await loadRecentSessions()
+            }
             
             // Bottom input area - using shared ChatInputView
             ChatInputView(
@@ -247,6 +250,9 @@ struct WelcomeView: View {
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
+        }
+        .sheet(isPresented: $showTrialInstructions) {
+            TrialModeInstructionsView()
         }
         .onChange(of: voiceManager.transcribedText) { newText in
             // Update input text with transcribed text in real-time
