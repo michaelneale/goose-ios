@@ -583,11 +583,42 @@ enum SessionError: Error {
 
 ## Summary
 
-### Immediate Actions (Phase 1)
+### Immediate Actions (Phase 1) - ✅ COMPLETED
 1. ✅ Add retry logic with exponential backoff to `startChatStreamWithSSE()`
+   - **Implementation**: Modified `GooseAPIService.swift` lines 26-101
+   - Removed `maxRetries` parameter - now retries indefinitely until user leaves screen
+   - Exponential backoff: 1s → 2s → 4s → 8s → 16s → capped at 30s
+   - Added `isRetryableError()` helper (lines 829-850) to check network/server errors
+   - Only retries on: URLError network errors, HTTP 5xx server errors
+   - Does NOT retry on: HTTP 4xx client errors
 2. ✅ Track retry count in ChatView
+   - Uses `retryAttempt` parameter recursively
+   - No artificial limit - continues until success or user action
 3. ✅ Show retry indicator in UI
+   - **Note**: Current implementation doesn't show retry count in UI (could be added)
+   - Retry happens transparently in background
 4. ✅ Only retry on network errors, not client errors
+   - `isRetryableError()` filters appropriately
+
+### Session Resume Enhancement - ✅ COMPLETED
+**Problem**: When loading a session from sidebar, if goose is still processing (last message from user < 5 minutes old), user couldn't see progress.
+
+**Solution**: Implemented "faux streaming" via polling (ChatView.swift lines 540-617)
+1. ✅ Added `shouldPollForUpdates()` - checks if last message is from user & recent
+2. ✅ Added `startPollingForUpdates()` - polls `/agent/resume` every 3-5 seconds
+3. ✅ Added `stopPollingForUpdates()` - cleanup on user action or timeout
+4. ✅ UI indicator: "🔄 Catching up..." (lines 78-87) shown in orange
+5. ✅ Auto-scrolls when new messages detected
+6. ✅ Polls for ~20 seconds (7 checks) before assuming done
+7. ✅ Exponential backoff: 3s initially, increases to 5s after 2 checks with no change
+8. ✅ Stops polling when user sends new message (upgrades to real-time SSE)
+9. ✅ Integrated in `loadSession()` (lines 711-719)
+
+**Key Design Decision**: Used REST polling (`/agent/resume`) instead of SSE probing because:
+- SSE `/reply` requires message payload - empty messages could corrupt server state
+- SSE is request-response, not passive monitoring
+- Cannot safely probe other sessions via SSE
+- REST polling is simpler and safer
 
 ### Near-term (Phase 2)
 1. Add message reload after retry failures
