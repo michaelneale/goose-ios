@@ -2,10 +2,14 @@ import SwiftUI
 
 struct NodeMatrix: View {
     let sessions: [ChatSession]
+    let selectedSessionId: String?
+    let onNodeTap: (ChatSession) -> Void
     @Environment(\.colorScheme) var colorScheme
     @State private var daysOffset: Int = 0 // 0 = today, 1 = yesterday, etc.
     @State private var dragOffset: CGFloat = 0
     @GestureState private var isDragging: Bool = false
+    @State private var selectedSessionMessages: [Message] = []
+    @State private var isLoadingMessages = false
     
     // Get the date for the current offset
     private var targetDate: Date {
@@ -56,123 +60,155 @@ struct NodeMatrix: View {
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                // Background
-                Color.clear
-                
-                // Main content
-                VStack(spacing: 0) {
-                    // Date label header - left aligned
-                    HStack {
-                        HStack(spacing: 8) {
-                            Text(dateLabel)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.primary)
-                            
-                            // Right indicator (for going to past)
-                            Image(systemName: "chevron.right")
+            VStack(spacing: 0) {
+                // Date label header - left aligned
+                HStack {
+                    HStack(spacing: 8) {
+                        Text(dateLabel)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                        
+                        // Right indicator (for going to past)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary.opacity(0.5))
+                        
+                        // Left indicator (only show if not on today)
+                        if daysOffset > 0 {
+                            Image(systemName: "chevron.left")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(.secondary.opacity(0.5))
-                            
-                            // Left indicator (only show if not on today)
-                            if daysOffset > 0 {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 10, weight: .semibold))
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.top, 24)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+                
+                // Node content area - fills all available space
+                GeometryReader { nodeGeometry in
+                    ZStack {
+                        // Empty state
+                        if daySessions.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "calendar.badge.clock")
+                                    .font(.system(size: 32))
                                     .foregroundColor(.secondary.opacity(0.5))
+                                
+                                Text("No sessions on \(dateLabel.lowercased())")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary)
                             }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                         
-                        Spacer()
-                    }
-                    .padding(.top, 32)
-                    .padding(.horizontal, 16)
-                    
-                    Spacer()
-                    
-                    // Node content area - centered
-                    GeometryReader { nodeGeometry in
-                        ZStack {
-                            // Empty state
-                            if daySessions.isEmpty {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "calendar.badge.clock")
-                                        .font(.system(size: 32))
-                                        .foregroundColor(.secondary.opacity(0.5))
+                        // Draw connections (lines between nodes)
+                        if daySessions.count > 1 {
+                            Path { path in
+                                for i in 0..<(daySessions.count - 1) {
+                                    let startPoint = nodePosition(for: i, session: daySessions[i], in: nodeGeometry.size, allSessions: daySessions)
+                                    let endPoint = nodePosition(for: i + 1, session: daySessions[i + 1], in: nodeGeometry.size, allSessions: daySessions)
                                     
-                                    Text("No sessions on \(dateLabel.lowercased())")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.secondary)
+                                    path.move(to: startPoint)
+                                    path.addLine(to: endPoint)
                                 }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
+                            .stroke(
+                                colorScheme == .dark ?
+                                Color.white.opacity(0.15) :
+                                Color.black.opacity(0.1),
+                                style: StrokeStyle(lineWidth: 1, lineCap: .round)
+                            )
+                        }
+                        
+                        // Draw session nodes (now tappable with highlight)
+                        ForEach(Array(daySessions.enumerated()), id: \.element.id) { index, session in
+                            let position = nodePosition(for: index, session: session, in: nodeGeometry.size, allSessions: daySessions)
+                            let isSelected = selectedSessionId == session.id
                             
-                            // Draw connections (lines between nodes)
-                            if daySessions.count > 1 {
-                                Path { path in
-                                    for i in 0..<(daySessions.count - 1) {
-                                        let startPoint = nodePosition(for: i, session: daySessions[i], in: nodeGeometry.size, allSessions: daySessions)
-                                        let endPoint = nodePosition(for: i + 1, session: daySessions[i + 1], in: nodeGeometry.size, allSessions: daySessions)
-                                        
-                                        path.move(to: startPoint)
-                                        path.addLine(to: endPoint)
+                            Button(action: {
+                                onNodeTap(session)
+                            }) {
+                                ZStack {
+                                    // Outer tap target (invisible)
+                                    Circle()
+                                        .fill(Color.clear)
+                                        .frame(width: 32, height: 32)
+                                    
+                                    // Highlight ring for selected node
+                                    if isSelected {
+                                        Circle()
+                                            .stroke(Color.blue, lineWidth: 2)
+                                            .frame(width: 20, height: 20)
+                                            .transition(.scale.combined(with: .opacity))
                                     }
+                                    
+                                    // Inner node
+                                    Circle()
+                                        .fill(
+                                            isSelected ?
+                                            Color.blue :
+                                            (colorScheme == .dark ?
+                                             Color.white.opacity(0.5) :
+                                             Color.black.opacity(0.3))
+                                        )
+                                        .frame(width: 8, height: 8)
                                 }
-                                .stroke(
-                                    colorScheme == .dark ?
-                                    Color.white.opacity(0.15) :
-                                    Color.black.opacity(0.1),
-                                    style: StrokeStyle(lineWidth: 1, lineCap: .round)
-                                )
                             }
+                            .buttonStyle(.plain)
+                            .position(position)
+                        }
+                        
+                        // Draw message nodes for selected session
+                        if let selectedId = selectedSessionId,
+                           let selectedSession = daySessions.first(where: { $0.id == selectedId }),
+                           let sessionIndex = daySessions.firstIndex(where: { $0.id == selectedId }),
+                           !selectedSessionMessages.isEmpty {
                             
-                            // Draw nodes
-                            ForEach(Array(daySessions.enumerated()), id: \.element.id) { index, session in
-                                let position = nodePosition(for: index, session: session, in: nodeGeometry.size, allSessions: daySessions)
-                                
-                                Circle()
-                                    .fill(
-                                        colorScheme == .dark ?
-                                        Color.white.opacity(0.3) :
-                                        Color.black.opacity(0.2)
-                                    )
-                                    .frame(width: 8, height: 8)
-                                    .position(position)
-                            }
+                            let sessionPosition = nodePosition(for: sessionIndex, session: selectedSession, in: nodeGeometry.size, allSessions: daySessions)
+                            
+                            MessageNodesOverlay(
+                                messages: selectedSessionMessages,
+                                centerPosition: sessionPosition,
+                                colorScheme: colorScheme
+                            )
                         }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 16)
-                    .id(daysOffset)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: dragOffset > 0 ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: dragOffset > 0 ? .leading : .trailing).combined(with: .opacity)
-                    ))
-                    .offset(x: dragOffset)
-                    
-                    Spacer()
-                    
-                    // Session count indicator - positioned at bottom
-                    if !daySessions.isEmpty {
-                        HStack {
-                            Text("\(daySessions.count) session\(daySessions.count == 1 ? "" : "s")")
-                                .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.6))
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 32)
-                    } else {
-                        HStack {
-                            Text("Swipe left or right")
-                                .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.5))
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 32)
                     }
                 }
+                .padding(.horizontal, 16)
+                .id(daysOffset)
+                .transition(.asymmetric(
+                    insertion: .move(edge: dragOffset > 0 ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: dragOffset > 0 ? .leading : .trailing).combined(with: .opacity)
+                ))
+                .offset(x: dragOffset)
+                
+                // Session count indicator - positioned at bottom with minimal padding
+                if !daySessions.isEmpty {
+                    HStack {
+                        Text("\(daySessions.count) session\(daySessions.count == 1 ? "" : "s")")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.6))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                } else {
+                    HStack {
+                        Text("Swipe left or right")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
             .highPriorityGesture(
                 DragGesture(minimumDistance: 30)
@@ -210,6 +246,32 @@ struct NodeMatrix: View {
                     }
             )
         }
+        .onChange(of: selectedSessionId) { oldValue, newValue in
+            // Clear messages immediately when selection changes
+            selectedSessionMessages = []
+            
+            if let sessionId = newValue {
+                Task {
+                    await loadMessagesForSession(sessionId)
+                }
+            }
+        }
+    }
+    
+    // Load messages for selected session
+    private func loadMessagesForSession(_ sessionId: String) async {
+        isLoadingMessages = true
+        
+        do {
+            let result = try await GooseAPIService.shared.resumeAgent(sessionId: sessionId)
+            await MainActor.run {
+                selectedSessionMessages = result.messages
+            }
+        } catch {
+            print("Error loading messages: \(error)")
+        }
+        
+        isLoadingMessages = false
     }
     
     // Calculate position for each node - centered and better distributed
@@ -218,7 +280,7 @@ struct NodeMatrix: View {
         
         // Use more conservative padding to keep nodes centered
         let paddingX: CGFloat = size.width * 0.15
-        let paddingY: CGFloat = size.height * 0.25
+        let paddingY: CGFloat = size.height * 0.20
         let availableWidth = size.width - (paddingX * 2)
         let availableHeight = size.height - (paddingY * 2)
         
@@ -265,7 +327,7 @@ struct NodeMatrix: View {
         
         // Reduce spread to keep nodes more centered
         let clusterSpreadX: CGFloat = 0.15
-        let clusterSpreadY: CGFloat = 0.2
+        let clusterSpreadY: CGFloat = 0.25
         
         let offsetX = (random1 * 0.5 + 0.5) * clusterSpreadX - (clusterSpreadX / 2)
         let offsetY = (random2 * 0.5 + 0.5) * clusterSpreadY - (clusterSpreadY / 2)
@@ -297,6 +359,70 @@ struct NodeMatrix: View {
     }
 }
 
+// MARK: - Message Nodes Overlay
+struct MessageNodesOverlay: View {
+    let messages: [Message]
+    let centerPosition: CGPoint
+    let colorScheme: ColorScheme
+    
+    var body: some View {
+        ZStack {
+            // Draw connecting lines between message nodes
+            if messages.count > 1 {
+                Path { path in
+                    for i in 0..<(messages.count - 1) {
+                        let startPos = messageNodePosition(for: i)
+                        let endPos = messageNodePosition(for: i + 1)
+                        
+                        path.move(to: startPos)
+                        path.addLine(to: endPos)
+                    }
+                }
+                .stroke(
+                    Color.blue.opacity(0.3),
+                    style: StrokeStyle(lineWidth: 1, lineCap: .round)
+                )
+            }
+            
+            // Draw message nodes
+            ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                let position = messageNodePosition(for: index)
+                
+                Circle()
+                    .fill(nodeColor(for: message.role))
+                    .frame(width: 4, height: 4)
+                    .position(position)
+            }
+        }
+    }
+    
+    // Calculate position for each message node in a circle around the session node
+    private func messageNodePosition(for index: Int) -> CGPoint {
+        let radius: CGFloat = 30
+        let angleStep = (2 * .pi) / CGFloat(messages.count)
+        let angle = angleStep * CGFloat(index) - (.pi / 2) // Start from top
+        
+        let x = centerPosition.x + radius * cos(angle)
+        let y = centerPosition.y + radius * sin(angle)
+        
+        return CGPoint(x: x, y: y)
+    }
+    
+    // Color based on message role
+    private func nodeColor(for role: MessageRole) -> Color {
+        switch role {
+        case .user:
+            return Color.blue.opacity(0.8)
+        case .assistant:
+            return colorScheme == .dark ?
+                Color.white.opacity(0.6) :
+                Color.black.opacity(0.4)
+        case .system:
+            return Color.gray.opacity(0.6)
+        }
+    }
+}
+
 #Preview {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
@@ -315,29 +441,18 @@ struct NodeMatrix: View {
         Color(UIColor.systemBackground)
             .ignoresSafeArea()
         
-        NodeMatrix(sessions: [
-            // Today
-            ChatSession(id: "1", description: "Early Morning", messageCount: 5, createdAt: dateString(daysAgo: 0, hoursAgo: 8), updatedAt: dateString(daysAgo: 0, hoursAgo: 8)),
-            ChatSession(id: "2", description: "Morning", messageCount: 12, createdAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30), updatedAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30)),
-            ChatSession(id: "3", description: "Late Morning", messageCount: 8, createdAt: dateString(daysAgo: 0, hoursAgo: 7), updatedAt: dateString(daysAgo: 0, hoursAgo: 7)),
-            ChatSession(id: "4", description: "Noon", messageCount: 3, createdAt: dateString(daysAgo: 0, hoursAgo: 5), updatedAt: dateString(daysAgo: 0, hoursAgo: 5)),
-            ChatSession(id: "5", description: "Afternoon", messageCount: 15, createdAt: dateString(daysAgo: 0, hoursAgo: 4), updatedAt: dateString(daysAgo: 0, hoursAgo: 4)),
-            ChatSession(id: "6", description: "Evening", messageCount: 7, createdAt: dateString(daysAgo: 0, hoursAgo: 2), updatedAt: dateString(daysAgo: 0, hoursAgo: 2)),
-            ChatSession(id: "7", description: "Now", messageCount: 2, createdAt: dateString(daysAgo: 0, hoursAgo: 0), updatedAt: dateString(daysAgo: 0, hoursAgo: 0)),
-            
-            // Yesterday
-            ChatSession(id: "8", description: "Yesterday Morning", messageCount: 10, createdAt: dateString(daysAgo: 1, hoursAgo: 8), updatedAt: dateString(daysAgo: 1, hoursAgo: 8)),
-            ChatSession(id: "9", description: "Yesterday Noon", messageCount: 6, createdAt: dateString(daysAgo: 1, hoursAgo: 5), updatedAt: dateString(daysAgo: 1, hoursAgo: 5)),
-            ChatSession(id: "10", description: "Yesterday Evening", messageCount: 8, createdAt: dateString(daysAgo: 1, hoursAgo: 2), updatedAt: dateString(daysAgo: 1, hoursAgo: 2)),
-            
-            // 2 days ago
-            ChatSession(id: "11", description: "Two Days Ago", messageCount: 5, createdAt: dateString(daysAgo: 2, hoursAgo: 6), updatedAt: dateString(daysAgo: 2, hoursAgo: 6)),
-            ChatSession(id: "12", description: "Two Days Ago PM", messageCount: 4, createdAt: dateString(daysAgo: 2, hoursAgo: 3), updatedAt: dateString(daysAgo: 2, hoursAgo: 3)),
-            
-            // 3 days ago
-            ChatSession(id: "13", description: "Three Days Ago", messageCount: 12, createdAt: dateString(daysAgo: 3, hoursAgo: 7), updatedAt: dateString(daysAgo: 3, hoursAgo: 7)),
-            ChatSession(id: "14", description: "Three Days Ago PM", messageCount: 9, createdAt: dateString(daysAgo: 3, hoursAgo: 4), updatedAt: dateString(daysAgo: 3, hoursAgo: 4))
-        ])
+        NodeMatrix(
+            sessions: [
+                // Today
+                ChatSession(id: "1", description: "Early Morning", messageCount: 5, createdAt: dateString(daysAgo: 0, hoursAgo: 8), updatedAt: dateString(daysAgo: 0, hoursAgo: 8)),
+                ChatSession(id: "2", description: "Morning", messageCount: 12, createdAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30), updatedAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30)),
+                ChatSession(id: "3", description: "Late Morning", messageCount: 8, createdAt: dateString(daysAgo: 0, hoursAgo: 7), updatedAt: dateString(daysAgo: 0, hoursAgo: 7)),
+            ],
+            selectedSessionId: "2",
+            onNodeTap: { session in
+                print("Tapped session: \(session.description)")
+            }
+        )
         .frame(height: 400)
     }
 }

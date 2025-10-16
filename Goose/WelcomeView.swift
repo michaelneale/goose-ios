@@ -21,61 +21,79 @@ struct WelcomeView: View {
     @State private var visibleSessionsCount = 0
     @State private var showTrialModeCard = false
     
+    // Session card state
+    @State private var selectedSession: ChatSession? = nil
+    @State private var showSessionCard = false
+    
     // Access API service for trial mode check
     @StateObject private var apiService = GooseAPIService.shared
     
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
-                // Main content with ScrollView
+                // Main content - use VStack with Spacer to push input to bottom
                 VStack(spacing: 0) {
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 0) {
-                            // Spacer for the card (dynamic based on card height)
-                            Color.clear
-                                .frame(height: 300) // Approximate height, adjust if needed
-                            
-                            // Node Matrix Section - fills remaining space dynamically
-                            if isLoadingSessions && showSessionsTitle {
-                                // Loading state
-                                HStack {
-                                    Spacer()
+                    // Spacer for the welcome card
+                    Color.clear
+                        .frame(height: 300)
+                    
+                    // Node Matrix Section - fills all remaining space above input
+                    ZStack {
+                        // Always render the space, just change the content
+                        if isLoadingSessions {
+                            // Loading state
+                            VStack {
+                                Spacer()
+                                if showSessionsTitle {
                                     ProgressView()
                                         .scaleEffect(0.8)
                                         .tint(.secondary)
-                                    Spacer()
+                                        .transition(.opacity)
                                 }
-                                .frame(height: calculateNodeMatrixHeight(for: geometry.size))
-                            } else if recentSessions.isEmpty && showSessionsTitle {
-                                // Empty state
-                                VStack(spacing: 8) {
-                                    Image(systemName: "calendar.badge.clock")
-                                        .font(.system(size: 32))
-                                        .foregroundColor(.secondary.opacity(0.5))
-                                    
-                                    Text("No sessions today")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .frame(height: calculateNodeMatrixHeight(for: geometry.size))
-                            } else if showSessionsTitle {
-                                // Node Matrix - expanded to fill space dynamically
-                                NodeMatrix(sessions: recentSessions)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: calculateNodeMatrixHeight(for: geometry.size))
-                                    .transition(.opacity)
+                                Spacer()
                             }
-                            
-                            Spacer(minLength: 80) // Reduced space for input box
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if recentSessions.isEmpty {
+                            // Empty state
+                            VStack {
+                                Spacer()
+                                if showSessionsTitle {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "calendar.badge.clock")
+                                            .font(.system(size: 32))
+                                            .foregroundColor(.secondary.opacity(0.5))
+                                        
+                                        Text("No sessions today")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .transition(.opacity)
+                                }
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // Node Matrix - fills all available space
+                            if showSessionsTitle {
+                                NodeMatrix(
+                                    sessions: recentSessions,
+                                    selectedSessionId: selectedSession?.id,
+                                    onNodeTap: { session in
+                                        handleNodeTap(session)
+                                    }
+                                )
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .transition(.opacity)
+                            } else {
+                                // Placeholder to maintain space before animation
+                                Color.clear
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
                         }
-                        .padding(.horizontal, 16)
                     }
-                    .refreshable {
-                        await loadRecentSessions()
-                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
-                    // Chat input with trial banner
+                    // Chat input at bottom - always present
                     ChatInputView(
                         text: $inputText,
                         voiceManager: voiceManager,
@@ -89,7 +107,7 @@ struct WelcomeView: View {
                     )
                 }
                 
-                // Welcome Card overlaid on top (full bleed)
+                // Welcome Card overlaid on top (full bleed) - always visible
                 VStack {
                     WelcomeCard(
                         showingSidebar: $showingSidebar,
@@ -103,7 +121,7 @@ struct WelcomeView: View {
                             
                             // Show sessions title
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                withAnimation(.easeOut(duration: 0.2)) {
+                                withAnimation(.easeOut(duration: 0.3)) {
                                     showSessionsTitle = true
                                 }
                             }
@@ -113,11 +131,34 @@ struct WelcomeView: View {
                     Spacer()
                 }
                 .zIndex(1)
-                .allowsHitTesting(true) // Allow interaction with the card
+                .allowsHitTesting(!showSessionCard) // Disable interaction when session card is showing
+                
+                // Sessions Card - slides in from top, overlays WelcomeCard
+                if showSessionCard, let session = selectedSession {
+                    VStack {
+                        SessionsCard(
+                            session: session,
+                            onClose: {
+                                handleCloseSessionCard()
+                            },
+                            onSessionSelect: { sessionId in
+                                onSessionSelect(sessionId)
+                                handleCloseSessionCard()
+                            }
+                        )
+                        
+                        Spacer()
+                    }
+                    .zIndex(2)
+                    .allowsHitTesting(true)
+                    .transition(.identity)
+                    .offset(y: showSessionCard ? 0 : -500)
+                    .animation(.easeOut(duration: 0.35), value: showSessionCard)
+                }
                 
                 // Safe area extension at the very top - covers the shadow
                 SafeAreaExtension()
-                    .zIndex(2) // Above WelcomeCard to cover its shadow
+                    .zIndex(3) // Above both cards to cover their shadows
             }
         }
         .sheet(isPresented: $isSettingsPresented) {
@@ -127,7 +168,7 @@ struct WelcomeView: View {
         .sheet(isPresented: $showTrialInstructions) {
             TrialModeInstructionsView()
         }
-        .onChange(of: voiceManager.transcribedText) { newText in
+        .onChange(of: voiceManager.transcribedText) { oldValue, newText in
             // Update input text with transcribed text in real-time
             if !newText.isEmpty && voiceManager.voiceMode != .normal {
                 inputText = newText
@@ -156,17 +197,20 @@ struct WelcomeView: View {
         }
     }
     
-    // Calculate dynamic height for NodeMatrix based on viewport
-    private func calculateNodeMatrixHeight(for size: CGSize) -> CGFloat {
-        // Account for: welcome card (300), chat input (~100), padding, safe areas
-        let reservedSpace: CGFloat = 500
-        let availableHeight = size.height - reservedSpace
+    // Handle node tap
+    private func handleNodeTap(_ session: ChatSession) {
+        selectedSession = session
+        showSessionCard = true
+    }
+    
+    // Handle close session card
+    private func handleCloseSessionCard() {
+        showSessionCard = false
         
-        // Set min and max bounds
-        let minHeight: CGFloat = 250
-        let maxHeight: CGFloat = 500
-        
-        return min(max(availableHeight, minHeight), maxHeight)
+        // Clear selected session after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            selectedSession = nil
+        }
     }
     
     // Load recent sessions from API

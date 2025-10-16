@@ -33,6 +33,7 @@
 		D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */; };
 		D3BC33FE2EA16CF30057E748 /* TrialModeBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FD2EA16CF30057E748 /* TrialModeBanner.swift */; };
 		D3BC34002EA1713D0057E748 /* NodeMatrix.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */; };
+		D3BC34022EA18E160057E748 /* SessionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC34012EA18E160057E748 /* SessionsCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +65,7 @@
 		D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeAreaExtension.swift; sourceTree = "<group>"; };
 		D3BC33FD2EA16CF30057E748 /* TrialModeBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialModeBanner.swift; sourceTree = "<group>"; };
 		D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeMatrix.swift; sourceTree = "<group>"; };
+		D3BC34012EA18E160057E748 /* SessionsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +91,7 @@
 		A1234567890ABCDEF990 = {
 			isa = PBXGroup;
 			children = (
+				D3BC34012EA18E160057E748 /* SessionsCard.swift */,
 				838F2DE92E9E1CF700E2FC48 /* TaskDetailView.swift */,
 				838F2DEA2E9E1CF700E2FC48 /* ThemeManager.swift */,
 				834A2CB72E98D93A00D15D6A /* ContinuousVoiceManager.swift */,
@@ -234,6 +237,7 @@
 				838F2DEE2E9E24E200E2FC48 /* SidebarView.swift in Sources */,
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,
 				D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */,
+				D3BC34022EA18E160057E748 /* SessionsCard.swift in Sources */,
 				A1234567890ABCDEF001 /* GooseApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
