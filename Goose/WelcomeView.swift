@@ -234,6 +234,9 @@ struct WelcomeView: View {
                 }
                 .padding(.horizontal, 16)
             }
+            .refreshable {
+                await loadRecentSessions()
+            }
             
             // Bottom input area - using shared ChatInputView
             ChatInputView(

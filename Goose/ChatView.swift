@@ -98,6 +98,9 @@ struct ChatView: View {
                         .padding(.horizontal)
                         .padding(.top, 70)  // Matches PR #1 with simpler nav bar
                     }
+                    .refreshable {
+                        await refreshCurrentSession()
+                    }
                     .simultaneousGesture(
                         DragGesture()
                             .onChanged { _ in
@@ -976,6 +979,29 @@ struct ChatView: View {
         isLoading = false
 
         print("🆕 Created new session - cleared all state")
+    }
+    
+    /// Refresh the current session (for pull-to-refresh)
+    private func refreshCurrentSession() async {
+        guard let sessionId = currentSessionId else {
+            print("🔄 No session to refresh")
+            return
+        }
+        
+        print("🔄 Refreshing session: \(sessionId)")
+        
+        do {
+            let (_, newMessages) = try await apiService.resumeAgent(sessionId: sessionId)
+            
+            await MainActor.run {
+                messages = newMessages
+                rebuildToolCallState(from: newMessages)
+                scrollRefreshTrigger = UUID()
+                print("✅ Session refreshed with \(newMessages.count) messages")
+            }
+        } catch {
+            print("⚠️ Failed to refresh session: \(error)")
+        }
     }
 }
 
