@@ -30,8 +30,8 @@ struct TrialModeBanner: View {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 8)
+            .padding(.top, 20)
+            .padding(.bottom, 32)
         }
         .buttonStyle(.plain)
     }
