@@ -17,235 +17,174 @@ struct WelcomeView: View {
     @State private var showTrialInstructions = false
     
     // Animation states
-    @State private var displayedText = ""
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
-    @State private var showLogo = false
-    @State private var showProgressSection = false
     @State private var showTrialModeCard = false
-    @State private var progressValue: CGFloat = 0.0
     @State private var tokenCount: Int64 = 0
-    private let maxTokens: Int64 = 1_000_000_000 // 1 billion
     
     // Access API service for trial mode check
     @StateObject private var apiService = GooseAPIService.shared
     
-    // Computed property for time-aware greeting
-    private var fullText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let greeting: String
-        
-        switch hour {
-        case 0..<12:
-            greeting = "Good morning!"
-        case 12..<17:
-            greeting = "Good afternoon!"
-        case 17..<21:
-            greeting = "Good evening!"
-        default:
-            greeting = "Good night!"
-        }
-        
-        return "\(greeting)\nWhat do you want to do?"
-    }
-    
     var body: some View {
-        VStack(spacing: 0) {
-            // Top navigation bar
+        ZStack(alignment: .top) {
+            // Main content with ScrollView
             VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar.toggle()
-                        }
-                    }) {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 22))
-                            .foregroundColor(.primary)
-                            .frame(width: 24, height: 22)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 66)
-                .padding(.bottom, 8)
-            }
-            .background(Color(UIColor.systemBackground).opacity(0.95))
-            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
-            
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Greeting text with goose logo
-                    HStack(alignment: .top, spacing: 16) {
-                        Text(displayedText)
-                            .font(.system(size: 20, weight: .medium))
-                            .lineSpacing(6)
-                            .foregroundColor(.primary)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Spacer for the card (dynamic based on card height)
+                        Color.clear
+                            .frame(height: 300) // Approximate height, adjust if needed
                         
-                        Spacer()
-                        
-                        if showLogo {
-                            Image("GooseLogo")
-                                .resizable()
-                                .renderingMode(.template)
-                                .foregroundColor(.primary)
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 48, height: 48)
-                                .transition(.scale.combined(with: .opacity))
-                        }
-                    }
-                    .padding(.top, 32)
-                    
-                    // Trial Mode Indicator Card - Always show if in trial mode
-                    if apiService.isTrialMode {
-                        Button(action: {
-                            showTrialInstructions = true
-                        }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "info.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.blue)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Trial Mode")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(.primary)
+                        // Trial Mode Indicator Card - Always show if in trial mode
+                        if apiService.isTrialMode && showTrialModeCard {
+                            Button(action: {
+                                showTrialInstructions = true
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "info.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.blue)
                                     
-                                    Text("Connect to your personal goose agent for the full experience")
-                                        .font(.system(size: 13))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Trial Mode")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                        
+                                        Text("Connect to your personal goose agent for the full experience")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .semibold))
                                         .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                        .fixedSize(horizontal: false, vertical: true)
                                 }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.secondary)
+                                .padding(16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(colorScheme == .dark ?
+                                              Color(red: 0.15, green: 0.15, blue: 0.18) :
+                                              Color(red: 0.96, green: 0.96, blue: 0.98))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(
+                                            colorScheme == .dark ?
+                                            Color(red: 0.25, green: 0.25, blue: 0.28) :
+                                            Color(red: 0.88, green: 0.88, blue: 0.90),
+                                            lineWidth: 1
+                                        )
+                                )
                             }
-                            .padding(16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(colorScheme == .dark ?
-                                          Color(red: 0.15, green: 0.15, blue: 0.18) :
-                                          Color(red: 0.96, green: 0.96, blue: 0.98))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(
-                                        colorScheme == .dark ?
-                                        Color(red: 0.25, green: 0.25, blue: 0.28) :
-                                        Color(red: 0.88, green: 0.88, blue: 0.90),
-                                        lineWidth: 1
-                                    )
-                            )
+                            .buttonStyle(.plain)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
-                        .buttonStyle(.plain)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .padding(.top, 8)
-                    }
-                    
-                    // Progress Section
-                    if showProgressSection {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("TOKENS USED")
+                        
+                        // Recent Sessions Section
+                        VStack(alignment: .leading, spacing: 16) {
+                            if showSessionsTitle {
+                                Text("RECENT SESSIONS")
                                     .font(.system(size: 12, weight: .semibold))
                                     .tracking(1.02)
-                                    .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
-                                
-                                Spacer()
-                                
-                                Text("\(formatTokenCount(tokenCount)) of 1B")
-                                    .font(.system(size: 12))
                                     .foregroundColor(.secondary)
+                                    .padding(.top, 16)
                             }
                             
-                            // Progress bar
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    // Background
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(colorScheme == .dark ? 
-                                              Color(red: 0.10, green: 0.10, blue: 0.13) : 
-                                              Color(red: 0.95, green: 0.95, blue: 0.95))
-                                        .frame(height: 12)
-                                    
-                                    // Foreground (animated)
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(colorScheme == .dark ? Color.white : Color.black)
-                                        .frame(width: geometry.size.width * progressValue, height: 12)
+                            if isLoadingSessions && showSessionsTitle {
+                                // Loading state
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .tint(.secondary)
+                                    Spacer()
+                                }
+                                .frame(height: 100)
+                            } else if recentSessions.isEmpty && showSessionsTitle {
+                                // Empty state
+                                Text("No recent sessions")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.vertical, 32)
+                            } else {
+                                // Session list - show sessions one by one
+                                VStack(spacing: 24) {
+                                    ForEach(Array(recentSessions.prefix(3).enumerated()), id: \.element.id) { index, session in
+                                        if index < visibleSessionsCount {
+                                            WelcomeSessionRowView(session: session)
+                                                .transition(.opacity)
+                                                .onTapGesture {
+                                                    // Load the session when tapped
+                                                    onSessionSelect(session.id)
+                                                }
+                                        }
+                                    }
                                 }
                             }
-                            .frame(height: 12)
-                        }
-                        .padding(.top, 16)
-                        .transition(.opacity)
-                    }
-                    
-                    // Recent Sessions Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        if showSessionsTitle {
-                            Text("RECENT SESSIONS")
-                                .font(.system(size: 12, weight: .semibold))
-                                .tracking(1.02)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 16)
                         }
                         
-                        if isLoadingSessions && showSessionsTitle {
-                            // Loading state
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .tint(.secondary)
-                                Spacer()
+                        Spacer(minLength: 180) // Space for input box
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .refreshable {
+                    await loadRecentSessions()
+                }
+                
+                // Bottom input area - using shared ChatInputView
+                ChatInputView(
+                    text: $inputText,
+                    voiceManager: voiceManager,
+                    onSubmit: {
+                        onStartChat(inputText)
+                    }
+                )
+            }
+            
+            // Welcome Card overlaid on top (full bleed)
+            VStack {
+                WelcomeCard(
+                    showingSidebar: $showingSidebar,
+                    tokenCount: tokenCount,
+                    onAnimationComplete: {
+                        // Show trial mode card if in trial mode
+                        if apiService.isTrialMode {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                showTrialModeCard = true
                             }
-                            .frame(height: 100)
-                        } else if recentSessions.isEmpty && showSessionsTitle {
-                            // Empty state
-                            Text("No recent sessions")
-                                .font(.system(size: 14))
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 32)
-                        } else {
-                            // Session list - show sessions one by one
-                            VStack(spacing: 24) {
-                                ForEach(Array(recentSessions.prefix(3).enumerated()), id: \.element.id) { index, session in
-                                    if index < visibleSessionsCount {
-                                        WelcomeSessionRowView(session: session)
-                                            .transition(.opacity)
-                                            .onTapGesture {
-                                                // Load the session when tapped
-                                                onSessionSelect(session.id)
-                                            }
+                        }
+                        
+                        // Show sessions title
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                showSessionsTitle = true
+                            }
+                            
+                            // Show sessions one by one quickly (100ms between each)
+                            for i in 0..<min(3, recentSessions.count) {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1 + Double(i) * 0.1) {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        visibleSessionsCount = i + 1
                                     }
                                 }
                             }
                         }
                     }
-                    
-                    Spacer(minLength: 180) // Space for input box
-                }
-                .padding(.horizontal, 16)
+                )
+                
+                Spacer()
             }
-            .refreshable {
-                await loadRecentSessions()
-            }
+            .zIndex(1)
+            .allowsHitTesting(true) // Allow interaction with the card
             
-            // Bottom input area - using shared ChatInputView
-            ChatInputView(
-                text: $inputText,
-                voiceManager: voiceManager,
-                onSubmit: {
-                    onStartChat(inputText)
-                }
-            )
+            // Safe area extension at the very top - covers the shadow
+            SafeAreaExtension()
+                .zIndex(2) // Above WelcomeCard to cover its shadow
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
@@ -270,9 +209,6 @@ struct WelcomeView: View {
                 }
             }
             
-            // Start typewriter animation
-            startTypewriterEffect()
-            
             // Load recent sessions
             Task {
                 await loadRecentSessions()
@@ -282,72 +218,6 @@ struct WelcomeView: View {
             // Refresh sessions when settings are saved
             Task {
                 await loadRecentSessions()
-                // Update progress bar with new data
-                await MainActor.run {
-                    let percentage = Double(tokenCount) / Double(maxTokens)
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        progressValue = CGFloat(min(percentage, 1.0))
-                    }
-                }
-            }
-        }
-    }
-    
-    // Typewriter effect for greeting text
-    private func startTypewriterEffect() {
-        displayedText = ""
-        
-        // Fast typewriter effect - 20ms per character
-        for (index, character) in fullText.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.02) {
-                displayedText.append(character)
-                
-                // When text is complete, show logo
-                if displayedText == fullText {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        showLogo = true
-                    }
-                    
-                    // Show trial mode card if in trial mode
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if apiService.isTrialMode {
-                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                showTrialModeCard = true
-                            }
-                        }
-                    }
-                    
-                    // Show progress section
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            showProgressSection = true
-                        }
-                        
-                        // Animate progress bar
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            let percentage = Double(tokenCount) / Double(maxTokens)
-                            withAnimation(.easeOut(duration: 0.8)) {
-                                progressValue = CGFloat(min(percentage, 1.0))
-                            }
-                        }
-                    }
-                    
-                    // Show sessions title
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            showSessionsTitle = true
-                        }
-                        
-                        // Show sessions one by one quickly (100ms between each)
-                        for i in 0..<min(3, recentSessions.count) {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4 + Double(i) * 0.1) {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    visibleSessionsCount = i + 1
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -366,14 +236,6 @@ struct WelcomeView: View {
             // Update token count from insights
             if let insights = insights {
                 tokenCount = insights.totalTokens
-                
-                // If progress bar is already visible, update it immediately
-                if showProgressSection {
-                    let percentage = Double(tokenCount) / Double(maxTokens)
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        progressValue = CGFloat(min(percentage, 1.0))
-                    }
-                }
             }
             
             recentSessions = Array(sessions.prefix(3))
@@ -389,18 +251,6 @@ struct WelcomeView: View {
                     }
                 }
             }
-        }
-    }
-    
-    // Format token count for display (e.g., "450M")
-    private func formatTokenCount(_ count: Int64) -> String {
-        let million: Int64 = 1_000_000
-        if count >= million {
-            let millions = Double(count) / Double(million)
-            return String(format: "%.0fM", millions)
-        } else {
-            let thousands = Double(count) / 1000.0
-            return String(format: "%.0fK", thousands)
         }
     }
 }

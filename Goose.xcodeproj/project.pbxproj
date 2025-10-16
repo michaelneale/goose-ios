@@ -29,6 +29,8 @@
 		A1234567890ABCDEF018 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF017 /* SettingsView.swift */; };
 		A1234567890ABCDEF020 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = A1234567890ABCDEF019 /* Markdown */; };
 		C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */; };
+		D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33F92EA1597B0057E748 /* WelcomeCard.swift */; };
+		D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +58,8 @@
 		A1234567890ABCDEF017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1234567890ABCDEF999 /* Goose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Goose.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOutputManager.swift; sourceTree = "<group>"; };
+		D3BC33F92EA1597B0057E748 /* WelcomeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeCard.swift; sourceTree = "<group>"; };
+		D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeAreaExtension.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,6 +96,8 @@
 		A1234567890ABCDEF991 /* Goose */ = {
 			isa = PBXGroup;
 			children = (
+				D3BC33F92EA1597B0057E748 /* WelcomeCard.swift */,
+				D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */,
 				83398FCB2EA0D47900EB958C /* TrialModeInstructionsView.swift */,
 				838F2DEF2E9E270300E2FC48 /* ChatInputView.swift */,
 				838F2DED2E9E24E200E2FC48 /* SidebarView.swift */,
@@ -209,6 +215,7 @@
 				838F2DEB2E9E1CF700E2FC48 /* ThemeManager.swift in Sources */,
 				838F2DEC2E9E1CF700E2FC48 /* TaskDetailView.swift in Sources */,
 				C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */,
+				D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */,
 				A1234567890ABCDEF012 /* Message.swift in Sources */,
 				83398FCC2EA0D47900EB958C /* TrialModeInstructionsView.swift in Sources */,
 				83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */,
@@ -218,6 +225,7 @@
 				A1234567890ABCDEF016 /* MessageBubbleView.swift in Sources */,
 				838F2DEE2E9E24E200E2FC48 /* SidebarView.swift in Sources */,
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,
+				D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */,
 				A1234567890ABCDEF001 /* GooseApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
