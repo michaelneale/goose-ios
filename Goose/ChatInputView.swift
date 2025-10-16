@@ -10,6 +10,7 @@ import SwiftUI
 struct ChatInputView: View {
     @Binding var text: String
     @Environment(\.colorScheme) var colorScheme
+    @FocusState.Binding var isFocused: Bool
     
     // Configuration
     var placeholder: String = "I want to..."
@@ -80,6 +81,7 @@ struct ChatInputView: View {
                         .foregroundColor(.primary)
                         .lineLimit(1...4)
                         .padding(.vertical, 8)
+                        .focused($isFocused)
                         .disabled(voiceManager?.voiceMode != .normal && voiceManager != nil)
                         .onSubmit {
                             onSubmit()
@@ -194,19 +196,29 @@ struct ChatInputView: View {
 }
 
 #Preview {
-    VStack {
-        Spacer()
+    struct PreviewWrapper: View {
+        @State private var text = ""
+        @FocusState private var isFocused: Bool
         
-        // With trial banner
-        ChatInputView(
-            text: .constant(""),
-            onSubmit: {
-                print("Submit tapped")
-            },
-            showTrialBanner: true,
-            onTrialBannerTap: {
-                print("Trial banner tapped")
+        var body: some View {
+            VStack {
+                Spacer()
+                
+                // With trial banner
+                ChatInputView(
+                    text: $text,
+                    isFocused: $isFocused,
+                    onSubmit: {
+                        print("Submit tapped")
+                    },
+                    showTrialBanner: true,
+                    onTrialBannerTap: {
+                        print("Trial banner tapped")
+                    }
+                )
             }
-        )
+        }
     }
+    
+    return PreviewWrapper()
 }

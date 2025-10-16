@@ -3,6 +3,7 @@ import SwiftUI
 struct WelcomeView: View {
     @Binding var showingSidebar: Bool
     @State private var inputText = ""
+    @FocusState private var isInputFocused: Bool
     @Environment(\.colorScheme) var colorScheme
     var onStartChat: (String) -> Void
     var onSessionSelect: (String) -> Void
@@ -25,6 +26,10 @@ struct WelcomeView: View {
     @State private var selectedSession: ChatSession? = nil
     @State private var showSessionCard = false
     
+    // Node focus state (for focus mode)
+    @State private var focusedNodeSession: ChatSession? = nil
+    @State private var focusedNodePosition: CGPoint = .zero
+    
     // Access API service for trial mode check
     @StateObject private var apiService = GooseAPIService.shared
     
@@ -33,9 +38,10 @@ struct WelcomeView: View {
             ZStack(alignment: .top) {
                 // Main content - use VStack with Spacer to push input to bottom
                 VStack(spacing: 0) {
-                    // Spacer for the welcome card
+                    // Spacer for the welcome card (animated height)
                     Color.clear
-                        .frame(height: 300)
+                        .frame(height: isInputFocused ? 0 : 300)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
                     
                     // Node Matrix Section - fills all remaining space above input
                     ZStack {
@@ -53,7 +59,7 @@ struct WelcomeView: View {
                                 Spacer()
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if recentSessions.isEmpty {
+                        } else if recentSessions.isEmpty && !isInputFocused {
                             // Empty state
                             VStack {
                                 Spacer()
@@ -75,14 +81,22 @@ struct WelcomeView: View {
                         } else {
                             // Node Matrix - fills all available space
                             if showSessionsTitle {
-                                NodeMatrix(
-                                    sessions: recentSessions,
-                                    selectedSessionId: selectedSession?.id,
-                                    onNodeTap: { session in
-                                        handleNodeTap(session)
-                                    }
-                                )
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                GeometryReader { matrixGeo in
+                                    NodeMatrix(
+                                        sessions: recentSessions,
+                                        selectedSessionId: isInputFocused ? focusedNodeSession?.id : selectedSession?.id,
+                                        onNodeTap: { session, position in
+                                            // Convert position from NodeMatrix local space to global space
+                                            let globalPosition = CGPoint(
+                                                x: matrixGeo.frame(in: .global).minX + position.x,
+                                                y: matrixGeo.frame(in: .global).minY + position.y
+                                            )
+                                            handleNodeTap(session, at: globalPosition)
+                                        },
+                                        showDraftNode: isInputFocused && focusedNodeSession == nil
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
                                 .transition(.opacity)
                             } else {
                                 // Placeholder to maintain space before animation
@@ -92,13 +106,22 @@ struct WelcomeView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle()) // Make the entire area tappable
+                    .onTapGesture {
+                        // Dismiss keyboard and return to home when tapping outside chat input
+                        if isInputFocused {
+                            isInputFocused = false
+                            focusedNodeSession = nil
+                        }
+                    }
                     
                     // Chat input at bottom - always present
                     ChatInputView(
                         text: $inputText,
+                        isFocused: $isInputFocused,
                         voiceManager: voiceManager,
                         onSubmit: {
-                            onStartChat(inputText)
+                            handleSubmit()
                         },
                         showTrialBanner: apiService.isTrialMode && showTrialModeCard,
                         onTrialBannerTap: {
@@ -107,7 +130,7 @@ struct WelcomeView: View {
                     )
                 }
                 
-                // Welcome Card overlaid on top (full bleed) - always visible
+                // Welcome Card overlaid on top (full bleed) - animated
                 VStack {
                     WelcomeCard(
                         showingSidebar: $showingSidebar,
@@ -130,8 +153,11 @@ struct WelcomeView: View {
                     
                     Spacer()
                 }
+                .offset(y: isInputFocused ? -350 : 0)
+                .opacity(isInputFocused ? 0 : 1)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
                 .zIndex(1)
-                .allowsHitTesting(!showSessionCard) // Disable interaction when session card is showing
+                .allowsHitTesting(!showSessionCard && !isInputFocused) // Disable interaction when session card is showing or input focused
                 
                 // Sessions Card - slides in from top, overlays WelcomeCard
                 if showSessionCard, let session = selectedSession {
@@ -156,9 +182,43 @@ struct WelcomeView: View {
                     .animation(.easeOut(duration: 0.35), value: showSessionCard)
                 }
                 
+                // NodeFocus popover - overlaid on top, positioned near the node
+                if let focusedSession = focusedNodeSession, isInputFocused {
+                    let popoverWidth: CGFloat = 200
+                    let popoverHeight: CGFloat = 100 // Approximate height
+                    let offsetAboveNode: CGFloat = 70
+                    
+                    // Calculate optimal position with bounds checking
+                    let targetX = focusedNodePosition.x
+                    let targetY = focusedNodePosition.y - offsetAboveNode
+                    
+                    // Clamp X to keep popover on screen
+                    let clampedX = min(max(targetX, popoverWidth / 2 + 16), geometry.size.width - popoverWidth / 2 - 16)
+                    
+                    // Clamp Y to keep popover on screen (account for safe area)
+                    let clampedY = max(targetY, popoverHeight / 2 + 60)
+                    
+                    NodeFocus(
+                        session: focusedSession,
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                focusedNodeSession = nil
+                            }
+                        }
+                    )
+                    .position(x: clampedX, y: clampedY)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(3)
+                    .allowsHitTesting(true)
+                }
+                
                 // Safe area extension at the very top - covers the shadow
-                SafeAreaExtension()
-                    .zIndex(3) // Above both cards to cover their shadows
+                // Switches color based on focus state: system background when focused (draft view),
+                // WelcomeCard color when not focused
+                SafeAreaExtension(useSystemBackground: isInputFocused)
+                    .zIndex(10) // Increased from 3 to ensure it's always on top
+                    .allowsHitTesting(false) // Don't block touches
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
             }
         }
         .sheet(isPresented: $isSettingsPresented) {
@@ -174,13 +234,19 @@ struct WelcomeView: View {
                 inputText = newText
             }
         }
+        .onChange(of: isInputFocused) { oldValue, newValue in
+            // Clear focused node when input loses focus
+            if !newValue {
+                focusedNodeSession = nil
+            }
+        }
         .onAppear {
             // Set up voice manager callback for auto-sending messages
             voiceManager.onSubmitMessage = { message in
                 inputText = message
                 // Auto-send the message
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    onStartChat(inputText)
+                    handleSubmit()
                 }
             }
             
@@ -197,10 +263,44 @@ struct WelcomeView: View {
         }
     }
     
+    // Handle message submission
+    private func handleSubmit() {
+        let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+        
+        if let focusedSession = focusedNodeSession {
+            // Route to existing session
+            print("📨 Routing message to session: \(focusedSession.id)")
+            onSessionSelect(focusedSession.id)
+            
+            // Send the message to that session via notification
+            NotificationCenter.default.post(
+                name: Notification.Name("SendMessageToSession"),
+                object: nil,
+                userInfo: ["message": trimmedText, "sessionId": focusedSession.id]
+            )
+            
+            // Clear state
+            focusedNodeSession = nil
+        } else {
+            // Start new chat
+            onStartChat(inputText)
+        }
+    }
+    
     // Handle node tap
-    private func handleNodeTap(_ session: ChatSession) {
-        selectedSession = session
-        showSessionCard = true
+    private func handleNodeTap(_ session: ChatSession, at position: CGPoint) {
+        if isInputFocused {
+            // In focus mode - show NodeFocus popover
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                focusedNodeSession = session
+                focusedNodePosition = position
+            }
+        } else {
+            // Not in focus mode - show SessionCard
+            selectedSession = session
+            showSessionCard = true
+        }
     }
     
     // Handle close session card

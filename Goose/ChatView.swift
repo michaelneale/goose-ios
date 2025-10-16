@@ -15,6 +15,8 @@ struct ChatView: View {
     @State private var currentSessionId: String?
     @State private var isSettingsPresented = false
 
+    @FocusState private var isInputFocused: Bool
+
     // Session polling for live updates
     @State private var isPollingForUpdates = false
     @State private var pollingTask: Task<Void, Never>?
@@ -166,6 +168,7 @@ struct ChatView: View {
 
                 ChatInputView(
                     text: $inputText,
+                    isFocused: $isInputFocused,
                     showPlusButton: true,
                     isLoading: isLoading,
                     voiceManager: voiceManager,
@@ -268,6 +271,24 @@ struct ChatView: View {
             ) { notification in
                 if let sessionId = notification.userInfo?["sessionId"] as? String {
                     loadSession(sessionId)
+                }
+            }
+
+            // Listen for message to be sent to specific session
+            NotificationCenter.default.addObserver(
+                forName: Notification.Name("SendMessageToSession"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let message = notification.userInfo?["message"] as? String,
+                   let sessionId = notification.userInfo?["sessionId"] as? String {
+                    // Load the session first
+                    loadSession(sessionId)
+                    // Then set the input text and send
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        inputText = message
+                        sendMessage()
+                    }
                 }
             }
         }

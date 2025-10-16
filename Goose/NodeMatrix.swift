@@ -3,13 +3,15 @@ import SwiftUI
 struct NodeMatrix: View {
     let sessions: [ChatSession]
     let selectedSessionId: String?
-    let onNodeTap: (ChatSession) -> Void
+    let onNodeTap: (ChatSession, CGPoint) -> Void
+    var showDraftNode: Bool = false
     @Environment(\.colorScheme) var colorScheme
     @State private var daysOffset: Int = 0 // 0 = today, 1 = yesterday, etc.
     @State private var dragOffset: CGFloat = 0
     @GestureState private var isDragging: Bool = false
     @State private var selectedSessionMessages: [Message] = []
     @State private var isLoadingMessages = false
+    @State private var pulseAnimation = false // For draft node pulsing
     
     // Get the date for the current offset
     private var targetDate: Date {
@@ -90,8 +92,8 @@ struct NodeMatrix: View {
                 // Node content area - fills all available space
                 GeometryReader { nodeGeometry in
                     ZStack {
-                        // Empty state
-                        if daySessions.isEmpty {
+                        // Empty state (only show if no draft node and no sessions)
+                        if daySessions.isEmpty && !showDraftNode {
                             VStack(spacing: 8) {
                                 Image(systemName: "calendar.badge.clock")
                                     .font(.system(size: 32))
@@ -123,13 +125,30 @@ struct NodeMatrix: View {
                             )
                         }
                         
+                        // Draw connection line from last session to draft node
+                        if showDraftNode && daysOffset == 0 && !daySessions.isEmpty {
+                            Path { path in
+                                let lastSession = daySessions[daySessions.count - 1]
+                                let lastPosition = nodePosition(for: daySessions.count - 1, session: lastSession, in: nodeGeometry.size, allSessions: daySessions)
+                                let draftPos = draftNodePosition(in: nodeGeometry.size)
+                                
+                                path.move(to: lastPosition)
+                                path.addLine(to: draftPos)
+                            }
+                            .stroke(
+                                Color.green.opacity(0.3),
+                                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [5, 5])
+                            )
+                            .transition(.opacity)
+                        }
+                        
                         // Draw session nodes (now tappable with highlight)
                         ForEach(Array(daySessions.enumerated()), id: \.element.id) { index, session in
                             let position = nodePosition(for: index, session: session, in: nodeGeometry.size, allSessions: daySessions)
                             let isSelected = selectedSessionId == session.id
                             
                             Button(action: {
-                                onNodeTap(session)
+                                onNodeTap(session, position)
                             }) {
                                 ZStack {
                                     // Outer tap target (invisible)
@@ -161,6 +180,35 @@ struct NodeMatrix: View {
                             .position(position)
                         }
                         
+                        // Draw draft node (pulsing animation)
+                        if showDraftNode && daysOffset == 0 {
+                            let draftPosition = draftNodePosition(in: nodeGeometry.size)
+                            
+                            ZStack {
+                                // Pulsing outer ring
+                                Circle()
+                                    .stroke(Color.green.opacity(0.3), lineWidth: 2)
+                                    .frame(width: 20, height: 20)
+                                    .scaleEffect(pulseAnimation ? 1.8 : 1.0)
+                                    .opacity(pulseAnimation ? 0.0 : 0.5)
+                                
+                                // Inner draft node
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 8, height: 8)
+                            }
+                            .position(draftPosition)
+                            .transition(.scale.combined(with: .opacity))
+                            .onAppear {
+                                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
+                                    pulseAnimation = true
+                                }
+                            }
+                            .onDisappear {
+                                pulseAnimation = false
+                            }
+                        }
+                        
                         // Draw message nodes for selected session
                         if let selectedId = selectedSessionId,
                            let selectedSession = daySessions.first(where: { $0.id == selectedId }),
@@ -186,11 +234,23 @@ struct NodeMatrix: View {
                 .offset(x: dragOffset)
                 
                 // Session count indicator - positioned at bottom with minimal padding
-                if !daySessions.isEmpty {
+                if !daySessions.isEmpty || showDraftNode {
                     HStack {
-                        Text("\(daySessions.count) session\(daySessions.count == 1 ? "" : "s")")
-                            .font(.caption2)
-                            .foregroundColor(.secondary.opacity(0.6))
+                        if showDraftNode && daysOffset == 0 {
+                            if daySessions.isEmpty {
+                                Text("Draft in progress")
+                                    .font(.caption2)
+                                    .foregroundColor(.green.opacity(0.8))
+                            } else {
+                                Text("Draft + \(daySessions.count) session\(daySessions.count == 1 ? "" : "s")")
+                                    .font(.caption2)
+                                    .foregroundColor(.green.opacity(0.8))
+                            }
+                        } else {
+                            Text("\(daySessions.count) session\(daySessions.count == 1 ? "" : "s")")
+                                .font(.caption2)
+                                .foregroundColor(.secondary.opacity(0.6))
+                        }
                         Spacer()
                     }
                     .padding(.horizontal, 16)
@@ -256,6 +316,12 @@ struct NodeMatrix: View {
                 }
             }
         }
+        .onChange(of: showDraftNode) { oldValue, newValue in
+            // Animate draft node appearance/disappearance
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                // State change will trigger draft node appearance
+            }
+        }
     }
     
     // Load messages for selected session
@@ -272,6 +338,43 @@ struct NodeMatrix: View {
         }
         
         isLoadingMessages = false
+    }
+    
+    // Calculate position for draft node - improved to prevent off-screen placement
+    private func draftNodePosition(in size: CGSize) -> CGPoint {
+        if daySessions.isEmpty {
+            // Center if no other sessions
+            return CGPoint(x: size.width / 2, y: size.height / 2)
+        } else {
+            // Position after the last session with better bounds checking
+            let lastSession = daySessions[daySessions.count - 1]
+            let lastPosition = nodePosition(for: daySessions.count - 1, session: lastSession, in: size, allSessions: daySessions)
+            
+            // Calculate offset with bounds checking
+            let paddingX: CGFloat = size.width * 0.15
+            let maxX = size.width - paddingX
+            let minX = paddingX
+            
+            let paddingY: CGFloat = size.height * 0.20
+            let maxY = size.height - paddingY
+            let minY = paddingY
+            
+            // Try to place to the right and slightly down
+            var targetX = lastPosition.x + 60
+            var targetY = lastPosition.y + 20
+            
+            // If too far right, wrap to left side but lower
+            if targetX > maxX {
+                targetX = minX + 40
+                targetY = min(lastPosition.y + 60, maxY)
+            }
+            
+            // Clamp to bounds
+            targetX = max(minX, min(targetX, maxX))
+            targetY = max(minY, min(targetY, maxY))
+            
+            return CGPoint(x: targetX, y: targetY)
+        }
     }
     
     // Calculate position for each node - centered and better distributed
@@ -449,9 +552,10 @@ struct MessageNodesOverlay: View {
                 ChatSession(id: "3", description: "Late Morning", messageCount: 8, createdAt: dateString(daysAgo: 0, hoursAgo: 7), updatedAt: dateString(daysAgo: 0, hoursAgo: 7)),
             ],
             selectedSessionId: "2",
-            onNodeTap: { session in
-                print("Tapped session: \(session.description)")
-            }
+            onNodeTap: { session, position in
+                print("Tapped session: \(session.description) at position: \(position)")
+            },
+            showDraftNode: true
         )
         .frame(height: 400)
     }
