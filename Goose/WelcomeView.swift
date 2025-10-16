@@ -25,25 +25,17 @@ struct WelcomeView: View {
     @StateObject private var apiService = GooseAPIService.shared
     
     var body: some View {
-        ZStack(alignment: .top) {
-            // Main content with ScrollView
-            VStack(spacing: 0) {
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // Spacer for the card (dynamic based on card height)
-                        Color.clear
-                            .frame(height: 300) // Approximate height, adjust if needed
-                        
-                        // Recent Sessions Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            if showSessionsTitle {
-                                Text("RECENT SESSIONS")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .tracking(1.02)
-                                    .foregroundColor(.secondary)
-                                    .padding(.top, 16)
-                            }
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                // Main content with ScrollView
+                VStack(spacing: 0) {
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Spacer for the card (dynamic based on card height)
+                            Color.clear
+                                .frame(height: 300) // Approximate height, adjust if needed
                             
+                            // Node Matrix Section - fills remaining space dynamically
                             if isLoadingSessions && showSessionsTitle {
                                 // Loading state
                                 HStack {
@@ -53,91 +45,80 @@ struct WelcomeView: View {
                                         .tint(.secondary)
                                     Spacer()
                                 }
-                                .frame(height: 100)
+                                .frame(height: calculateNodeMatrixHeight(for: geometry.size))
                             } else if recentSessions.isEmpty && showSessionsTitle {
                                 // Empty state
-                                Text("No recent sessions")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 32)
-                            } else {
-                                // Session list - show sessions one by one
-                                VStack(spacing: 24) {
-                                    ForEach(Array(recentSessions.prefix(3).enumerated()), id: \.element.id) { index, session in
-                                        if index < visibleSessionsCount {
-                                            WelcomeSessionRowView(session: session)
-                                                .transition(.opacity)
-                                                .onTapGesture {
-                                                    // Load the session when tapped
-                                                    onSessionSelect(session.id)
-                                                }
-                                        }
-                                    }
+                                VStack(spacing: 8) {
+                                    Image(systemName: "calendar.badge.clock")
+                                        .font(.system(size: 32))
+                                        .foregroundColor(.secondary.opacity(0.5))
+                                    
+                                    Text("No sessions today")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.secondary)
                                 }
-                            }
-                        }
-                        
-                        Spacer(minLength: 180) // Space for input box
-                    }
-                    .padding(.horizontal, 16)
-                }
-                .refreshable {
-                    await loadRecentSessions()
-                }
-                
-                // Chat input with trial banner
-                ChatInputView(
-                    text: $inputText,
-                    voiceManager: voiceManager,
-                    onSubmit: {
-                        onStartChat(inputText)
-                    },
-                    showTrialBanner: apiService.isTrialMode && showTrialModeCard,
-                    onTrialBannerTap: {
-                        showTrialInstructions = true
-                    }
-                )
-            }
-            
-            // Welcome Card overlaid on top (full bleed)
-            VStack {
-                WelcomeCard(
-                    showingSidebar: $showingSidebar,
-                    onAnimationComplete: {
-                        // Show trial mode card if in trial mode
-                        if apiService.isTrialMode {
-                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                showTrialModeCard = true
-                            }
-                        }
-                        
-                        // Show sessions title
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                showSessionsTitle = true
+                                .frame(maxWidth: .infinity)
+                                .frame(height: calculateNodeMatrixHeight(for: geometry.size))
+                            } else if showSessionsTitle {
+                                // Node Matrix - expanded to fill space dynamically
+                                NodeMatrix(sessions: recentSessions)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: calculateNodeMatrixHeight(for: geometry.size))
+                                    .transition(.opacity)
                             }
                             
-                            // Show sessions one by one quickly (100ms between each)
-                            for i in 0..<min(3, recentSessions.count) {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1 + Double(i) * 0.1) {
-                                    withAnimation(.easeOut(duration: 0.2)) {
-                                        visibleSessionsCount = i + 1
-                                    }
+                            Spacer(minLength: 80) // Reduced space for input box
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    .refreshable {
+                        await loadRecentSessions()
+                    }
+                    
+                    // Chat input with trial banner
+                    ChatInputView(
+                        text: $inputText,
+                        voiceManager: voiceManager,
+                        onSubmit: {
+                            onStartChat(inputText)
+                        },
+                        showTrialBanner: apiService.isTrialMode && showTrialModeCard,
+                        onTrialBannerTap: {
+                            showTrialInstructions = true
+                        }
+                    )
+                }
+                
+                // Welcome Card overlaid on top (full bleed)
+                VStack {
+                    WelcomeCard(
+                        showingSidebar: $showingSidebar,
+                        onAnimationComplete: {
+                            // Show trial mode card if in trial mode
+                            if apiService.isTrialMode {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    showTrialModeCard = true
+                                }
+                            }
+                            
+                            // Show sessions title
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    showSessionsTitle = true
                                 }
                             }
                         }
-                    }
-                )
+                    )
+                    
+                    Spacer()
+                }
+                .zIndex(1)
+                .allowsHitTesting(true) // Allow interaction with the card
                 
-                Spacer()
+                // Safe area extension at the very top - covers the shadow
+                SafeAreaExtension()
+                    .zIndex(2) // Above WelcomeCard to cover its shadow
             }
-            .zIndex(1)
-            .allowsHitTesting(true) // Allow interaction with the card
-            
-            // Safe area extension at the very top - covers the shadow
-            SafeAreaExtension()
-                .zIndex(2) // Above WelcomeCard to cover its shadow
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
@@ -175,6 +156,19 @@ struct WelcomeView: View {
         }
     }
     
+    // Calculate dynamic height for NodeMatrix based on viewport
+    private func calculateNodeMatrixHeight(for size: CGSize) -> CGFloat {
+        // Account for: welcome card (300), chat input (~100), padding, safe areas
+        let reservedSpace: CGFloat = 500
+        let availableHeight = size.height - reservedSpace
+        
+        // Set min and max bounds
+        let minHeight: CGFloat = 250
+        let maxHeight: CGFloat = 500
+        
+        return min(max(availableHeight, minHeight), maxHeight)
+    }
+    
     // Load recent sessions from API
     private func loadRecentSessions() async {
         isLoadingSessions = true
@@ -186,19 +180,8 @@ struct WelcomeView: View {
         let (insights, sessions) = await (insightsTask, sessionsTask)
         
         await MainActor.run {
-            recentSessions = Array(sessions.prefix(3))
+            recentSessions = Array(sessions.prefix(30))
             isLoadingSessions = false
-            
-            // Update visible count if sessions loaded after animation
-            if showSessionsTitle && visibleSessionsCount == 0 {
-                for i in 0..<min(3, recentSessions.count) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            visibleSessionsCount = i + 1
-                        }
-                    }
-                }
-            }
         }
     }
 }

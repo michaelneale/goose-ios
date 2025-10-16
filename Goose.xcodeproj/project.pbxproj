@@ -32,6 +32,7 @@
 		D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33F92EA1597B0057E748 /* WelcomeCard.swift */; };
 		D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */; };
 		D3BC33FE2EA16CF30057E748 /* TrialModeBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FD2EA16CF30057E748 /* TrialModeBanner.swift */; };
+		D3BC34002EA1713D0057E748 /* NodeMatrix.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,6 +63,7 @@
 		D3BC33F92EA1597B0057E748 /* WelcomeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeCard.swift; sourceTree = "<group>"; };
 		D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeAreaExtension.swift; sourceTree = "<group>"; };
 		D3BC33FD2EA16CF30057E748 /* TrialModeBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialModeBanner.swift; sourceTree = "<group>"; };
+		D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeMatrix.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -106,6 +108,7 @@
 				838F2DED2E9E24E200E2FC48 /* SidebarView.swift */,
 				838F2DE32E9CA43D00E2FC48 /* SplashScreenView.swift */,
 				838F2DE42E9CA43D00E2FC48 /* WelcomeView.swift */,
+				D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */,
 				83ACD8AC2E827FAE00379D0E /* Info.plist */,
 				83ACD8A82E827DB500379D0E /* ConfigurationHandler.swift */,
 				83ACD8A92E827DB500379D0E /* Info.plist */,
@@ -227,6 +230,7 @@
 				834A2CB92E98D93B00D15D6A /* EnhancedVoiceManager.swift in Sources */,
 				A1234567890ABCDEF014 /* GooseAPIService.swift in Sources */,
 				A1234567890ABCDEF016 /* MessageBubbleView.swift in Sources */,
+				D3BC34002EA1713D0057E748 /* NodeMatrix.swift in Sources */,
 				838F2DEE2E9E24E200E2FC48 /* SidebarView.swift in Sources */,
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,
 				D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */,
@@ -245,7 +249,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Goose/Preview Content\"";
-				DEVELOPMENT_TEAM = W2L75AE9HQ;
+				DEVELOPMENT_TEAM = 8HGTQKQUPP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Goose/Info.plist;
@@ -395,7 +399,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Goose/Preview Content\"";
-				DEVELOPMENT_TEAM = W2L75AE9HQ;
+				DEVELOPMENT_TEAM = 8HGTQKQUPP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Goose/Info.plist;
