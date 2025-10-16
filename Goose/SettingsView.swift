@@ -165,8 +165,19 @@ struct SettingsView: View {
             await MainActor.run {
                 isTestingConnection = false
 
-                // Restore original settings if test failed
+                // If connection failed, use ConfigurationHandler for consistent error display
                 if !apiService.isConnected {
+                    // Check if this is a Tailscale URL (100.x.x.x range)
+                    let originalError = apiService.connectionError ?? "Connection test failed"
+                    if baseURL.hasPrefix("http://100.") {
+                        configurationHandler.isTailscaleError = true
+                        configurationHandler.configurationError = "Please log in to Tailscale to connect to your agent"
+                    } else {
+                        configurationHandler.isTailscaleError = false
+                        configurationHandler.configurationError = originalError
+                    }
+                    
+                    // Restore original settings
                     if let originalURL = originalBaseURL {
                         UserDefaults.standard.set(originalURL, forKey: "goose_base_url")
                     }

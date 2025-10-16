@@ -66,7 +66,8 @@ struct Message: Identifiable, Codable {
         self.content = content
         self.created = created
         self.id = UUID().uuidString
-        self.metadata = nil
+        // Set default metadata - both visible to user and agent
+        self.metadata = MessageMetadata(userVisible: true, agentVisible: true)
         self.display = true
         self.sendToLLM = true
     }
@@ -77,7 +78,8 @@ struct Message: Identifiable, Codable {
         self.content = [MessageContent.text(TextContent(text: text))]
         self.created = created
         self.id = UUID().uuidString
-        self.metadata = nil
+        // Set default metadata - both visible to user and agent
+        self.metadata = MessageMetadata(userVisible: true, agentVisible: true)
         self.display = true
         self.sendToLLM = true
     }
@@ -95,8 +97,8 @@ struct MessageMetadata: Codable {
     let agentVisible: Bool
     
     enum CodingKeys: String, CodingKey {
-        case userVisible
-        case agentVisible
+        case userVisible  // Server expects camelCase
+        case agentVisible  // Server expects camelCase
     }
 }
 
@@ -107,6 +109,7 @@ enum MessageContent: Codable {
     case toolResponse(ToolResponseContent)
     case toolConfirmationRequest(ToolConfirmationRequestContent)
     case summarizationRequested(SummarizationRequestedContent)
+    case conversationCompacted(ConversationCompactedContent)
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -127,6 +130,8 @@ enum MessageContent: Codable {
             self = .toolConfirmationRequest(try ToolConfirmationRequestContent(from: decoder))
         case "summarizationRequested":
             self = .summarizationRequested(try SummarizationRequestedContent(from: decoder))
+        case "conversationCompacted":
+            self = .conversationCompacted(try ConversationCompactedContent(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message content type: \(type)")
         }
@@ -143,6 +148,8 @@ enum MessageContent: Codable {
         case .toolConfirmationRequest(let content):
             try content.encode(to: encoder)
         case .summarizationRequested(let content):
+            try content.encode(to: encoder)
+        case .conversationCompacted(let content):
             try content.encode(to: encoder)
         }
     }
@@ -188,6 +195,11 @@ struct SummarizationRequestedContent: Codable {
     let type = "summarizationRequested"
     // Add any fields that might be in the summarization request
     // For now, keeping it minimal since we don't know the exact structure
+}
+
+struct ConversationCompactedContent: Codable {
+    let type = "conversationCompacted"
+    let msg: String
 }
 
 struct ToolCall: Codable {
@@ -311,15 +323,15 @@ struct AnyCodable: Codable {
 // MARK: - Chat Request/Response Models
 struct ChatRequest: Codable {
     let messages: [Message]
-    let sessionId: String?
-    let sessionWorkingDir: String
-    let scheduledJobId: String?
+    let sessionId: String  // Changed to non-optional as server requires it
+    let recipeName: String?
+    let recipeVersion: String?
     
     enum CodingKeys: String, CodingKey {
         case messages
         case sessionId = "session_id"
-        case sessionWorkingDir = "session_working_dir"
-        case scheduledJobId = "scheduled_job_id"
+        case recipeName = "recipe_name"
+        case recipeVersion = "recipe_version"
     }
 }
 
@@ -330,6 +342,7 @@ enum SSEEvent: Codable {
     case finish(FinishEvent)
     case modelChange(ModelChangeEvent)
     case notification(NotificationEvent)
+    case updateConversation(UpdateConversationEvent)
     case ping(PingEvent)
     
     enum CodingKeys: String, CodingKey {
@@ -351,6 +364,8 @@ enum SSEEvent: Codable {
             self = .modelChange(try ModelChangeEvent(from: decoder))
         case "Notification":
             self = .notification(try NotificationEvent(from: decoder))
+        case "UpdateConversation":
+            self = .updateConversation(try UpdateConversationEvent(from: decoder))
         case "Ping":
             self = .ping(try PingEvent(from: decoder))
         default:
@@ -369,6 +384,8 @@ enum SSEEvent: Codable {
         case .modelChange(let event):
             try event.encode(to: encoder)
         case .notification(let event):
+            try event.encode(to: encoder)
+        case .updateConversation(let event):
             try event.encode(to: encoder)
         case .ping(let event):
             try event.encode(to: encoder)
@@ -399,6 +416,11 @@ struct ModelChangeEvent: Codable {
 
 struct PingEvent: Codable {
     let type = "Ping"
+}
+
+struct UpdateConversationEvent: Codable {
+    let type = "UpdateConversation"
+    let conversation: [Message]
 }
 
 struct NotificationEvent: Codable {

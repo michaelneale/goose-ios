@@ -125,10 +125,17 @@ struct ContentView: View {
                 } else if configurationHandler.configurationSuccess {
                     ConfigurationStatusView(message: "✅ Configuration successful!", isSuccess: true)
                 } else if let error = configurationHandler.configurationError {
-                    ConfigurationStatusView(message: "❌ \(error)", isError: true)
-                        .onTapGesture {
-                            configurationHandler.clearError()
+                    ConfigurationStatusView(
+                        message: error, 
+                        isError: true,
+                        isTailscaleError: configurationHandler.isTailscaleError,
+                        onTailscaleAction: {
+                            configurationHandler.openTailscale()
                         }
+                    )
+                    .onTapGesture {
+                        configurationHandler.clearError()
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
@@ -202,29 +209,55 @@ struct ConfigurationStatusView: View {
     var isLoading = false
     var isSuccess = false
     var isError = false
+    var isTailscaleError = false
+    var onTailscaleAction: (() -> Void)?
     
     var backgroundColor: Color {
         if isSuccess { return .green }
+        if isError && isTailscaleError { return .blue }  // Friendly blue for Tailscale
         if isError { return .red }
         return .blue
     }
     
     var body: some View {
-        HStack(spacing: 12) {
-            if isLoading {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(0.8)
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                }
+                
+                Text(message)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                
+                if isError && !isTailscaleError {
+                    Text("Tap to dismiss")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.8))
+                }
             }
             
-            Text(message)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
-            
-            if isError {
-                Text("Tap to dismiss")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.8))
+            if isTailscaleError {
+                Button(action: {
+                    onTailscaleAction?()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.right.circle.fill")
+                        Text("Open Tailscale")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.white)
+                    .cornerRadius(6)
+                }
+                
+                Text("Tap anywhere to dismiss")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.7))
             }
         }
         .padding(.horizontal, 16)

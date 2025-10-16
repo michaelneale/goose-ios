@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// Handles configuration of the app from QR codes and URLs
 class ConfigurationHandler: ObservableObject {
@@ -7,6 +8,7 @@ class ConfigurationHandler: ObservableObject {
     @Published var isConfiguring = false
     @Published var configurationError: String?
     @Published var configurationSuccess = false
+    @Published var isTailscaleError = false
     
     private init() {}
     
@@ -107,7 +109,15 @@ class ConfigurationHandler: ObservableObject {
                         self.configurationSuccess = false
                     }
                 } else {
-                    self.configurationError = GooseAPIService.shared.connectionError ?? "Connection test failed"
+                    // Check if this is a Tailscale URL (100.x.x.x range)
+                    let originalError = GooseAPIService.shared.connectionError ?? "Connection test failed"
+                    if baseURL.hasPrefix("http://100.") {
+                        self.isTailscaleError = true
+                        self.configurationError = "Please log in to Tailscale to connect to your agent"
+                    } else {
+                        self.isTailscaleError = false
+                        self.configurationError = originalError
+                    }
                     print("❌ Configuration test failed: \(self.configurationError ?? "Unknown error")")
                 }
             }
@@ -117,6 +127,21 @@ class ConfigurationHandler: ObservableObject {
     /// Clear any configuration errors
     func clearError() {
         configurationError = nil
+        isTailscaleError = false
+    }
+    
+    /// Open Tailscale app or App Store
+    func openTailscale() {
+        // Try to open the Tailscale app first
+        if let tailscaleURL = URL(string: "tailscale://"), 
+           UIApplication.shared.canOpenURL(tailscaleURL) {
+            UIApplication.shared.open(tailscaleURL)
+        } else {
+            // If app isn't installed, open App Store
+            if let appStoreURL = URL(string: "https://apps.apple.com/app/tailscale/id1470499037") {
+                UIApplication.shared.open(appStoreURL)
+            }
+        }
     }
     
     /// Reset configuration to demo/trial mode
