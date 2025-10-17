@@ -110,6 +110,10 @@ struct SidebarView: View {
                             .frame(maxWidth: .infinity)
                             .background(Color(.systemBackground))
                             
+                            // Additional spacer below action buttons
+                            Color.clear
+                                .frame(height: 48)
+                            
                             // Spacer to push sessions further down
                             Color.clear
                                 .frame(height: 48)
