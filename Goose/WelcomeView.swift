@@ -338,7 +338,9 @@ struct WelcomeView: View {
     
     // Handle close session card
     private func handleCloseSessionCard() {
-        showSessionCard = false
+        withAnimation(.easeOut(duration: 0.35)) {
+            showSessionCard = false
+        }
         
         // Clear selected session after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
