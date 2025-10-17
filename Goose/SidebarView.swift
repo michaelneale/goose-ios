@@ -24,6 +24,11 @@ struct SidebarView: View {
             return screenWidth // 100% on iPhone
         }
     }
+    
+    // Check if we're on iPad
+    private var isIPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
 
     var body: some View {
         ZStack {
@@ -36,7 +41,7 @@ struct SidebarView: View {
                 .animation(.easeInOut(duration: 0.3), value: isShowing)
 
             // Sidebar panel
-            HStack {
+            HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
                     // Header with New Session button at top
                     HStack {
@@ -128,7 +133,10 @@ struct SidebarView: View {
                 .offset(x: isShowing ? 0 : -sidebarWidth)
                 .animation(.easeInOut(duration: 0.3), value: isShowing)
 
-                Spacer()
+                // Only add spacer on iPad to show overlay on the right
+                if isIPad {
+                    Spacer()
+                }
             }
         }
     }
