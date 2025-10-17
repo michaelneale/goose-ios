@@ -81,13 +81,22 @@ struct SidebarView: View {
                     // Sessions list with placeholders at top
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            // PLACEHOLDER SPACE 1 - Add status/buttons here
-                            VStack {
-                                Text("Status Area")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            // PLACEHOLDER SPACE 1 - Server status area
+                            HStack(spacing: 12) {
+                                Image("ServerIcon")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 13, height: 13)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Servers")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
                             }
-                            .frame(height: 100)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                             .frame(maxWidth: .infinity)
                             .background(Color(.systemBackground))
                             
