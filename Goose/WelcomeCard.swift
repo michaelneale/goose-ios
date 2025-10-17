@@ -4,6 +4,8 @@ struct WelcomeCard: View {
     @Environment(\.colorScheme) var colorScheme
     
     // Sidebar binding
+    var daysOffset: Int = 0 // Days offset from today (0 = today, 1 = yesterday, etc.)
+    var sessions: [ChatSession] = [] // All sessions for density calculation
     @Binding var showingSidebar: Bool
     
     // Animation states
@@ -12,6 +14,7 @@ struct WelcomeCard: View {
     @State private var showProgressSection = false
     @State private var progressValue: CGFloat = 0.0
     @State private var showActionsSection = false
+    @State private var hasInitiallyLoaded = false // Track if initial animation has completed
     
     // Token data - managed internally
     @State private var tokenCount: Int64 = 0
@@ -39,24 +42,90 @@ struct WelcomeCard: View {
         Color.blue
     }
     
-    // Computed property for time-aware greeting
-    private var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
+    // Session density levels
+    private enum SessionDensity {
+        case quiet, light, busy
+    }
+    
+    // Calculate session density for the current day
+    private var sessionDensity: SessionDensity {
+        let calendar = Calendar.current
+        let targetDate = calendar.date(byAdding: .day, value: -daysOffset, to: Date()) ?? Date()
         
-        switch hour {
-        case 0..<12:
-            return "Good morning!"
-        case 12..<17:
-            return "Good afternoon!"
-        case 17..<21:
-            return "Good evening!"
-        default:
-            return "Good night!"
+        let daySessions = sessions.filter { session in
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            guard let sessionDate = formatter.date(from: session.updatedAt) else {
+                return false
+            }
+            
+            return calendar.isDate(sessionDate, inSameDayAs: targetDate)
+        }
+        
+        let count = daySessions.count
+        
+        if count <= 2 {
+            return .quiet
+        } else if count <= 5 {
+            return .light
+        } else {
+            return .busy
+        }
+    }
+    
+    // Computed property for day-aware greeting with density awareness
+    private var greeting: String {
+        let calendar = Calendar.current
+        let targetDate = calendar.date(byAdding: .day, value: -daysOffset, to: Date()) ?? Date()
+        
+        if daysOffset == 0 {
+            // Today - use time-aware greeting
+            let hour = calendar.component(.hour, from: Date())
+            
+            switch hour {
+            case 0..<12:
+                return "Good morning!"
+            case 12..<17:
+                return "Good afternoon!"
+            case 17..<21:
+                return "Good evening!"
+            default:
+                return "Good night!"
+            }
+        } else {
+            // Past days - use density-based messages
+            let density = sessionDensity
+            
+            if daysOffset == 1 {
+                // Yesterday with density
+                switch density {
+                case .quiet:
+                    return "Quiet yesterday"
+                case .light:
+                    return "Light yesterday"
+                case .busy:
+                    return "Busy yesterday"
+                }
+            } else {
+                // Other days - show day of week
+                let formatter = DateFormatter()
+                formatter.dateFormat = "EEEE" // Full day name (e.g., "Monday")
+                return formatter.string(from: targetDate)
+            }
         }
     }
     
     private var subheading: String {
-        "What do you want to do?"
+        if daysOffset == 0 {
+            return "What do you want to do?"
+        } else {
+            let calendar = Calendar.current
+            let targetDate = calendar.date(byAdding: .day, value: -daysOffset, to: Date()) ?? Date()
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            return "Viewing \(formatter.string(from: targetDate))"
+        }
     }
     
     var body: some View {
@@ -68,8 +137,9 @@ struct WelcomeCard: View {
                         showingSidebar.toggle()
                     }
                 }) {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 22))
+                    Image("SideMenuIcon")
+                        .renderingMode(.template)
+                        .resizable()
                         .foregroundColor(.primary)
                         .frame(width: 24, height: 22)
                 }
@@ -96,59 +166,54 @@ struct WelcomeCard: View {
                 
                 Spacer()
                 
-                if showLogo {
-                    Image("GooseLogo")
-                        .resizable()
-                        .renderingMode(.template)
-                        .foregroundColor(.primary)
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 48, height: 48)
-                        .transition(.scale.combined(with: .opacity))
-                }
+                Image("GooseLogo")
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundColor(.primary)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 48, height: 48)
+                    .opacity(showLogo ? 1 : 0)
+                    .scaleEffect(showLogo ? 1 : 0.8)
             }
             
             // Actions and Apps Section - Placeholder (60px)
-            if showActionsSection {
-                Color.clear
-                    .frame(height: 60)
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity)
-            }
+            Color.clear
+                .frame(height: 60)
+                .frame(maxWidth: .infinity)
+                .opacity(showActionsSection ? 1 : 0)
             
             // Progress Section
-            if showProgressSection {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("TOKENS USED")
-                            .font(.system(size: 12, weight: .semibold))
-                            .tracking(1.02)
-                            .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
-                        
-                        Spacer()
-                        
-                        Text("\(formatTokenCount(tokenCount)) of 1B")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                    }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("TOKENS USED")
+                        .font(.system(size: 12, weight: .semibold))
+                        .tracking(1.02)
+                        .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
                     
-                    // Progress bar with better visibility
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            // Background
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(progressBackgroundColor)
-                                .frame(width: geometry.size.width, height: 4)
-                            
-                            // Foreground (animated) - BLUE for testing
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(progressForegroundColor)
-                                .frame(width: geometry.size.width * progressValue, height: 4)
-                        }
-                    }
-                    .frame(height: 4)
+                    Spacer()
+                    
+                    Text("\(formatTokenCount(tokenCount)) of 1B")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                 }
-                .transition(.opacity)
+                
+                // Progress bar with better visibility
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        // Background
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(progressBackgroundColor)
+                            .frame(width: geometry.size.width, height: 4)
+                        
+                        // Foreground (animated) - BLUE for testing
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(progressForegroundColor)
+                            .frame(width: geometry.size.width * progressValue, height: 4)
+                    }
+                }
+                .frame(height: 4)
             }
+            .opacity(showProgressSection ? 1 : 0)
         }
         .padding(.horizontal, 20)
         .padding(.top, 48)
@@ -180,11 +245,15 @@ struct WelcomeCard: View {
             y: 8
         )
         .onAppear {
-            startTypewriterEffect()
+            startTypewriterEffect(isInitialLoad: true)
             // Fetch token count
             Task {
                 await fetchTokenCount()
             }
+        }
+        .onChange(of: daysOffset) { _, _ in
+            // Re-trigger typewriter effect when day changes (text only)
+            startTypewriterEffect()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
             // Refresh token count when configuration changes
@@ -225,7 +294,7 @@ struct WelcomeCard: View {
     }
     
     // Typewriter effect for greeting text
-    private func startTypewriterEffect() {
+    private func startTypewriterEffect(isInitialLoad: Bool = false) {
         displayedText = ""
         let fullText = "\(greeting)\n\(subheading)"
         
@@ -234,36 +303,39 @@ struct WelcomeCard: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.02) {
                 displayedText.append(character)
                 
-                // When text is complete, show logo
+                // When text is complete, show logo and other sections (only on initial load)
                 if displayedText == fullText {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        showLogo = true
-                    }
-                    
-                    // Show actions section
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            showActionsSection = true
-                        }
-                    }
-                    
-                    // Show progress section
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            showProgressSection = true
+                    if isInitialLoad {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            showLogo = true
                         }
                         
-                        // Animate progress bar with current token count
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            let percentage = Double(tokenCount) / Double(maxTokens)
-                            print("Animating progress bar: tokenCount=\(tokenCount), percentage=\(percentage)")
-                            withAnimation(.easeOut(duration: 0.8)) {
-                                progressValue = CGFloat(min(percentage, 1.0))
+                        // Show actions section
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                showActionsSection = true
+                            }
+                        }
+                        
+                        // Show progress section
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                showProgressSection = true
                             }
                             
-                            // Notify parent that animation is complete
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                                onAnimationComplete?()
+                            // Animate progress bar with current token count
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                let percentage = Double(tokenCount) / Double(maxTokens)
+                                print("Animating progress bar: tokenCount=\(tokenCount), percentage=\(percentage)")
+                                withAnimation(.easeOut(duration: 0.8)) {
+                                    progressValue = CGFloat(min(percentage, 1.0))
+                                }
+                                
+                                // Notify parent that animation is complete
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                    onAnimationComplete?()
+                                    hasInitiallyLoaded = true
+                                }
                             }
                         }
                     }

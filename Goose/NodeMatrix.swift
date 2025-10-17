@@ -4,12 +4,14 @@ struct NodeMatrix: View {
     let sessions: [ChatSession]
     let selectedSessionId: String?
     let onNodeTap: (ChatSession, CGPoint) -> Void
+    let onDayChange: ((Int) -> Void)? // NEW: Callback when day changes
     var showDraftNode: Bool = false
     @Environment(\.colorScheme) var colorScheme
     @State private var daysOffset: Int = 0 // 0 = today, 1 = yesterday, etc.
     @State private var dragOffset: CGFloat = 0
     @GestureState private var isDragging: Bool = false
     @State private var pulseAnimation = false // For draft node pulsing
+    @State private var dashPhase: CGFloat = 0 // For draft line animation
     
     // Get the date for the current offset
     private var targetDate: Date {
@@ -135,7 +137,7 @@ struct NodeMatrix: View {
                             }
                             .stroke(
                                 Color.green.opacity(0.3),
-                                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [5, 5])
+                                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [5, 5], dashPhase: dashPhase)
                             )
                             .transition(.opacity)
                         }
@@ -198,12 +200,18 @@ struct NodeMatrix: View {
                             .position(draftPosition)
                             .transition(.scale.combined(with: .opacity))
                             .onAppear {
+                                // Animate the pulsing ring
                                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
                                     pulseAnimation = true
+                                }
+                                // Animate the dashed line (flowing effect)
+                                withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                                    dashPhase = 10 // Move the dash pattern
                                 }
                             }
                             .onDisappear {
                                 pulseAnimation = false
+                                dashPhase = 0
                             }
                         }
                         
@@ -309,6 +317,14 @@ struct NodeMatrix: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 // State change will trigger draft node appearance
             }
+        }
+        .onChange(of: daysOffset) { oldValue, newValue in
+            // NEW: Notify parent when day changes
+            onDayChange?(newValue)
+        }
+        .onAppear {
+            // NEW: Notify parent of initial day on appear
+            onDayChange?(daysOffset)
         }
     }
     
@@ -538,6 +554,9 @@ struct SimulatedMessageDotsOverlay: View {
             selectedSessionId: "2",
             onNodeTap: { session, position in
                 print("Tapped session: \(session.description) at position: \(position)")
+            },
+            onDayChange: { daysOffset in
+                print("Day changed to offset: \(daysOffset)")
             },
             showDraftNode: true
         )

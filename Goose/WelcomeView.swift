@@ -22,10 +22,12 @@ struct WelcomeView: View {
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
     @State private var showTrialModeCard = false
+    @State private var currentDaysOffset: Int = 0 // Track current day being viewed in NodeMatrix
     
     // Session card state
     @State private var selectedSession: ChatSession? = nil
     @State private var showSessionCard = false
+    @State private var selectedSessionPosition: CGPoint = .zero // Store position for transition to focus mode
     
     // Node focus state (for focus mode)
     @State private var focusedNodeSession: ChatSession? = nil
@@ -85,7 +87,7 @@ struct WelcomeView: View {
                                 GeometryReader { matrixGeo in
                                     NodeMatrix(
                                         sessions: recentSessions,
-                                        selectedSessionId: isInputFocused ? focusedNodeSession?.id : selectedSession?.id,
+                                        selectedSessionId: isInputFocused ? focusedNodeSession?.id : (showSessionCard ? selectedSession?.id : nil),
                                         onNodeTap: { session, position in
                                             // Convert position from NodeMatrix local space to global space
                                             let globalPosition = CGPoint(
@@ -93,6 +95,9 @@ struct WelcomeView: View {
                                                 y: matrixGeo.frame(in: .global).minY + position.y
                                             )
                                             handleNodeTap(session, at: globalPosition)
+                                        },
+                                        onDayChange: { daysOffset in
+                                            currentDaysOffset = daysOffset
                                         },
                                         showDraftNode: isInputFocused && focusedNodeSession == nil
                                     )
@@ -112,7 +117,12 @@ struct WelcomeView: View {
                         // Dismiss keyboard and return to home when tapping outside chat input
                         if isInputFocused {
                             isInputFocused = false
-                            focusedNodeSession = nil
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                focusedNodeSession = nil
+                            }
+                        } else if showSessionCard {
+                            // Dismiss session card when tapping background
+                            handleCloseSessionCard()
                         }
                     }
                     
@@ -129,11 +139,14 @@ struct WelcomeView: View {
                             showTrialInstructions = true
                         }
                     )
+                    .zIndex(10) // Always on top for tappability
                 }
                 
                 // Welcome Card overlaid on top (full bleed) - animated
                 VStack {
                     WelcomeCard(
+                        daysOffset: currentDaysOffset,
+                        sessions: recentSessions,
                         showingSidebar: $showingSidebar,
                         onAnimationComplete: {
                             // Show trial mode card if in trial mode
@@ -162,25 +175,31 @@ struct WelcomeView: View {
                 
                 // Sessions Card - slides in from top, overlays WelcomeCard
                 if showSessionCard, let session = selectedSession {
-                    VStack {
-                        SessionsCard(
-                            session: session,
-                            onClose: {
-                                handleCloseSessionCard()
-                            },
-                            onSessionSelect: { sessionId in
-                                onSessionSelect(sessionId)
-                                handleCloseSessionCard()
-                            }
-                        )
+                    ZStack {
                         
-                        Spacer()
+                        VStack {
+                            SessionsCard(
+                                session: session,
+                                onClose: {
+                                    handleCloseSessionCard()
+                                },
+                                onSessionSelect: { sessionId in
+                                    onSessionSelect(sessionId)
+                                    handleCloseSessionCard()
+                                }
+                            )
+                            
+                            Spacer()
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    handleCloseSessionCard()
+                                }
+                        }
+                        .allowsHitTesting(true)
                     }
+                    .frame(maxHeight: .infinity, alignment: .top)
                     .zIndex(2)
-                    .allowsHitTesting(true)
-                    .transition(.identity)
                     .offset(y: showSessionCard ? 0 : -500)
-                    .animation(.easeOut(duration: 0.35), value: showSessionCard)
                 }
                 
                 // NodeFocus popover - overlaid on top, positioned near the node
@@ -191,7 +210,9 @@ struct WelcomeView: View {
                     
                     // Calculate optimal position with bounds checking
                     let targetX = focusedNodePosition.x
-                    let targetY = focusedNodePosition.y - offsetAboveNode
+                    // Account for WelcomeCard shift when input is focused
+                    let welcomeCardOffset: CGFloat = isInputFocused ? -350 : 0
+                    let targetY = focusedNodePosition.y - offsetAboveNode + welcomeCardOffset
                     
                     // Clamp X to keep popover on screen
                     let clampedX = min(max(targetX, popoverWidth / 2 + 16), geometry.size.width - popoverWidth / 2 - 16)
@@ -236,9 +257,22 @@ struct WelcomeView: View {
             }
         }
         .onChange(of: isInputFocused) { oldValue, newValue in
-            // Clear focused node when input loses focus
-            if !newValue {
-                focusedNodeSession = nil
+            if newValue {
+                // Input gained focus
+                // If there's a selected session AND the card is showing, transfer it to focus mode
+                if let selected = selectedSession, showSessionCard {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        focusedNodeSession = selected
+                        focusedNodePosition = selectedSessionPosition
+                        // Dismiss session card
+                        showSessionCard = false
+                    }
+                }
+            } else {
+                // Input lost focus - clear focused node
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    focusedNodeSession = nil
+                }
             }
         }
         .onAppear {
@@ -300,21 +334,19 @@ struct WelcomeView: View {
         } else {
             // Not in focus mode - show SessionCard
             selectedSession = session
-            showSessionCard = true
+            selectedSessionPosition = position // Store position for potential transition to focus mode
+            withAnimation(.easeOut(duration: 0.35)) {
+                showSessionCard = true
+            }
         }
     }
     
     // Handle close session card
     private func handleCloseSessionCard() {
-        showSessionCard = false
-        
-        // Clear selected session after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            selectedSession = nil
+        withAnimation(.easeOut(duration: 0.35)) {
+            showSessionCard = false
         }
     }
-    
-    // Load recent sessions - use cached if available, otherwise fetch
     private func loadRecentSessions() async {
         // Use cached sessions immediately if available
         if !cachedSessions.isEmpty {
