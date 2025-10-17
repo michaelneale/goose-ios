@@ -120,6 +120,9 @@ struct WelcomeView: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 focusedNodeSession = nil
                             }
+                        } else if showSessionCard {
+                            // Dismiss session card when tapping background
+                            handleCloseSessionCard()
                         }
                     }
                     
