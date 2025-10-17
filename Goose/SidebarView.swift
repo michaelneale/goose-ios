@@ -14,6 +14,16 @@ struct SidebarView: View {
     @Binding var cachedSessions: [ChatSession]
     let onSessionSelect: (String) -> Void
     let onNewSession: () -> Void
+    
+    // Dynamic sidebar width based on device
+    private var sidebarWidth: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return screenWidth * 0.5 // 50% on iPad
+        } else {
+            return screenWidth // 100% on iPhone
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -120,9 +130,9 @@ struct SidebarView: View {
                     .buttonStyle(.plain)
                     .background(Color(.systemBackground))
                 }
-                .frame(width: 280)
+                .frame(width: sidebarWidth)
                 .background(Color(.systemBackground))
-                .offset(x: isShowing ? 0 : -280)
+                .offset(x: isShowing ? 0 : -sidebarWidth)
 
                 Spacer()
             }
