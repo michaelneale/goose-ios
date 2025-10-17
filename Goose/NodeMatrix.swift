@@ -4,6 +4,7 @@ struct NodeMatrix: View {
     let sessions: [ChatSession]
     let selectedSessionId: String?
     let onNodeTap: (ChatSession, CGPoint) -> Void
+    let onDayChange: ((Int) -> Void)? // NEW: Callback when day changes
     var showDraftNode: Bool = false
     @Environment(\.colorScheme) var colorScheme
     @State private var daysOffset: Int = 0 // 0 = today, 1 = yesterday, etc.
@@ -310,6 +311,14 @@ struct NodeMatrix: View {
                 // State change will trigger draft node appearance
             }
         }
+        .onChange(of: daysOffset) { oldValue, newValue in
+            // NEW: Notify parent when day changes
+            onDayChange?(newValue)
+        }
+        .onAppear {
+            // NEW: Notify parent of initial day on appear
+            onDayChange?(daysOffset)
+        }
     }
     
     // Calculate position for draft node - improved to prevent off-screen placement
@@ -538,6 +547,9 @@ struct SimulatedMessageDotsOverlay: View {
             selectedSessionId: "2",
             onNodeTap: { session, position in
                 print("Tapped session: \(session.description) at position: \(position)")
+            },
+            onDayChange: { daysOffset in
+                print("Day changed to offset: \(daysOffset)")
             },
             showDraftNode: true
         )

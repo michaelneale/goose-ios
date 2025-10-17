@@ -22,6 +22,7 @@ struct WelcomeView: View {
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
     @State private var showTrialModeCard = false
+    @State private var currentDaysOffset: Int = 0 // Track current day being viewed in NodeMatrix
     
     // Session card state
     @State private var selectedSession: ChatSession? = nil
@@ -94,6 +95,9 @@ struct WelcomeView: View {
                                             )
                                             handleNodeTap(session, at: globalPosition)
                                         },
+                                        onDayChange: { daysOffset in
+                                            currentDaysOffset = daysOffset
+                                        },
                                         showDraftNode: isInputFocused && focusedNodeSession == nil
                                     )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -134,6 +138,8 @@ struct WelcomeView: View {
                 // Welcome Card overlaid on top (full bleed) - animated
                 VStack {
                     WelcomeCard(
+                        daysOffset: currentDaysOffset,
+                        sessions: recentSessions,
                         showingSidebar: $showingSidebar,
                         onAnimationComplete: {
                             // Show trial mode card if in trial mode
