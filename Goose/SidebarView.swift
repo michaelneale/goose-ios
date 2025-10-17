@@ -101,6 +101,10 @@ struct SidebarView: View {
                             .frame(maxWidth: .infinity)
                             .background(Color(.systemBackground))
                             
+                            // Spacer to push sessions further down
+                            Color.clear
+                                .frame(height: 48)
+                            
                             Divider()
                                 .padding(.vertical, 8)
                             
