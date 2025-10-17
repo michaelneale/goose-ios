@@ -194,6 +194,7 @@ struct WelcomeView: View {
                         }
                         .allowsHitTesting(true)
                     }
+                    .frame(maxHeight: .infinity, alignment: .top)
                     .zIndex(2)
                     .offset(y: showSessionCard ? 0 : -500)
                 }
