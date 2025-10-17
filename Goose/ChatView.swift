@@ -83,7 +83,7 @@ struct ChatView: View {
                                 HStack {
                                     ProgressView()
                                         .scaleEffect(0.8)
-                                    Text("🔄 Following along...")
+                                    Text("🔍 Checking for new messages...")
                                         .font(.caption)
                                         .foregroundColor(.orange)
                                     Spacer()
@@ -618,11 +618,11 @@ struct ChatView: View {
 
         print("🔍 Last message role: \(lastMessage.role), age: \(Int(age))s")
 
-        // Always poll if last message is recent (< 5 minutes)
+        // Poll if last message is recent (< 2 minutes)
         // This catches both waiting-for-response and mid-response scenarios
-        let shouldPoll = age < 300 && age > -60  // 5 minutes, but also check for future dates
+        let shouldPoll = age < 120 && age > -60  // 2 minutes, but also check for future dates
         if shouldPoll {
-            print("🔍 ✅ Will start polling")
+            print("🔍 ✅ Will start polling (recent activity)")
         } else {
             print("🔍 ❌ Too old (\(Int(age))s), won't poll")
         }
