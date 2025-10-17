@@ -104,7 +104,7 @@ struct SidebarView: View {
                             VStack {
                                 Text("Action Buttons")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(.clear) // Hidden placeholder text
                             }
                             .frame(height: 100)
                             .frame(maxWidth: .infinity)
