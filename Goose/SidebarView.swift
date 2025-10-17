@@ -102,6 +102,7 @@ struct SidebarView: View {
                                         }
                                     }
                                 Divider()
+                                    .background(Color.gray.opacity(0.2))
                                     .padding(.leading)
                             }
                         }
