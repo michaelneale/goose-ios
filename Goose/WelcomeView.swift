@@ -27,6 +27,7 @@ struct WelcomeView: View {
     // Session card state
     @State private var selectedSession: ChatSession? = nil
     @State private var showSessionCard = false
+    @State private var selectedSessionPosition: CGPoint = .zero // Store position for transition to focus mode
     
     // Node focus state (for focus mode)
     @State private var focusedNodeSession: ChatSession? = nil
@@ -242,8 +243,23 @@ struct WelcomeView: View {
             }
         }
         .onChange(of: isInputFocused) { oldValue, newValue in
-            // Clear focused node when input loses focus
-            if !newValue {
+            if newValue {
+                // Input gained focus
+                // If there's a selected session from the session card, transfer it to focus mode
+                if let selected = selectedSession {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        focusedNodeSession = selected
+                        focusedNodePosition = selectedSessionPosition
+                        // Dismiss session card
+                        showSessionCard = false
+                    }
+                    // Clear selected session after a delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        selectedSession = nil
+                    }
+                }
+            } else {
+                // Input lost focus - clear focused node
                 focusedNodeSession = nil
             }
         }
@@ -306,6 +322,7 @@ struct WelcomeView: View {
         } else {
             // Not in focus mode - show SessionCard
             selectedSession = session
+            selectedSessionPosition = position // Store position for potential transition to focus mode
             showSessionCard = true
         }
     }
