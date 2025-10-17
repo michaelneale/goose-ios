@@ -9,8 +9,6 @@ struct NodeMatrix: View {
     @State private var daysOffset: Int = 0 // 0 = today, 1 = yesterday, etc.
     @State private var dragOffset: CGFloat = 0
     @GestureState private var isDragging: Bool = false
-    @State private var selectedSessionMessages: [Message] = []
-    @State private var isLoadingMessages = false
     @State private var pulseAnimation = false // For draft node pulsing
     
     // Get the date for the current offset
@@ -209,16 +207,16 @@ struct NodeMatrix: View {
                             }
                         }
                         
-                        // Draw message nodes for selected session
+                        // Draw message dots for selected session (using messageCount, no loading)
                         if let selectedId = selectedSessionId,
                            let selectedSession = daySessions.first(where: { $0.id == selectedId }),
-                           let sessionIndex = daySessions.firstIndex(where: { $0.id == selectedId }),
-                           !selectedSessionMessages.isEmpty {
+                           let sessionIndex = daySessions.firstIndex(where: { $0.id == selectedId }) {
                             
                             let sessionPosition = nodePosition(for: sessionIndex, session: selectedSession, in: nodeGeometry.size, allSessions: daySessions)
                             
-                            MessageNodesOverlay(
-                                messages: selectedSessionMessages,
+                            // Show simulated message dots based on messageCount
+                            SimulatedMessageDotsOverlay(
+                                messageCount: selectedSession.messageCount,
                                 centerPosition: sessionPosition,
                                 colorScheme: colorScheme
                             )
@@ -306,38 +304,12 @@ struct NodeMatrix: View {
                     }
             )
         }
-        .onChange(of: selectedSessionId) { oldValue, newValue in
-            // Clear messages immediately when selection changes
-            selectedSessionMessages = []
-            
-            if let sessionId = newValue {
-                Task {
-                    await loadMessagesForSession(sessionId)
-                }
-            }
-        }
         .onChange(of: showDraftNode) { oldValue, newValue in
             // Animate draft node appearance/disappearance
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 // State change will trigger draft node appearance
             }
         }
-    }
-    
-    // Load messages for selected session
-    private func loadMessagesForSession(_ sessionId: String) async {
-        isLoadingMessages = true
-        
-        do {
-            let result = try await GooseAPIService.shared.resumeAgent(sessionId: sessionId)
-            await MainActor.run {
-                selectedSessionMessages = result.messages
-            }
-        } catch {
-            print("Error loading messages: \(error)")
-        }
-        
-        isLoadingMessages = false
     }
     
     // Calculate position for draft node - improved to prevent off-screen placement
@@ -462,20 +434,31 @@ struct NodeMatrix: View {
     }
 }
 
-// MARK: - Message Nodes Overlay
-struct MessageNodesOverlay: View {
-    let messages: [Message]
+// MARK: - Simulated Message Dots Overlay (no message loading, just uses messageCount)
+struct SimulatedMessageDotsOverlay: View {
+    let messageCount: Int
     let centerPosition: CGPoint
     let colorScheme: ColorScheme
     
+    // Calculate how many dots to show based on message count
+    private var displayedDotCount: Int {
+        if messageCount <= 20 {
+            return messageCount
+        } else if messageCount <= 50 {
+            return messageCount / 2
+        } else {
+            return min(25, messageCount / 3)
+        }
+    }
+    
     var body: some View {
         ZStack {
-            // Draw connecting lines between message nodes
-            if messages.count > 1 {
+            // Draw connecting lines between dots
+            if displayedDotCount > 1 {
                 Path { path in
-                    for i in 0..<(messages.count - 1) {
-                        let startPos = messageNodePosition(for: i)
-                        let endPos = messageNodePosition(for: i + 1)
+                    for i in 0..<(displayedDotCount - 1) {
+                        let startPos = dotPosition(for: i)
+                        let endPos = dotPosition(for: i + 1)
                         
                         path.move(to: startPos)
                         path.addLine(to: endPos)
@@ -487,22 +470,20 @@ struct MessageNodesOverlay: View {
                 )
             }
             
-            // Draw message nodes
-            ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                let position = messageNodePosition(for: index)
-                
+            // Draw message dots
+            ForEach(0..<displayedDotCount, id: \.self) { index in
                 Circle()
-                    .fill(nodeColor(for: message.role))
+                    .fill(dotColor(for: index))
                     .frame(width: 4, height: 4)
-                    .position(position)
+                    .position(dotPosition(for: index))
             }
         }
     }
     
-    // Calculate position for each message node in a circle around the session node
-    private func messageNodePosition(for index: Int) -> CGPoint {
+    // Calculate position for each dot in a circle around the session node
+    private func dotPosition(for index: Int) -> CGPoint {
         let radius: CGFloat = 30
-        let angleStep = (2 * .pi) / CGFloat(messages.count)
+        let angleStep = (2 * .pi) / CGFloat(displayedDotCount)
         let angle = angleStep * CGFloat(index) - (.pi / 2) // Start from top
         
         let x = centerPosition.x + radius * cos(angle)
@@ -511,17 +492,20 @@ struct MessageNodesOverlay: View {
         return CGPoint(x: x, y: y)
     }
     
-    // Color based on message role
-    private func nodeColor(for role: MessageRole) -> Color {
-        switch role {
-        case .user:
+    // Simulate alternating user/assistant pattern for dots
+    private func dotColor(for index: Int) -> Color {
+        // Simulate a pattern: user, assistant, user, assistant, etc with occasional system
+        if index % 7 == 6 {
+            // Every 7th message is "system"
+            return Color.gray.opacity(0.6)
+        } else if index % 2 == 0 {
+            // Even indices are "user"
             return Color.blue.opacity(0.8)
-        case .assistant:
+        } else {
+            // Odd indices are "assistant"
             return colorScheme == .dark ?
                 Color.white.opacity(0.6) :
                 Color.black.opacity(0.4)
-        case .system:
-            return Color.gray.opacity(0.6)
         }
     }
 }

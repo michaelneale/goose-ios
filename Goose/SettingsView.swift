@@ -167,9 +167,9 @@ struct SettingsView: View {
 
                 // If connection failed, use ConfigurationHandler for consistent error display
                 if !apiService.isConnected {
-                    // Check if this is a Tailscale URL (100.x.x.x range)
+                    // Check if this is a Tailscale URL (100.x.x.x range or .ts.net domain)
                     let originalError = apiService.connectionError ?? "Connection test failed"
-                    if baseURL.hasPrefix("http://100.") {
+                    if configurationHandler.isTailscaleURL(baseURL) {
                         configurationHandler.isTailscaleError = true
                         configurationHandler.configurationError = "Please log in to Tailscale to connect to your agent"
                     } else {

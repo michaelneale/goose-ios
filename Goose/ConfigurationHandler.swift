@@ -109,9 +109,9 @@ class ConfigurationHandler: ObservableObject {
                         self.configurationSuccess = false
                     }
                 } else {
-                    // Check if this is a Tailscale URL (100.x.x.x range)
+                    // Check if this is a Tailscale URL (100.x.x.x range or .ts.net domain)
                     let originalError = GooseAPIService.shared.connectionError ?? "Connection test failed"
-                    if baseURL.hasPrefix("http://100.") {
+                    if self.isTailscaleURL(baseURL) {
                         self.isTailscaleError = true
                         self.configurationError = "Please log in to Tailscale to connect to your agent"
                     } else {
@@ -124,6 +124,14 @@ class ConfigurationHandler: ObservableObject {
         }
     }
 
+    /// Check if a URL is a Tailscale URL
+    /// Returns true for both 100.x.x.x IP addresses and .ts.net domains
+    func isTailscaleURL(_ urlString: String) -> Bool {
+        return urlString.hasPrefix("http://100.") || 
+               urlString.hasPrefix("https://100.") ||
+               urlString.contains(".ts.net")
+    }
+    
     /// Clear any configuration errors
     func clearError() {
         configurationError = nil
