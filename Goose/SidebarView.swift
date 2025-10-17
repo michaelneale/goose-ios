@@ -166,13 +166,11 @@ struct SessionRowView: View {
                 .foregroundColor(.primary)
             
             // Time ago and message count
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 // Time ago
                 Text(formatDate(session.timestamp))
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
-                
-                Spacer()
                 
                 // Message count with icon
                 HStack(spacing: 4) {
@@ -186,6 +184,8 @@ struct SessionRowView: View {
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
+                
+                Spacer()
             }
         }
         .padding(.horizontal, 16)
