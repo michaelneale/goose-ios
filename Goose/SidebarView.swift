@@ -158,21 +158,36 @@ struct SessionRowView: View {
     let session: ChatSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
+            // Session name
             Text(session.title)
-                .font(.headline)
+                .font(.system(size: 15, weight: .medium))
                 .lineLimit(1)
-
-            Text(session.lastMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-
-            Text(formatDate(session.timestamp))
-                .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundColor(.primary)
+            
+            // Time ago and message count
+            HStack(spacing: 12) {
+                // Time ago
+                Text(formatDate(session.timestamp))
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                // Message count with icon
+                HStack(spacing: 4) {
+                    Image(systemName: "message.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    Text("\(session.messageCount)")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+            }
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
