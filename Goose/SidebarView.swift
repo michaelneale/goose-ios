@@ -77,33 +77,33 @@ struct SidebarView: View {
                     .background(Color(.systemBackground))
 
                     Divider()
-                    
-                    // PLACEHOLDER SPACE 1 - Add content here
-                    VStack {
-                        Text("Placeholder 1")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(height: 100)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.systemGray6).opacity(0.3))
-                    
-                    // PLACEHOLDER SPACE 2 - Add content here
-                    VStack {
-                        Text("Placeholder 2")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(height: 100)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.systemGray5).opacity(0.3))
-                    
-                    Divider()
-                        .padding(.top, 20)
 
-                    // Sessions list (starts at ~60% down)
+                    // Sessions list with placeholders at top
                     ScrollView {
                         LazyVStack(spacing: 0) {
+                            // PLACEHOLDER SPACE 1 - Add status/buttons here
+                            VStack {
+                                Text("Status Area")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(height: 100)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemBackground))
+                            
+                            // PLACEHOLDER SPACE 2 - Add buttons/actions here
+                            VStack {
+                                Text("Action Buttons")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(height: 100)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemBackground))
+                            
+                            Divider()
+                                .padding(.vertical, 8)
+                            
                             // Sessions header
                             HStack {
                                 Text("Sessions")
