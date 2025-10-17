@@ -117,7 +117,9 @@ struct WelcomeView: View {
                         // Dismiss keyboard and return to home when tapping outside chat input
                         if isInputFocused {
                             isInputFocused = false
-                            focusedNodeSession = nil
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                focusedNodeSession = nil
+                            }
                         }
                     }
                     
@@ -269,7 +271,9 @@ struct WelcomeView: View {
                 }
             } else {
                 // Input lost focus - clear focused node
-                focusedNodeSession = nil
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    focusedNodeSession = nil
+                }
             }
         }
         .onAppear {
