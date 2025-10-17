@@ -52,6 +52,7 @@ struct ContentView: View {
                                     hasActiveChat = true
                                 }
                             },
+                                cachedSessions: cachedSessions,  // Pass cached sessions
                                 voiceManager: sharedVoiceManager
                             )
                             .navigationBarHidden(true)

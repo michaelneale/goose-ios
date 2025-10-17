@@ -6,9 +6,6 @@ struct SessionsCard: View {
     let onClose: () -> Void
     let onSessionSelect: (String) -> Void
     
-    @State private var messages: [Message] = []
-    @State private var isLoadingMessages = false
-    
     // Computed property for card background color
     private var cardBackgroundColor: Color {
         colorScheme == .dark ?
@@ -90,17 +87,9 @@ struct SessionsCard: View {
                     .foregroundColor(.secondary)
             }
             
-            // Message nodes visualization
-            if isLoadingMessages {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Spacer()
-                }
-                .frame(height: 80)
-            } else if !messages.isEmpty {
-                MessageNodesView(messages: messages)
+            // Message nodes visualization - based on message count
+            if session.messageCount > 0 {
+                SimulatedMessageNodesView(messageCount: session.messageCount)
                     .frame(height: 80)
             }
             
@@ -169,36 +158,32 @@ struct SessionsCard: View {
             x: 0,
             y: 8
         )
-        .task {
-            await loadMessages()
-        }
-    }
-    
-    // Load messages for the session
-    private func loadMessages() async {
-        isLoadingMessages = true
-        
-        do {
-            let result = try await GooseAPIService.shared.resumeAgent(sessionId: session.id)
-            messages = result.messages
-        } catch {
-            print("Error loading messages: \(error)")
-        }
-        
-        isLoadingMessages = false
     }
 }
 
-// MARK: - Message Nodes View
-struct MessageNodesView: View {
-    let messages: [Message]
+// MARK: - Simulated Message Nodes View (based on message count)
+struct SimulatedMessageNodesView: View {
+    let messageCount: Int
     @Environment(\.colorScheme) var colorScheme
+    
+    // Limit the number of dots displayed for performance and visual clarity
+    private var displayedDotCount: Int {
+        if messageCount <= 20 {
+            return messageCount
+        } else if messageCount <= 50 {
+            // Show every other message
+            return messageCount / 2
+        } else {
+            // Cap at 25 dots maximum
+            return min(25, messageCount / 3)
+        }
+    }
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 // Draw connecting line
-                if messages.count > 1 {
+                if displayedDotCount > 1 {
                     Path { path in
                         let startX = geometry.size.width * 0.1
                         let endX = geometry.size.width * 0.9
@@ -215,12 +200,12 @@ struct MessageNodesView: View {
                     )
                 }
                 
-                // Draw message nodes
-                ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                    let position = nodePosition(for: index, total: messages.count, in: geometry.size)
+                // Draw simulated message nodes
+                ForEach(0..<displayedDotCount, id: \.self) { index in
+                    let position = nodePosition(for: index, total: displayedDotCount, in: geometry.size)
                     
                     Circle()
-                        .fill(nodeColor(for: message.role))
+                        .fill(nodeColor(for: index))
                         .frame(width: 6, height: 6)
                         .position(position)
                 }
@@ -241,17 +226,18 @@ struct MessageNodesView: View {
         return CGPoint(x: x, y: y)
     }
     
-    // Color based on message role
-    private func nodeColor(for role: MessageRole) -> Color {
-        switch role {
-        case .user:
-            return Color.blue.opacity(colorScheme == .dark ? 0.6 : 0.5)
-        case .assistant:
+    // Simulate alternating user/assistant pattern with occasional system messages
+    private func nodeColor(for index: Int) -> Color {
+        // First message is typically user, then alternates with assistant
+        // Occasionally add a system message (every 7th message)
+        if index % 7 == 6 {
+            return Color.gray.opacity(0.5) // System message
+        } else if index % 2 == 0 {
+            return Color.blue.opacity(colorScheme == .dark ? 0.6 : 0.5) // User message
+        } else {
             return colorScheme == .dark ?
                 Color.white.opacity(0.5) :
-                Color.black.opacity(0.3)
-        case .system:
-            return Color.gray.opacity(0.5)
+                Color.black.opacity(0.3) // Assistant message
         }
     }
 }

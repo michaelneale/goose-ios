@@ -7,13 +7,14 @@ struct WelcomeView: View {
     @Environment(\.colorScheme) var colorScheme
     var onStartChat: (String) -> Void
     var onSessionSelect: (String) -> Void
+    var cachedSessions: [ChatSession] = []  // Pass in cached sessions from ContentView
     
     // Voice features - shared with ChatView
     @ObservedObject var voiceManager: EnhancedVoiceManager
     
     // States for welcome view
     @State private var recentSessions: [ChatSession] = []
-    @State private var isLoadingSessions = true
+    @State private var isLoadingSessions = false
     @State private var isSettingsPresented = false
     @State private var showTrialInstructions = false
     
@@ -313,19 +314,34 @@ struct WelcomeView: View {
         }
     }
     
-    // Load recent sessions from API
+    // Load recent sessions - use cached if available, otherwise fetch
     private func loadRecentSessions() async {
-        isLoadingSessions = true
-        
-        // Fetch insights and sessions in parallel
-        async let insightsTask = GooseAPIService.shared.fetchInsights()
-        async let sessionsTask = GooseAPIService.shared.fetchSessions()
-        
-        let (insights, sessions) = await (insightsTask, sessionsTask)
-        
-        await MainActor.run {
-            recentSessions = Array(sessions.prefix(30))
-            isLoadingSessions = false
+        // Use cached sessions immediately if available
+        if !cachedSessions.isEmpty {
+            await MainActor.run {
+                recentSessions = Array(cachedSessions.prefix(30))
+                isLoadingSessions = false
+            }
+            
+            // Optionally fetch fresh data in background for next time
+            // This is non-blocking and updates ContentView's cache
+            Task.detached(priority: .background) {
+                _ = await GooseAPIService.shared.fetchSessions()
+            }
+        } else {
+            // No cache, need to fetch
+            isLoadingSessions = true
+            
+            // Fetch insights and sessions in parallel
+            async let insightsTask = GooseAPIService.shared.fetchInsights()
+            async let sessionsTask = GooseAPIService.shared.fetchSessions()
+            
+            let (insights, sessions) = await (insightsTask, sessionsTask)
+            
+            await MainActor.run {
+                recentSessions = Array(sessions.prefix(30))
+                isLoadingSessions = false
+            }
         }
     }
 }
