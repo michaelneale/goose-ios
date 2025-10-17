@@ -31,10 +31,9 @@ struct SidebarView: View {
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isShowing = false
-                    }
+                    isShowing = false
                 }
+                .animation(.easeInOut(duration: 0.3), value: isShowing)
 
             // Sidebar panel
             HStack {
@@ -43,9 +42,7 @@ struct SidebarView: View {
                     HStack {
                         Button(action: {
                             onNewSession()
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isShowing = false
-                            }
+                            isShowing = false
                         }) {
                             Image(systemName: "plus")
                                 .font(.system(size: 18, weight: .medium))
@@ -59,9 +56,7 @@ struct SidebarView: View {
                         Spacer()
 
                         Button(action: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isShowing = false
-                            }
+                            isShowing = false
                         }) {
                             Image(systemName: "xmark")
                                 .font(.title3)
@@ -92,9 +87,7 @@ struct SidebarView: View {
                                 SessionRowView(session: session)
                                     .onTapGesture {
                                         onSessionSelect(session.id)
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            isShowing = false
-                                        }
+                                        isShowing = false
                                     }
                                 Divider()
                                     .padding(.leading)
@@ -133,6 +126,7 @@ struct SidebarView: View {
                 .frame(width: sidebarWidth)
                 .background(Color(.systemBackground))
                 .offset(x: isShowing ? 0 : -sidebarWidth)
+                .animation(.easeInOut(duration: 0.3), value: isShowing)
 
                 Spacer()
             }

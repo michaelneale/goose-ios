@@ -198,9 +198,7 @@ struct ChatView: View {
 
                     // Sidebar button
                     Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar.toggle()
-                        }
+                        showingSidebar.toggle()
                     }) {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 22))
