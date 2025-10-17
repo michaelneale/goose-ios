@@ -169,22 +169,31 @@ struct WelcomeView: View {
                 
                 // Sessions Card - slides in from top, overlays WelcomeCard
                 if showSessionCard, let session = selectedSession {
-                    VStack {
-                        SessionsCard(
-                            session: session,
-                            onClose: {
-                                handleCloseSessionCard()
-                            },
-                            onSessionSelect: { sessionId in
-                                onSessionSelect(sessionId)
+                    ZStack {
+                        // Dismissible background
+                        Color.black.opacity(0.001)
+                            .ignoresSafeArea()
+                            .onTapGesture {
                                 handleCloseSessionCard()
                             }
-                        )
                         
-                        Spacer()
+                        VStack {
+                            SessionsCard(
+                                session: session,
+                                onClose: {
+                                    handleCloseSessionCard()
+                                },
+                                onSessionSelect: { sessionId in
+                                    onSessionSelect(sessionId)
+                                    handleCloseSessionCard()
+                                }
+                            )
+                            
+                            Spacer()
+                        }
+                        .allowsHitTesting(true)
                     }
                     .zIndex(2)
-                    .allowsHitTesting(true)
                     .transition(.identity)
                     .offset(y: showSessionCard ? 0 : -500)
                     .animation(.easeOut(duration: 0.35), value: showSessionCard)
