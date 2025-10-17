@@ -68,8 +68,9 @@ struct WelcomeCard: View {
                         showingSidebar.toggle()
                     }
                 }) {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 22))
+                    Image("SideMenuIcon")
+                        .renderingMode(.template)
+                        .resizable()
                         .foregroundColor(.primary)
                         .frame(width: 24, height: 22)
                 }
