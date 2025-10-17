@@ -97,8 +97,7 @@ struct ContentView: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .background(Color(UIColor.systemBackground))
                     .offset(x: showingSidebar ? sidebarWidth : 0) // Offset content when sidebar shows
-                    .animation(.easeInOut(duration: 0.3), value: showingSidebar)
-                }
+                                    }
                 .edgesIgnoringSafeArea(.all)
                 
                 // Sidebar overlay

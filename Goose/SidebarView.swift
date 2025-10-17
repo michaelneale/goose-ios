@@ -36,9 +36,10 @@ struct SidebarView: View {
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    isShowing = false
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isShowing = false
+                    }
                 }
-                .animation(.easeInOut(duration: 0.3), value: isShowing)
 
             // Sidebar panel
             HStack(spacing: 0) {
@@ -47,7 +48,9 @@ struct SidebarView: View {
                     HStack {
                         Button(action: {
                             onNewSession()
-                            isShowing = false
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isShowing = false
+                            }
                         }) {
                             Image(systemName: "plus")
                                 .font(.system(size: 18, weight: .medium))
@@ -61,7 +64,9 @@ struct SidebarView: View {
                         Spacer()
 
                         Button(action: {
-                            isShowing = false
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isShowing = false
+                            }
                         }) {
                             Image(systemName: "xmark")
                                 .font(.title3)
@@ -92,7 +97,9 @@ struct SidebarView: View {
                                 SessionRowView(session: session)
                                     .onTapGesture {
                                         onSessionSelect(session.id)
-                                        isShowing = false
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            isShowing = false
+                                        }
                                     }
                                 Divider()
                                     .padding(.leading)
@@ -106,10 +113,14 @@ struct SidebarView: View {
 
                     // Bottom row: Settings button
                     Button(action: {
-                        // Close sidebar immediately
-                        isShowing = false
-                        // Open settings immediately (sheet will present after sidebar closes)
-                        isSettingsPresented = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            // Close sidebar with animation
+                            isShowing = false
+                        }
+                        // Open settings after animation completes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            isSettingsPresented = true
+                        }
                     }) {
                         HStack {
                             Image(systemName: "gear")
@@ -131,7 +142,6 @@ struct SidebarView: View {
                 .frame(width: sidebarWidth)
                 .background(Color(.systemBackground))
                 .offset(x: isShowing ? 0 : -sidebarWidth)
-                .animation(.easeInOut(duration: 0.3), value: isShowing)
 
                 // Only add spacer on iPad to show overlay on the right
                 if isIPad {
