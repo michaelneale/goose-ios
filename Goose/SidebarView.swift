@@ -142,6 +142,7 @@ struct SidebarView: View {
                 .frame(width: sidebarWidth)
                 .background(Color(.systemBackground))
                 .offset(x: isShowing ? 0 : -sidebarWidth)
+                .animation(.easeInOut(duration: 0.3), value: isShowing)
 
                 // Only add spacer on iPad to show overlay on the right
                 if isIPad {
