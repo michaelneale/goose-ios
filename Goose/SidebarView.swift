@@ -104,21 +104,6 @@ struct SidebarView: View {
                             // Spacer to push sessions further down
                             Color.clear
                                 .frame(height: 48)
-                            
-                            Divider()
-                                .padding(.vertical, 8)
-                            
-                            // Sessions header
-                            HStack {
-                                Text("Sessions")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
 
                             ForEach(cachedSessions) { session in
                                 SessionRowView(session: session)
