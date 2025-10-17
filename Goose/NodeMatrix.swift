@@ -11,6 +11,7 @@ struct NodeMatrix: View {
     @State private var dragOffset: CGFloat = 0
     @GestureState private var isDragging: Bool = false
     @State private var pulseAnimation = false // For draft node pulsing
+    @State private var dashPhase: CGFloat = 0 // For draft line animation
     
     // Get the date for the current offset
     private var targetDate: Date {
@@ -136,7 +137,7 @@ struct NodeMatrix: View {
                             }
                             .stroke(
                                 Color.green.opacity(0.3),
-                                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [5, 5])
+                                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [5, 5], dashPhase: dashPhase)
                             )
                             .transition(.opacity)
                         }
@@ -199,12 +200,18 @@ struct NodeMatrix: View {
                             .position(draftPosition)
                             .transition(.scale.combined(with: .opacity))
                             .onAppear {
+                                // Animate the pulsing ring
                                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
                                     pulseAnimation = true
+                                }
+                                // Animate the dashed line (flowing effect)
+                                withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                                    dashPhase = 10 // Move the dash pattern
                                 }
                             }
                             .onDisappear {
                                 pulseAnimation = false
+                                dashPhase = 0
                             }
                         }
                         
