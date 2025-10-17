@@ -176,8 +176,10 @@ struct SessionRowView: View {
                 
                 // Message count with icon
                 HStack(spacing: 4) {
-                    Image(systemName: "message.fill")
-                        .font(.system(size: 11))
+                    Image("MessageIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 12, height: 12)
                         .foregroundColor(.secondary)
                     
                     Text("\(session.messageCount)")
