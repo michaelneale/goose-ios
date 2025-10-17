@@ -336,7 +336,7 @@ struct WelcomeView: View {
             async let insightsTask = GooseAPIService.shared.fetchInsights()
             async let sessionsTask = GooseAPIService.shared.fetchSessions()
             
-            let (insights, sessions) = await (insightsTask, sessionsTask)
+            let (_, sessions) = await (insightsTask, sessionsTask)
             
             await MainActor.run {
                 recentSessions = Array(sessions.prefix(30))

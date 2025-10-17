@@ -186,22 +186,38 @@ struct WelcomeCard: View {
                 await fetchTokenCount()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
+            // Refresh token count when configuration changes
+            print("🔄 WelcomeCard: RefreshSessions notification received, refetching insights")
+            Task {
+                await fetchTokenCount()
+            }
+        }
     }
     
-    // Fetch token count from API
+    // Fetch token count from API - silent failure
     private func fetchTokenCount() async {
         let insights = await GooseAPIService.shared.fetchInsights()
         
         await MainActor.run {
             if let insights = insights {
                 tokenCount = insights.totalTokens
-                print("Fetched token count: \(tokenCount)")
+                print("✅ WelcomeCard: Fetched token count: \(tokenCount)")
                 
                 // Update progress bar if it's already visible
                 if showProgressSection {
                     let percentage = Double(tokenCount) / Double(maxTokens)
                     withAnimation(.easeOut(duration: 0.8)) {
                         progressValue = CGFloat(min(percentage, 1.0))
+                    }
+                }
+            } else {
+                // Silent failure - show 0
+                print("⚠️ WelcomeCard: Failed to fetch token count - showing 0")
+                tokenCount = 0
+                if showProgressSection {
+                    withAnimation(.easeOut(duration: 0.8)) {
+                        progressValue = 0
                     }
                 }
             }
