@@ -15,6 +15,8 @@ struct ChatView: View {
     @State private var currentSessionId: String?
     @State private var isSettingsPresented = false
 
+    @FocusState private var isInputFocused: Bool
+
     // Session polling for live updates
     @State private var isPollingForUpdates = false
     @State private var pollingTask: Task<Void, Never>?
@@ -81,7 +83,7 @@ struct ChatView: View {
                                 HStack {
                                     ProgressView()
                                         .scaleEffect(0.8)
-                                    Text("🔄 Following along...")
+                                    Text("🔍 Checking for new messages...")
                                         .font(.caption)
                                         .foregroundColor(.orange)
                                     Spacer()
@@ -166,6 +168,7 @@ struct ChatView: View {
 
                 ChatInputView(
                     text: $inputText,
+                    isFocused: $isInputFocused,
                     showPlusButton: true,
                     isLoading: isLoading,
                     voiceManager: voiceManager,
@@ -268,6 +271,24 @@ struct ChatView: View {
             ) { notification in
                 if let sessionId = notification.userInfo?["sessionId"] as? String {
                     loadSession(sessionId)
+                }
+            }
+
+            // Listen for message to be sent to specific session
+            NotificationCenter.default.addObserver(
+                forName: Notification.Name("SendMessageToSession"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let message = notification.userInfo?["message"] as? String,
+                   let sessionId = notification.userInfo?["sessionId"] as? String {
+                    // Load the session first
+                    loadSession(sessionId)
+                    // Then set the input text and send
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        inputText = message
+                        sendMessage()
+                    }
                 }
             }
         }
@@ -597,11 +618,11 @@ struct ChatView: View {
 
         print("🔍 Last message role: \(lastMessage.role), age: \(Int(age))s")
 
-        // Always poll if last message is recent (< 5 minutes)
+        // Poll if last message is recent (< 2 minutes)
         // This catches both waiting-for-response and mid-response scenarios
-        let shouldPoll = age < 300 && age > -60  // 5 minutes, but also check for future dates
+        let shouldPoll = age < 120 && age > -60  // 2 minutes, but also check for future dates
         if shouldPoll {
-            print("🔍 ✅ Will start polling")
+            print("🔍 ✅ Will start polling (recent activity)")
         } else {
             print("🔍 ❌ Too old (\(Int(age))s), won't poll")
         }

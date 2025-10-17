@@ -3,249 +3,224 @@ import SwiftUI
 struct WelcomeView: View {
     @Binding var showingSidebar: Bool
     @State private var inputText = ""
+    @FocusState private var isInputFocused: Bool
     @Environment(\.colorScheme) var colorScheme
     var onStartChat: (String) -> Void
     var onSessionSelect: (String) -> Void
+    var cachedSessions: [ChatSession] = []  // Pass in cached sessions from ContentView
     
     // Voice features - shared with ChatView
     @ObservedObject var voiceManager: EnhancedVoiceManager
     
     // States for welcome view
     @State private var recentSessions: [ChatSession] = []
-    @State private var isLoadingSessions = true
+    @State private var isLoadingSessions = false
     @State private var isSettingsPresented = false
     @State private var showTrialInstructions = false
     
     // Animation states
-    @State private var displayedText = ""
     @State private var showSessionsTitle = false
     @State private var visibleSessionsCount = 0
-    @State private var showLogo = false
-    @State private var showProgressSection = false
     @State private var showTrialModeCard = false
-    @State private var progressValue: CGFloat = 0.0
-    @State private var tokenCount: Int64 = 0
-    private let maxTokens: Int64 = 1_000_000_000 // 1 billion
+    
+    // Session card state
+    @State private var selectedSession: ChatSession? = nil
+    @State private var showSessionCard = false
+    
+    // Node focus state (for focus mode)
+    @State private var focusedNodeSession: ChatSession? = nil
+    @State private var focusedNodePosition: CGPoint = .zero
     
     // Access API service for trial mode check
     @StateObject private var apiService = GooseAPIService.shared
     
-    // Computed property for time-aware greeting
-    private var fullText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let greeting: String
-        
-        switch hour {
-        case 0..<12:
-            greeting = "Good morning!"
-        case 12..<17:
-            greeting = "Good afternoon!"
-        case 17..<21:
-            greeting = "Good evening!"
-        default:
-            greeting = "Good night!"
-        }
-        
-        return "\(greeting)\nWhat do you want to do?"
-    }
-    
     var body: some View {
-        VStack(spacing: 0) {
-            // Top navigation bar
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar.toggle()
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                // Main content - use VStack with Spacer to push input to bottom
+                VStack(spacing: 0) {
+                    // Spacer for the welcome card (animated height)
+                    Color.clear
+                        .frame(height: isInputFocused ? 0 : 300)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
+                    
+                    // Node Matrix Section - fills all remaining space above input
+                    ZStack {
+                        // Always render the space, just change the content
+                        if isLoadingSessions {
+                            // Loading state
+                            VStack {
+                                Spacer()
+                                if showSessionsTitle {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .tint(.secondary)
+                                        .transition(.opacity)
+                                }
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if recentSessions.isEmpty && !isInputFocused {
+                            // Empty state
+                            VStack {
+                                Spacer()
+                                if showSessionsTitle {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "calendar.badge.clock")
+                                            .font(.system(size: 32))
+                                            .foregroundColor(.secondary.opacity(0.5))
+                                        
+                                        Text("No sessions today")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .transition(.opacity)
+                                }
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // Node Matrix - fills all available space
+                            if showSessionsTitle {
+                                GeometryReader { matrixGeo in
+                                    NodeMatrix(
+                                        sessions: recentSessions,
+                                        selectedSessionId: isInputFocused ? focusedNodeSession?.id : selectedSession?.id,
+                                        onNodeTap: { session, position in
+                                            // Convert position from NodeMatrix local space to global space
+                                            let globalPosition = CGPoint(
+                                                x: matrixGeo.frame(in: .global).minX + position.x,
+                                                y: matrixGeo.frame(in: .global).minY + position.y
+                                            )
+                                            handleNodeTap(session, at: globalPosition)
+                                        },
+                                        showDraftNode: isInputFocused && focusedNodeSession == nil
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
+                                .transition(.opacity)
+                            } else {
+                                // Placeholder to maintain space before animation
+                                Color.clear
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
                         }
-                    }) {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 22))
-                            .foregroundColor(.primary)
-                            .frame(width: 24, height: 22)
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle()) // Make the entire area tappable
+                    .onTapGesture {
+                        // Dismiss keyboard and return to home when tapping outside chat input
+                        if isInputFocused {
+                            isInputFocused = false
+                            focusedNodeSession = nil
+                        }
+                    }
+                    
+                    // Chat input at bottom - always present
+                    ChatInputView(
+                        text: $inputText,
+                        isFocused: $isInputFocused,
+                        voiceManager: voiceManager,
+                        onSubmit: {
+                            handleSubmit()
+                        },
+                        showTrialBanner: apiService.isTrialMode && showTrialModeCard,
+                        onTrialBannerTap: {
+                            showTrialInstructions = true
+                        }
+                    )
+                }
+                
+                // Welcome Card overlaid on top (full bleed) - animated
+                VStack {
+                    WelcomeCard(
+                        showingSidebar: $showingSidebar,
+                        onAnimationComplete: {
+                            // Show trial mode card if in trial mode
+                            if apiService.isTrialMode {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    showTrialModeCard = true
+                                }
+                            }
+                            
+                            // Show sessions title
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeOut(duration: 0.3)) {
+                                    showSessionsTitle = true
+                                }
+                            }
+                        }
+                    )
                     
                     Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 66)
-                .padding(.bottom, 8)
-            }
-            .background(Color(UIColor.systemBackground).opacity(0.95))
-            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
-            
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Greeting text with goose logo
-                    HStack(alignment: .top, spacing: 16) {
-                        Text(displayedText)
-                            .font(.system(size: 20, weight: .medium))
-                            .lineSpacing(6)
-                            .foregroundColor(.primary)
+                .offset(y: isInputFocused ? -350 : 0)
+                .opacity(isInputFocused ? 0 : 1)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
+                .zIndex(1)
+                .allowsHitTesting(!showSessionCard && !isInputFocused) // Disable interaction when session card is showing or input focused
+                
+                // Sessions Card - slides in from top, overlays WelcomeCard
+                if showSessionCard, let session = selectedSession {
+                    VStack {
+                        SessionsCard(
+                            session: session,
+                            onClose: {
+                                handleCloseSessionCard()
+                            },
+                            onSessionSelect: { sessionId in
+                                onSessionSelect(sessionId)
+                                handleCloseSessionCard()
+                            }
+                        )
                         
                         Spacer()
-                        
-                        if showLogo {
-                            Image("GooseLogo")
-                                .resizable()
-                                .renderingMode(.template)
-                                .foregroundColor(.primary)
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 48, height: 48)
-                                .transition(.scale.combined(with: .opacity))
-                        }
                     }
-                    .padding(.top, 32)
-                    
-                    // Trial Mode Indicator Card - Always show if in trial mode
-                    if apiService.isTrialMode {
-                        Button(action: {
-                            showTrialInstructions = true
-                        }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "info.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.blue)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Trial Mode")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(.primary)
-                                    
-                                    Text("Connect to your personal goose agent for the full experience")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(colorScheme == .dark ?
-                                          Color(red: 0.15, green: 0.15, blue: 0.18) :
-                                          Color(red: 0.96, green: 0.96, blue: 0.98))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(
-                                        colorScheme == .dark ?
-                                        Color(red: 0.25, green: 0.25, blue: 0.28) :
-                                        Color(red: 0.88, green: 0.88, blue: 0.90),
-                                        lineWidth: 1
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .padding(.top, 8)
-                    }
-                    
-                    // Progress Section
-                    if showProgressSection {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("TOKENS USED")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .tracking(1.02)
-                                    .foregroundColor(Color(red: 0.56, green: 0.56, blue: 0.66))
-                                
-                                Spacer()
-                                
-                                Text("\(formatTokenCount(tokenCount)) of 1B")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            // Progress bar
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    // Background
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(colorScheme == .dark ? 
-                                              Color(red: 0.10, green: 0.10, blue: 0.13) : 
-                                              Color(red: 0.95, green: 0.95, blue: 0.95))
-                                        .frame(height: 12)
-                                    
-                                    // Foreground (animated)
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(colorScheme == .dark ? Color.white : Color.black)
-                                        .frame(width: geometry.size.width * progressValue, height: 12)
-                                }
-                            }
-                            .frame(height: 12)
-                        }
-                        .padding(.top, 16)
-                        .transition(.opacity)
-                    }
-                    
-                    // Recent Sessions Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        if showSessionsTitle {
-                            Text("RECENT SESSIONS")
-                                .font(.system(size: 12, weight: .semibold))
-                                .tracking(1.02)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 16)
-                        }
-                        
-                        if isLoadingSessions && showSessionsTitle {
-                            // Loading state
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .tint(.secondary)
-                                Spacer()
-                            }
-                            .frame(height: 100)
-                        } else if recentSessions.isEmpty && showSessionsTitle {
-                            // Empty state
-                            Text("No recent sessions")
-                                .font(.system(size: 14))
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 32)
-                        } else {
-                            // Session list - show sessions one by one
-                            VStack(spacing: 24) {
-                                ForEach(Array(recentSessions.prefix(3).enumerated()), id: \.element.id) { index, session in
-                                    if index < visibleSessionsCount {
-                                        WelcomeSessionRowView(session: session)
-                                            .transition(.opacity)
-                                            .onTapGesture {
-                                                // Load the session when tapped
-                                                onSessionSelect(session.id)
-                                            }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    Spacer(minLength: 180) // Space for input box
+                    .zIndex(2)
+                    .allowsHitTesting(true)
+                    .transition(.identity)
+                    .offset(y: showSessionCard ? 0 : -500)
+                    .animation(.easeOut(duration: 0.35), value: showSessionCard)
                 }
-                .padding(.horizontal, 16)
-            }
-            .refreshable {
-                await loadRecentSessions()
-            }
-            
-            // Bottom input area - using shared ChatInputView
-            ChatInputView(
-                text: $inputText,
-                voiceManager: voiceManager,
-                onSubmit: {
-                    onStartChat(inputText)
+                
+                // NodeFocus popover - overlaid on top, positioned near the node
+                if let focusedSession = focusedNodeSession, isInputFocused {
+                    let popoverWidth: CGFloat = 200
+                    let popoverHeight: CGFloat = 100 // Approximate height
+                    let offsetAboveNode: CGFloat = 70
+                    
+                    // Calculate optimal position with bounds checking
+                    let targetX = focusedNodePosition.x
+                    let targetY = focusedNodePosition.y - offsetAboveNode
+                    
+                    // Clamp X to keep popover on screen
+                    let clampedX = min(max(targetX, popoverWidth / 2 + 16), geometry.size.width - popoverWidth / 2 - 16)
+                    
+                    // Clamp Y to keep popover on screen (account for safe area)
+                    let clampedY = max(targetY, popoverHeight / 2 + 60)
+                    
+                    NodeFocus(
+                        session: focusedSession,
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                focusedNodeSession = nil
+                            }
+                        }
+                    )
+                    .position(x: clampedX, y: clampedY)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(3)
+                    .allowsHitTesting(true)
                 }
-            )
+                
+                // Safe area extension at the very top - covers the shadow
+                // Switches color based on focus state: system background when focused (draft view),
+                // WelcomeCard color when not focused
+                SafeAreaExtension(useSystemBackground: isInputFocused)
+                    .zIndex(10) // Increased from 3 to ensure it's always on top
+                    .allowsHitTesting(false) // Don't block touches
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
+            }
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
@@ -254,10 +229,16 @@ struct WelcomeView: View {
         .sheet(isPresented: $showTrialInstructions) {
             TrialModeInstructionsView()
         }
-        .onChange(of: voiceManager.transcribedText) { newText in
+        .onChange(of: voiceManager.transcribedText) { oldValue, newText in
             // Update input text with transcribed text in real-time
             if !newText.isEmpty && voiceManager.voiceMode != .normal {
                 inputText = newText
+            }
+        }
+        .onChange(of: isInputFocused) { oldValue, newValue in
+            // Clear focused node when input loses focus
+            if !newValue {
+                focusedNodeSession = nil
             }
         }
         .onAppear {
@@ -266,12 +247,9 @@ struct WelcomeView: View {
                 inputText = message
                 // Auto-send the message
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    onStartChat(inputText)
+                    handleSubmit()
                 }
             }
-            
-            // Start typewriter animation
-            startTypewriterEffect()
             
             // Load recent sessions
             Task {
@@ -282,125 +260,88 @@ struct WelcomeView: View {
             // Refresh sessions when settings are saved
             Task {
                 await loadRecentSessions()
-                // Update progress bar with new data
-                await MainActor.run {
-                    let percentage = Double(tokenCount) / Double(maxTokens)
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        progressValue = CGFloat(min(percentage, 1.0))
-                    }
-                }
             }
         }
     }
     
-    // Typewriter effect for greeting text
-    private func startTypewriterEffect() {
-        displayedText = ""
+    // Handle message submission
+    private func handleSubmit() {
+        let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
         
-        // Fast typewriter effect - 20ms per character
-        for (index, character) in fullText.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.02) {
-                displayedText.append(character)
-                
-                // When text is complete, show logo
-                if displayedText == fullText {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        showLogo = true
-                    }
-                    
-                    // Show trial mode card if in trial mode
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if apiService.isTrialMode {
-                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                showTrialModeCard = true
-                            }
-                        }
-                    }
-                    
-                    // Show progress section
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            showProgressSection = true
-                        }
-                        
-                        // Animate progress bar
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            let percentage = Double(tokenCount) / Double(maxTokens)
-                            withAnimation(.easeOut(duration: 0.8)) {
-                                progressValue = CGFloat(min(percentage, 1.0))
-                            }
-                        }
-                    }
-                    
-                    // Show sessions title
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            showSessionsTitle = true
-                        }
-                        
-                        // Show sessions one by one quickly (100ms between each)
-                        for i in 0..<min(3, recentSessions.count) {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4 + Double(i) * 0.1) {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    visibleSessionsCount = i + 1
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Load recent sessions from API
-    private func loadRecentSessions() async {
-        isLoadingSessions = true
-        
-        // Fetch insights and sessions in parallel
-        async let insightsTask = GooseAPIService.shared.fetchInsights()
-        async let sessionsTask = GooseAPIService.shared.fetchSessions()
-        
-        let (insights, sessions) = await (insightsTask, sessionsTask)
-        
-        await MainActor.run {
-            // Update token count from insights
-            if let insights = insights {
-                tokenCount = insights.totalTokens
-                
-                // If progress bar is already visible, update it immediately
-                if showProgressSection {
-                    let percentage = Double(tokenCount) / Double(maxTokens)
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        progressValue = CGFloat(min(percentage, 1.0))
-                    }
-                }
-            }
+        if let focusedSession = focusedNodeSession {
+            // Route to existing session
+            print("📨 Routing message to session: \(focusedSession.id)")
+            onSessionSelect(focusedSession.id)
             
-            recentSessions = Array(sessions.prefix(3))
-            isLoadingSessions = false
+            // Send the message to that session via notification
+            NotificationCenter.default.post(
+                name: Notification.Name("SendMessageToSession"),
+                object: nil,
+                userInfo: ["message": trimmedText, "sessionId": focusedSession.id]
+            )
             
-            // Update visible count if sessions loaded after animation
-            if showSessionsTitle && visibleSessionsCount == 0 {
-                for i in 0..<min(3, recentSessions.count) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            visibleSessionsCount = i + 1
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Format token count for display (e.g., "450M")
-    private func formatTokenCount(_ count: Int64) -> String {
-        let million: Int64 = 1_000_000
-        if count >= million {
-            let millions = Double(count) / Double(million)
-            return String(format: "%.0fM", millions)
+            // Clear state
+            focusedNodeSession = nil
         } else {
-            let thousands = Double(count) / 1000.0
-            return String(format: "%.0fK", thousands)
+            // Start new chat
+            onStartChat(inputText)
+        }
+    }
+    
+    // Handle node tap
+    private func handleNodeTap(_ session: ChatSession, at position: CGPoint) {
+        if isInputFocused {
+            // In focus mode - show NodeFocus popover
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                focusedNodeSession = session
+                focusedNodePosition = position
+            }
+        } else {
+            // Not in focus mode - show SessionCard
+            selectedSession = session
+            showSessionCard = true
+        }
+    }
+    
+    // Handle close session card
+    private func handleCloseSessionCard() {
+        showSessionCard = false
+        
+        // Clear selected session after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            selectedSession = nil
+        }
+    }
+    
+    // Load recent sessions - use cached if available, otherwise fetch
+    private func loadRecentSessions() async {
+        // Use cached sessions immediately if available
+        if !cachedSessions.isEmpty {
+            await MainActor.run {
+                recentSessions = Array(cachedSessions.prefix(30))
+                isLoadingSessions = false
+            }
+            
+            // Optionally fetch fresh data in background for next time
+            // This is non-blocking and updates ContentView's cache
+            Task.detached(priority: .background) {
+                _ = await GooseAPIService.shared.fetchSessions()
+            }
+        } else {
+            // No cache, need to fetch
+            isLoadingSessions = true
+            
+            // Fetch insights and sessions in parallel
+            async let insightsTask = GooseAPIService.shared.fetchInsights()
+            async let sessionsTask = GooseAPIService.shared.fetchSessions()
+            
+            let (insights, sessions) = await (insightsTask, sessionsTask)
+            
+            await MainActor.run {
+                recentSessions = Array(sessions.prefix(30))
+                isLoadingSessions = false
+            }
         }
     }
 }
