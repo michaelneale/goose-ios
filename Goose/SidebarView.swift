@@ -14,6 +14,21 @@ struct SidebarView: View {
     @Binding var cachedSessions: [ChatSession]
     let onSessionSelect: (String) -> Void
     let onNewSession: () -> Void
+    
+    // Dynamic sidebar width based on device
+    private var sidebarWidth: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return screenWidth * 0.5 // 50% on iPad
+        } else {
+            return screenWidth // 100% on iPhone
+        }
+    }
+    
+    // Check if we're on iPad
+    private var isIPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
 
     var body: some View {
         ZStack {
@@ -27,7 +42,7 @@ struct SidebarView: View {
                 }
 
             // Sidebar panel
-            HStack {
+            HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
                     // Header with New Session button at top
                     HStack {
@@ -63,20 +78,45 @@ struct SidebarView: View {
 
                     Divider()
 
-                    // Sessions list
+                    // Sessions list with placeholders at top
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            // Sessions header
-                            HStack {
-                                Text("Sessions")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
+                            // PLACEHOLDER SPACE 1 - Server status area
+                            HStack(spacing: 12) {
+                                Image("ServerIcon")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 13, height: 13)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Servers")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.primary)
+                                
                                 Spacer()
                             }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemBackground))
+                            
+                            // PLACEHOLDER SPACE 2 - Add buttons/actions here
+                            VStack {
+                                Text("Action Buttons")
+                                    .font(.caption)
+                                    .foregroundColor(.clear) // Hidden placeholder text
+                            }
+                            .frame(height: 100)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemBackground))
+                            
+                            // Additional spacer below action buttons
+                            Color.clear
+                                .frame(height: 48)
+                            
+                            // Spacer to push sessions further down
+                            Color.clear
+                                .frame(height: 48)
 
                             ForEach(cachedSessions) { session in
                                 SessionRowView(session: session)
@@ -87,6 +127,7 @@ struct SidebarView: View {
                                         }
                                     }
                                 Divider()
+                                    .background(Color.gray.opacity(0.2))
                                     .padding(.leading)
                             }
                         }
@@ -98,10 +139,14 @@ struct SidebarView: View {
 
                     // Bottom row: Settings button
                     Button(action: {
-                        // Close sidebar immediately
-                        isShowing = false
-                        // Open settings immediately (sheet will present after sidebar closes)
-                        isSettingsPresented = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            // Close sidebar with animation
+                            isShowing = false
+                        }
+                        // Open settings after animation completes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            isSettingsPresented = true
+                        }
                     }) {
                         HStack {
                             Image(systemName: "gear")
@@ -120,11 +165,15 @@ struct SidebarView: View {
                     .buttonStyle(.plain)
                     .background(Color(.systemBackground))
                 }
-                .frame(width: 280)
+                .frame(width: sidebarWidth)
                 .background(Color(.systemBackground))
-                .offset(x: isShowing ? 0 : -280)
+                .offset(x: isShowing ? 0 : -sidebarWidth)
+                .animation(.easeInOut(duration: 0.3), value: isShowing)
 
-                Spacer()
+                // Only add spacer on iPad to show overlay on the right
+                if isIPad {
+                    Spacer()
+                }
             }
         }
     }
@@ -135,21 +184,35 @@ struct SessionRowView: View {
     let session: ChatSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            // Session name
             Text(session.title)
-                .font(.headline)
+                .font(.system(size: 15, weight: .medium))
                 .lineLimit(1)
-
-            Text(session.lastMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-
+                .foregroundColor(.primary)
+            
+            Spacer()
+            
+            // Time ago
             Text(formatDate(session.timestamp))
-                .font(.caption2)
+                .font(.system(size: 13))
                 .foregroundColor(.secondary)
+            
+            // Message count with icon
+            HStack(spacing: 4) {
+                Image("MessageIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 12, height: 12)
+                    .foregroundColor(.secondary)
+                
+                Text("\(session.messageCount)")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
