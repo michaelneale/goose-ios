@@ -527,11 +527,17 @@ struct SimulatedMessageDotsOverlay: View {
 }
 
 #Preview {
+    PreviewContainer()
+}
+
+struct PreviewContainer: View {
     let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    
     let calendar = Calendar.current
     let now = Date()
+    
+    init() {
+        formatter.formatOptions = [.withInternetDateTime]
+    }
     
     func dateString(daysAgo: Int, hoursAgo: Int, minutesOffset: Int = 0) -> String {
         var date = calendar.date(byAdding: .day, value: -daysAgo, to: now)!
@@ -540,7 +546,8 @@ struct SimulatedMessageDotsOverlay: View {
         return formatter.string(from: date)
     }
     
-    ZStack {
+    var body: some View {
+        ZStack {
         Color(UIColor.systemBackground)
             .ignoresSafeArea()
         
@@ -561,5 +568,6 @@ struct SimulatedMessageDotsOverlay: View {
             showDraftNode: true
         )
         .frame(height: 400)
+        }
     }
 }
