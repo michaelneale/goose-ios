@@ -560,21 +560,21 @@ class GooseAPIService: ObservableObject {
         return [
             ChatSession(
                 id: "trial-demo-1",
-                name: "📝 Debugging my python app",
+                description: "📝 Debugging my python app",
                 messageCount: 8,
                 createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 24)),
                 updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 2))
             ),
             ChatSession(
                 id: "trial-demo-2",
-                name: "🚀 Deploy my home server",
+                description: "🚀 Deploy my home server",
                 messageCount: 15,
                 createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 48)),
                 updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 12))
             ),
             ChatSession(
                 id: "trial-demo-3",
-                name: "🔍 Transcribe the latest podcast",
+                description: "🔍 Transcribe the latest podcast",
                 messageCount: 23,
                 createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 72)),
                 updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 24))
