@@ -118,8 +118,6 @@ struct SidebarView: View {
             
             // Bottom section: Theme toggle + Settings
             VStack(spacing: 0) {
-                Divider()
-                
                 HStack(spacing: 16) {
                     // Theme toggle
                     Button(action: {
@@ -133,22 +131,16 @@ struct SidebarView: View {
                     
                     Spacer()
                     
-                    // Settings button
+                    // Settings button (icon only)
                     Button(action: {
                         isShowing = false
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             isSettingsPresented = true
                         }
                     }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 18))
-                                .foregroundColor(themeManager.primaryTextColor)
-                            
-                            Text("Settings")
-                                .font(.system(size: 16))
-                                .foregroundColor(themeManager.primaryTextColor)
-                        }
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 18))
+                            .foregroundColor(themeManager.primaryTextColor)
                     }
                     .buttonStyle(.plain)
                 }

@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var initialMessage = ""
     @State private var shouldSendInitialMessage = false
     @State private var selectedSessionId: String?
-    @State private var sessionName: String = "New Session"
+    @State private var selectedSessionTitle: String = "New Session"
     @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
     @EnvironmentObject var configurationHandler: ConfigurationHandler
     @EnvironmentObject var themeManager: ThemeManager
@@ -52,6 +52,7 @@ struct ContentView: View {
                             }, onSessionSelect: { sessionId, sessionName in
                                 // Load existing session
                                 selectedSessionId = sessionId
+                                selectedSessionTitle = sessionName
                                 withAnimation {
                                     hasActiveChat = true
                                 }
@@ -67,11 +68,13 @@ struct ContentView: View {
                                 initialMessage: initialMessage,
                                 shouldSendMessage: shouldSendInitialMessage,
                                 selectedSessionId: selectedSessionId,
+                                selectedSessionTitle: selectedSessionTitle,
                                 onMessageSent: {
                                     // Clear the initial message after sending
                                     initialMessage = ""
                                     shouldSendInitialMessage = false
                                     selectedSessionId = nil
+                                    selectedSessionTitle = "New Session"
                                 },
                                 onBackToWelcome: {
                                     // Return to welcome screen
@@ -196,7 +199,7 @@ struct ContentView: View {
     private func navigateToSession(sessionId: String?, sessionName: String = "New Session") {
         print("🧭 Navigating to session: \(sessionId ?? "NEW SESSION")")
         self.selectedSessionId = sessionId
-        self.sessionName = sessionName
+        self.selectedSessionTitle = sessionName
         self.initialMessage = ""
         self.shouldSendInitialMessage = false
         withAnimation {
@@ -208,30 +211,42 @@ struct ContentView: View {
     
     // Preload sessions in background
     private func preloadSessions() async {
-        print("📥 Attempting to preload sessions...")
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📥 ContentView: Preloading sessions for sidebar...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
+        
+        print("\n🔍 After fetch: Got \(fetchedSessions.count) sessions")
+        for (i, s) in fetchedSessions.prefix(3).enumerated() {
+            let age = Date().timeIntervalSince(s.timestamp) / 86400
+            print("  [\(i)] '\(s.description)' - \(String(format: "%.1f", age)) days ago")
+        }
+        
         await MainActor.run {
-            // Deduplicate sessions by ID (in case backend returns duplicates)
+            // Deduplicate
             var seenIds = Set<String>()
             let uniqueSessions = fetchedSessions.filter { session in
                 if seenIds.contains(session.id) {
-                    print("⚠️ Skipping duplicate session ID: \(session.id)")
                     return false
                 }
                 seenIds.insert(session.id)
                 return true
             }
             
-            // Sort by timestamp descending (most recent first) and limit to first 10
+            print("\n🔍 After dedup: \(uniqueSessions.count) unique sessions")
+            
+            // Sort by timestamp descending (newest first)
             let sorted = uniqueSessions.sorted { $0.timestamp > $1.timestamp }
+            
+            print("\n📊 After sorting (newest first):")
+            for (i, s) in sorted.prefix(10).enumerated() {
+                let age = Date().timeIntervalSince(s.timestamp) / 86400
+                print("  [\(i)] '\(s.description)' - \(String(format: "%.1f", age)) days")
+            }
+            
             self.cachedSessions = Array(sorted.prefix(10))
             
-            print("✅ Preloaded \(self.cachedSessions.count) unique sessions (from \(fetchedSessions.count) fetched)")
-            if self.cachedSessions.isEmpty {
-                print("⚠️ No sessions preloaded - server may not be connected or no sessions exist")
-            } else {
-                print("📋 Most recent session: '\(self.cachedSessions.first?.title ?? "Unknown")'")
-            }
+            print("\n✅ FINAL: Cached \(self.cachedSessions.count) for sidebar")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
         }
     }
     
@@ -315,6 +330,7 @@ struct ChatViewWithInitialMessage: View {
     let initialMessage: String
     let shouldSendMessage: Bool
     let selectedSessionId: String?
+    let selectedSessionTitle: String
     let onMessageSent: () -> Void
     let onBackToWelcome: () -> Void
     
@@ -327,7 +343,10 @@ struct ChatViewWithInitialMessage: View {
                         NotificationCenter.default.post(
                             name: Notification.Name("LoadSession"),
                             object: nil,
-                            userInfo: ["sessionId": sessionId]
+                            userInfo: [
+                                "sessionId": sessionId,
+                                "sessionTitle": selectedSessionTitle
+                            ]
                         )
                         onMessageSent()
                     }

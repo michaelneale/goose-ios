@@ -1,5 +1,4 @@
 import SwiftUI
-import Markdown
 
 struct MessageBubbleView: View {
     let message: Message
@@ -34,10 +33,7 @@ struct MessageBubbleView: View {
             
             // Show consolidated task completion pill if there are completed tasks (PR #1 style)
             if !completedTasks.isEmpty {
-                // Show all completed tools as navigable pills
-                ForEach(completedTasks, id: \.toolCall.name) { completedTask in
-                    CompletedToolPillView(completedCall: completedTask, message: message, sessionName: sessionName)
-                }
+                CompletedTasksSummaryView(completedTasks: completedTasks, message: message, sessionName: sessionName)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -74,7 +70,7 @@ struct MessageContentView: View {
     var body: some View {
         switch content {
         case .text(let textContent):
-            MarkdownText(text: textContent.text)
+            Text(textContent.text)
                 .textSelection(.enabled)
             
         case .toolRequest(let toolContent):
@@ -94,152 +90,166 @@ struct MessageContentView: View {
     }
 }
 
-// MARK: - Markdown Parsing Helper
-private struct MarkdownParser {
-    static func parse(_ text: String) -> AttributedString {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let document = Document(parsing: trimmedText)
-        
-        var attributedString = AttributedString()
-        for child in document.children {
-            attributedString.append(processElement(child))
+// MARK: - Cached Markdown Text View
+struct MarkdownText: View {
+    let text: String
+    var isUserMessage: Bool = false
+    @State private var codeBlocks: [(language: String, code: String)] = []
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // First render code blocks separately
+            ForEach(Array(codeBlocks.enumerated()), id: \.offset) { _, codeBlock in
+                CollapsibleCodePreviewView(code: codeBlock.code, language: codeBlock.language)
+            }
+            
+            // Render markdown content with proper formatting
+            let textWithoutCode = extractCodeBlocksAndRemove()
+            if !textWithoutCode.isEmpty {
+                FormattedMarkdownView(text: textWithoutCode)
+            }
         }
-        
-        return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
+        .onAppear {
+            extractCodeBlocksAndParse()
+        }
     }
     
-    private static func processElement(_ element: Markup) -> AttributedString {
-        var result = AttributedString()
+    private func extractCodeBlocksAndParse() {
+        codeBlocks = extractCodeBlocks(from: text)
+    }
+    
+    private func extractCodeBlocksAndRemove() -> String {
+        let codeBlockPattern = "```[\\s\\S]*?```"
+        let regex = try? NSRegularExpression(pattern: codeBlockPattern)
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex?.stringByReplacingMatches(in: text, range: range, withTemplate: "") ?? text
+    }
+    
+    private func extractCodeBlocks(from content: String) -> [(language: String, code: String)] {
+        let codeBlockPattern = "```(\\w*)\\n([\\s\\S]*?)```"
+        guard let regex = try? NSRegularExpression(pattern: codeBlockPattern) else { return [] }
         
-        switch element {
-        case let paragraph as Paragraph:
-            for child in paragraph.children {
-                if let inlineChild = child as? InlineMarkup {
-                    result.append(processInline(inlineChild))
-                }
+        var blocks: [(language: String, code: String)] = []
+        let range = NSRange(content.startIndex..<content.endIndex, in: content)
+        
+        regex.enumerateMatches(in: content, range: range) { match, _, _ in
+            guard let match = match, match.numberOfRanges == 3 else { return }
+            
+            let languageRange = match.range(at: 1)
+            let codeRange = match.range(at: 2)
+            
+            let language = languageRange.location != NSNotFound ? 
+                (content as NSString).substring(with: languageRange) : ""
+            let code = (content as NSString).substring(with: codeRange)
+            
+            blocks.append((language: language, code: code))
+        }
+        
+        return blocks
+    }
+}
+
+// MARK: - Formatted Markdown View with Proper Indentation
+struct FormattedMarkdownView: View {
+    let text: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(parseMarkdownLines().enumerated()), id: \.offset) { _, line in
+                renderMarkdownLine(line)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            result.append(AttributedString("\n"))
-            
-        case let heading as Heading:
-            var headingText = AttributedString()
-            for child in heading.children {
-                if let inlineChild = child as? InlineMarkup {
-                    headingText.append(processInline(inlineChild))
-                }
-            }
-            headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
-            result.append(headingText)
-            result.append(AttributedString("\n"))
-            
-        case let codeBlock as CodeBlock:
-            var codeText = AttributedString(codeBlock.code)
-            codeText.font = .monospaced(.body)()
-            codeText.backgroundColor = .secondary.opacity(0.1)
-            result.append(codeText)
-            result.append(AttributedString("\n"))
-            
-        case let listItem as ListItem:
-            result.append(AttributedString("• "))
-            for child in listItem.children {
-                result.append(processElement(child))
+        }
+        .textSelection(.enabled)
+    }
+    
+    private func parseMarkdownLines() -> [MarkdownLine] {
+        let lines = text.components(separatedBy: .newlines)
+        var result: [MarkdownLine] = []
+        
+        for line in lines {
+            // Skip empty lines but preserve them for spacing
+            if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                result.append(.empty)
+                continue
             }
             
-        default:
-            if let blockElement = element as? BlockMarkup {
-                for child in blockElement.children {
-                    result.append(processElement(child))
-                }
+            // Count leading spaces to detect nesting level
+            let leadingSpaces = line.prefix(while: { $0 == " " }).count
+            let indentLevel = leadingSpaces / 2 // 2 spaces = 1 indent level
+            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+            
+            // Check for bullet points
+            if trimmedLine.hasPrefix("- ") {
+                let content = String(trimmedLine.dropFirst(2))
+                result.append(.bullet(content, indentLevel: indentLevel))
+            } else if trimmedLine.hasPrefix("• ") {
+                let content = String(trimmedLine.dropFirst(2))
+                result.append(.bullet(content, indentLevel: indentLevel))
+            } else if trimmedLine.hasPrefix("* ") {
+                let content = String(trimmedLine.dropFirst(2))
+                result.append(.bullet(content, indentLevel: indentLevel))
+            } else if let match = trimmedLine.range(of: "^\\d+\\. ", options: .regularExpression) {
+                // Numbered lists (1. 2. etc)
+                let numberPart = String(trimmedLine[match])
+                let endIndex = trimmedLine.index(match.lowerBound, offsetBy: numberPart.count)
+                let content = String(trimmedLine[endIndex...])
+                result.append(.numbered(numberPart, content, indentLevel: indentLevel))
+            } else {
+                result.append(.text(trimmedLine, indentLevel: indentLevel))
             }
         }
         
         return result
     }
     
-    private static func processInline(_ element: InlineMarkup) -> AttributedString {
-        switch element {
-        case let text as Markdown.Text:
-            return AttributedString(text.plainText)
+    @ViewBuilder
+    private func renderMarkdownLine(_ line: MarkdownLine) -> some View {
+        switch line {
+        case .empty:
+            Spacer()
+                .frame(height: 4)
             
-        case let strong as Strong:
-            var strongText = AttributedString()
-            for child in strong.children {
-                if let inlineChild = child as? InlineMarkup {
-                    strongText.append(processInline(inlineChild))
-                }
+        case .bullet(let content, let indentLevel):
+            HStack(alignment: .top, spacing: 10) {
+                Text("•")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 14, alignment: .leading)
+                
+                Text(content)
+                    .lineSpacing(4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            strongText.font = .body.bold()
-            return strongText
+            .padding(.vertical, 4)
+            .padding(.leading, CGFloat(indentLevel) * 20) // 20pt per indent level
             
-        case let emphasis as Emphasis:
-            var emphasisText = AttributedString()
-            for child in emphasis.children {
-                if let inlineChild = child as? InlineMarkup {
-                    emphasisText.append(processInline(inlineChild))
-                }
+        case .numbered(let number, let content, let indentLevel):
+            HStack(alignment: .top, spacing: 10) {
+                Text(number)
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .frame(width: 24, alignment: .leading)
+                
+                Text(content)
+                    .lineSpacing(4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            emphasisText.font = .body.italic()
-            return emphasisText
+            .padding(.vertical, 4)
+            .padding(.leading, CGFloat(indentLevel) * 20) // 20pt per indent level
             
-        case let inlineCode as InlineCode:
-            var codeText = AttributedString(inlineCode.code)
-            codeText.font = .monospaced(.body)()
-            codeText.backgroundColor = .secondary.opacity(0.1)
-            return codeText
-            
-        case let link as Markdown.Link:
-            var linkText = AttributedString()
-            for child in link.children {
-                if let inlineChild = child as? InlineMarkup {
-                    linkText.append(processInline(inlineChild))
-                }
-            }
-            linkText.foregroundColor = .blue
-            linkText.underlineStyle = .single
-            if let destination = link.destination {
-                linkText.link = URL(string: destination)
-            }
-            return linkText
-            
-        default:
-            return AttributedString(element.plainText)
+        case .text(let content, let indentLevel):
+            Text(content)
+                .lineSpacing(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 2)
+                .padding(.leading, CGFloat(indentLevel) * 20) // 20pt per indent level
         }
     }
-}
-
-// MARK: - Cached Markdown Text View
-struct MarkdownText: View {
-    let text: String
-    var isUserMessage: Bool = false
-    @State private var cachedAttributedText: AttributedString?
-    @State private var previousText = ""
     
-    var body: some View {
-        Text(cachedAttributedText ?? AttributedString(text))
-            .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
-            .textSelection(.enabled)
-            .onAppear {
-                if cachedAttributedText == nil {
-                    cachedAttributedText = MarkdownParser.parse(text)
-                    previousText = text
-                }
-            }
-            .onChange(of: text) { oldValue, newText in
-                // Only reparse if text changed significantly
-                if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
-                    // Full reparse for significant changes
-                    cachedAttributedText = MarkdownParser.parse(newText)
-                } else if newText != previousText {
-                    // For streaming: just append the new part efficiently
-                    if let cached = cachedAttributedText {
-                        let newPart = String(newText.dropFirst(previousText.count))
-                        // Try to append without full reparse for efficiency
-                        cachedAttributedText = cached + AttributedString(newPart)
-                    } else {
-                        cachedAttributedText = MarkdownParser.parse(newText)
-                    }
-                }
-                previousText = newText
-            }
+    enum MarkdownLine {
+        case empty
+        case bullet(String, indentLevel: Int)
+        case numbered(String, String, indentLevel: Int)
+        case text(String, indentLevel: Int)
     }
 }
 
@@ -557,6 +567,7 @@ struct CompletedToolPillView: View {
     let completedCall: CompletedToolCall
     let message: Message
     let sessionName: String
+    @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
         NavigationLink(destination: TaskDetailView(
@@ -577,9 +588,9 @@ struct CompletedToolPillView: View {
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(.systemGray6).opacity(0.85))
+            .background(themeManager.chatInputBackgroundColor.opacity(0.85))
             .cornerRadius(16)
         }
         .buttonStyle(.plain)
@@ -692,7 +703,7 @@ struct TruncatableMarkdownText: View {
     private let showLastLines = true // Show last lines instead of first
     
     var body: some View {
-        Text(parseMarkdown(displayText.isEmpty ? text : displayText))
+        Text(AttributedString(displayText.isEmpty ? text : displayText))
             .textSelection(.enabled)
             .background(
                 GeometryReader { geometry in
@@ -781,10 +792,6 @@ struct TruncatableMarkdownText: View {
             displayText = firstLines.joined(separator: "\n") + "\n…"
         }
     }
-    
-    private func parseMarkdown(_ text: String) -> AttributedString {
-        return MarkdownParser.parse(text)
-    }
 }
 
 // MARK: - Full Text Overlay
@@ -810,6 +817,159 @@ struct FullTextOverlay: View {
                         dismiss()
                     }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Collapsible Code Preview View
+struct CollapsibleCodePreviewView: View {
+    let code: String
+    let language: String
+    @State private var isExpanded = false
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    private var lines: [String] {
+        code.components(separatedBy: .newlines)
+    }
+    
+    private var previewLines: [String] {
+        Array(lines.prefix(5))
+    }
+    
+    private var hasMoreLines: Bool {
+        lines.count > 5
+    }
+    
+    private var moreLineCount: Int {
+        max(0, lines.count - 5)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header with language
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+                    
+                    Image(systemName: "code")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    
+                    Text(language.isEmpty ? "Code" : language)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    
+                    if hasMoreLines && !isExpanded {
+                        Text("(\(moreLineCount) more lines)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Code preview
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 0) {
+                    Divider()
+                        .padding(.horizontal, 12)
+                    
+                    ScrollView(.horizontal) {
+                        Text(code)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .textSelection(.enabled)
+                            .padding(12)
+                    }
+                    .frame(maxHeight: 300)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    Divider()
+                        .padding(.horizontal, 12)
+                    
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(previewLines.enumerated()), id: \.offset) { _, line in
+                            Text(line.isEmpty ? " " : line)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(12)
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(themeManager.chatInputBackgroundColor.opacity(0.85))
+        )
+    }
+}
+
+// MARK: - Completed Tasks Summary View (Collapsible)
+struct CompletedTasksSummaryView: View {
+    let completedTasks: [CompletedToolCall]
+    let message: Message
+    let sessionName: String
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Summary header
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Executed \(completedTasks.count) tool\(completedTasks.count == 1 ? "" : "s")")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+                    
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Expanded pills list
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                        .padding(.horizontal, 12)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(Array(completedTasks.enumerated()), id: \.offset) { index, completedTask in
+                            CompletedToolPillView(completedCall: completedTask, message: message, sessionName: sessionName)
+                        }
+                    }
+                    .padding(12)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }

@@ -27,7 +27,7 @@
 		A1234567890ABCDEF016 /* MessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF015 /* MessageBubbleView.swift */; };
 		A1234567890ABCDEF018 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890ABCDEF017 /* SettingsView.swift */; };
 		A1234567890ABCDEF020 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = A1234567890ABCDEF019 /* Markdown */; };
-		C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */; };
+	C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +54,7 @@
 		A1234567890ABCDEF017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1234567890ABCDEF999 /* Goose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Goose.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOutputManager.swift; sourceTree = "<group>"; };
+		A1234567890ABCDEF019 /* Markdown */ = {isa = PBXFileReference; lastKnownFileType = framework; path = Markdown.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -426,22 +427,22 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A1234567890ABCDEF021 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-markdown";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.3.0;
-			};
+	A1234567890ABCDEF021 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+		isa = XCRemoteSwiftPackageReference;
+		repositoryURL = "https://github.com/apple/swift-markdown";
+		requirement = {
+			kind = upToNextMajorVersion;
+			minimumVersion = 0.3.0;
 		};
+	};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A1234567890ABCDEF019 /* Markdown */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A1234567890ABCDEF021 /* XCRemoteSwiftPackageReference "swift-markdown" */;
-			productName = Markdown;
-		};
+	A1234567890ABCDEF019 /* Markdown */ = {
+		isa = XCSwiftPackageProductDependency;
+		package = A1234567890ABCDEF021 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+		productName = Markdown;
+	};
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1234567890ABCDEF989 /* Project object */;

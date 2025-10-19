@@ -13,6 +13,7 @@ struct ChatView: View {
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
     @State private var currentSessionId: String?
+    @State private var currentSessionTitle: String = "New Session"
     @State private var isSettingsPresented = false
 
     // Voice features - shared with WelcomeView
@@ -44,24 +45,38 @@ struct ChatView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 12) {
-                            ForEach(messages) { message in
-                                MessageBubbleView(
-                                    message: message,
-                                    completedTasks: getCompletedTasksForMessage(message.id),
-                                    sessionName: currentSessionId ?? "Current Session"
-                                )
-                                .id(message.id)
+                            ForEach(Array(groupMessages(messages).enumerated()), id: \.offset) { _, group in
+                                if group.isGroup {
+                                    // Render grouped tool-only messages as a single summary
+                                    let allCompletedTasks = group.messages.flatMap { getCompletedTasksForMessage($0.id) }
+                                    if !allCompletedTasks.isEmpty {
+                                        CompletedTasksSummaryView(
+                                            completedTasks: allCompletedTasks,
+                                            message: group.messages.first ?? Message(role: .assistant, text: ""),
+                                            sessionName: currentSessionId ?? "Current Session"
+                                        )
+                                    }
+                                } else {
+                                    ForEach(group.messages) { message in
+                                        MessageBubbleView(
+                                            message: message,
+                                            completedTasks: getCompletedTasksForMessage(message.id),
+                                            sessionName: currentSessionId ?? "Current Session"
+                                        )
+                                        .id(message.id)
 
-                                // Show ONLY active/in-progress tool calls (completed ones are in the pill)
-                                ForEach(getToolCallsForMessage(message.id), id: \.self) {
-                                    toolCallId in
-                                    if let activeCall = activeToolCalls[toolCallId] {
-                                        HStack {
-                                            Spacer()
-                                            ToolCallProgressView(toolCall: activeCall.toolCall)
-                                            Spacer()
+                                        // Show ONLY active/in-progress tool calls (completed ones are in the pill)
+                                        ForEach(getToolCallsForMessage(message.id), id: \.self) {
+                                            toolCallId in
+                                            if let activeCall = activeToolCalls[toolCallId] {
+                                                HStack {
+                                                    Spacer()
+                                                    ToolCallProgressView(toolCall: activeCall.toolCall)
+                                                    Spacer()
+                                                }
+                                                .id("tool-\(toolCallId)")
+                                            }
                                         }
-                                        .id("tool-\(toolCallId)")
                                     }
                                 }
                             }
@@ -132,7 +147,7 @@ struct ChatView: View {
             }
 
             // Gradient fade overlay to dim content above the input box
-            VStack {
+            VStack(spacing: 0) {
                 Spacer()
                 LinearGradient(
                     gradient: Gradient(colors: [
@@ -147,6 +162,7 @@ struct ChatView: View {
                 .allowsHitTesting(false)
                 .blendMode(.multiply) // Darkens content underneath
             }
+            .ignoresSafeArea(edges: .bottom) // Extend VStack all the way to bottom
             .zIndex(1)
 
             // Floating input area - using shared ChatInputView
@@ -204,7 +220,7 @@ struct ChatView: View {
                     .buttonStyle(.plain)
                     
                     // Session name
-                    Text(currentSessionId != nil ? "Session" : "New Session")
+                    Text(currentSessionTitle)
                         .font(.system(size: 16))
                         .foregroundColor(themeManager.primaryTextColor)
                         .lineLimit(1)
@@ -212,7 +228,7 @@ struct ChatView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 20)  // Push drawer icon DOWN to align with search/plus button
+                .padding(.top, 8)  // Align with search/plus button in sidebar
                 .padding(.bottom, 24)
                 .background(
                     Group {
@@ -275,8 +291,11 @@ struct ChatView: View {
                 object: nil,
                 queue: .main
             ) { notification in
-                if let sessionId = notification.userInfo?["sessionId"] as? String {
-                    loadSession(sessionId)
+                if let sessionId = notification.userInfo?["sessionId"] as? String,
+                   let sessionTitle = notification.userInfo?["sessionTitle"] as? String {
+                    loadSession(sessionId, title: sessionTitle)
+                } else if let sessionId = notification.userInfo?["sessionId"] as? String {
+                    loadSession(sessionId, title: "Session")
                 }
             }
         }
@@ -557,6 +576,107 @@ struct ChatView: View {
         let toolCallIds = getToolCallsForMessage(messageId)
         return toolCallIds.compactMap { completedToolCalls[$0] }
     }
+    
+    // Group consecutive tool-only messages and empty messages together
+    private func groupMessages(_ msgs: [Message]) -> [(isGroup: Bool, messages: [Message])] {
+        var result: [(isGroup: Bool, messages: [Message])] = []
+        var currentGroup: [Message] = []
+        
+        print("🔍 Grouping \(msgs.count) messages...")
+        
+        for message in msgs {
+            let completedTasks = getCompletedTasksForMessage(message.id)
+            let hasVisibleContent = message.content.contains { content in
+                switch content {
+                case .text(let textContent):
+                    let hasText = !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    print("   📝 Message has text: \(hasText)")
+                    return hasText
+                case .toolConfirmationRequest: return true
+                default: return false
+                }
+            }
+            
+            let isToolOnly = !completedTasks.isEmpty && !hasVisibleContent
+            let isEmpty = completedTasks.isEmpty && !hasVisibleContent
+            let shouldGroup = isToolOnly || isEmpty
+            print("   💬 Message \(message.id.prefix(8)): \(completedTasks.count) tasks, visible=\(hasVisibleContent), toolOnly=\(isToolOnly), empty=\(isEmpty), shouldGroup=\(shouldGroup)")
+            
+            // If this message is tool-only or empty (invisible), add to current group
+            if shouldGroup {
+                currentGroup.append(message)
+            } else {
+                // End current group if any
+                if !currentGroup.isEmpty {
+                    print("   ✅ Grouping \(currentGroup.count) consecutive invisible messages")
+                    result.append((isGroup: true, messages: currentGroup))
+                    currentGroup = []
+                }
+                // Add non-tool, non-empty message individually
+                result.append((isGroup: false, messages: [message]))
+            }
+        }
+        
+        // Don't forget the last group
+        if !currentGroup.isEmpty {
+            print("   ✅ Grouping final \(currentGroup.count) consecutive invisible messages")
+            result.append((isGroup: true, messages: currentGroup))
+        }
+        
+        print("🔍 Result: \(result.count) groups")
+        return result
+    }
+    
+    // Process loaded messages to populate tool call tracking
+    private func processLoadedMessages(_ messages: [Message]) {
+        print("🔧 Processing \(messages.count) loaded messages for tool calls...")
+        
+        var tempActiveToolCalls: [String: (toolCall: ToolCall, messageId: String)] = [:]
+        
+        for message in messages {
+            for content in message.content {
+                switch content {
+                case .toolRequest(let toolRequest):
+                    // Track the tool request
+                    tempActiveToolCalls[toolRequest.id] = (
+                        toolCall: toolRequest.toolCall,
+                        messageId: message.id
+                    )
+                    toolCallMessageMap[toolRequest.id] = message.id
+                    print("  📝 Found tool request: \(toolRequest.toolCall.name) (id: \(toolRequest.id.prefix(8)))")
+                    
+                case .toolResponse(let toolResponse):
+                    // Match with corresponding request
+                    if let active = tempActiveToolCalls.removeValue(forKey: toolResponse.id) {
+                        completedToolCalls[toolResponse.id] = CompletedToolCall(
+                            toolCall: active.toolCall,
+                            result: toolResponse.toolResult,
+                            duration: 0, // Unknown for loaded sessions
+                            completedAt: Date()
+                        )
+                        print("  ✅ Matched tool response: \(active.toolCall.name) (id: \(toolResponse.id.prefix(8)))")
+                    } else {
+                        print("  ⚠️ Tool response without matching request: \(toolResponse.id.prefix(8))")
+                    }
+                    
+                default:
+                    break
+                }
+            }
+        }
+        
+        print("🔧 Finished processing: \(completedToolCalls.count) completed tool calls")
+    }
+    
+    private func contentType(_ content: MessageContent) -> String {
+        switch content {
+        case .text: return "text"
+        case .toolRequest: return "toolRequest"
+        case .toolResponse: return "toolResponse"
+        case .toolConfirmationRequest: return "toolConfirmation"
+        case .summarizationRequested: return "summarization"
+        }
+    }
 
     private func limitMessages() {
         guard messages.count > maxMessages else { return }
@@ -592,7 +712,7 @@ struct ChatView: View {
         print("🧹 Tool call cleanup: removed \(toolCallsToRemove) old tool calls")
     }
 
-    func loadSession(_ sessionId: String) {
+    func loadSession(_ sessionId: String, title: String? = nil) {
         // CRITICAL: Cancel any existing stream before switching sessions
         if let currentTask = currentStreamTask {
             print("🛑 Cancelling existing stream before session switch")
@@ -672,6 +792,7 @@ struct ChatView: View {
 
                     // Set new state with forced UI refresh
                     currentSessionId = resumedSessionId
+                    currentSessionTitle = title ?? "Session"
 
                     // Force UI refresh by clearing and setting messages
                     messages.removeAll()
@@ -680,6 +801,9 @@ struct ChatView: View {
                     print("📊 Messages array now has \(messages.count) messages")
                     print("📊 First message ID: \(messages.first?.id ?? "none")")
                     print("📊 Last message ID: \(messages.last?.id ?? "none")")
+                    
+                    // CRITICAL: Process loaded messages to populate tool call tracking
+                    processLoadedMessages(sessionMessages)
 
                     // Force scroll to bottom after loading
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -714,6 +838,7 @@ struct ChatView: View {
         completedToolCalls.removeAll()
         toolCallMessageMap.removeAll()
         currentSessionId = nil
+        currentSessionTitle = "New Session"
         isLoading = false
 
         print("🆕 Created new session - cleared all state")
@@ -746,9 +871,23 @@ struct ChatSession: Identifiable, Codable {
     }
 
     var timestamp: Date {
-        // Parse the ISO 8601 date string
+        // Parse the ISO 8601 date string - server sends BOTH formats (with and without fractional seconds)
         let formatter = ISO8601DateFormatter()
-        return formatter.date(from: updatedAt) ?? Date()
+        
+        // Try with fractional seconds first (old sessions)
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: updatedAt) {
+            return date
+        }
+        
+        // Try without fractional seconds (new sessions)
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: updatedAt) {
+            return date
+        }
+        
+        // Last resort fallback
+        return Date.distantPast
     }
 }
 

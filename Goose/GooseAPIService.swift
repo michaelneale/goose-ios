@@ -508,8 +508,15 @@ class GooseAPIService: ObservableObject {
     }
     
     func fetchSessions() async -> [ChatSession] {
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🔍 FETCHING SESSIONS")
+        print("   Trial Mode: \(isTrialMode)")
+        print("   Base URL: \(baseURL)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
         // In trial mode, return mock sessions
         if isTrialMode {
+            print("📦 Returning mock sessions for trial mode")
             return getMockSessions()
         }
 
@@ -530,20 +537,34 @@ class GooseAPIService: ObservableObject {
             }
 
             if httpResponse.statusCode == 200 {
-                let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
-                print("✅ Fetched \(sessionsResponse.sessions.count) sessions")
+                print("✅ HTTP 200 OK!")
                 
-                // Debug: Print session details
-                for (index, session) in sessionsResponse.sessions.prefix(5).enumerated() {
-                    print("  Session \(index + 1): ID=\(session.id.prefix(8))... Title='\(session.title)' Updated=\(session.updatedAt)")
+                // Print raw JSON
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("\n📥 RAW JSON (first 1000 chars):")
+                    print(String(jsonString.prefix(1000)))
+                }
+                
+                let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
+                print("\n✅ Decoded \(sessionsResponse.sessions.count) sessions")
+                
+                // Debug: Print ALL sessions with parsed timestamps
+                for (index, session) in sessionsResponse.sessions.enumerated() {
+                    let age = Date().timeIntervalSince(session.timestamp) / 86400
+                    print("\n📋 Session #\(index + 1):")
+                    print("   Description: '\(session.description)'")
+                    print("   UpdatedAt (raw): \(session.updatedAt)")
+                    print("   Parsed age: \(String(format: "%.1f", age)) days ago")
+                    print("   Timestamp: \(session.timestamp)")
                 }
                 
                 // Check for duplicates
                 let uniqueIds = Set(sessionsResponse.sessions.map { $0.id })
                 if uniqueIds.count != sessionsResponse.sessions.count {
-                    print("⚠️ WARNING: Found \(sessionsResponse.sessions.count - uniqueIds.count) duplicate session IDs!")
+                    print("\n⚠️ Found \(sessionsResponse.sessions.count - uniqueIds.count) duplicate IDs!")
                 }
                 
+                print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
                 return sessionsResponse.sessions
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"

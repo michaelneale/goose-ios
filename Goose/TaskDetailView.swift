@@ -49,6 +49,118 @@ struct TaskDetailView: View {
         return formatter.string(from: date)
     }
     
+    // Unescape string literals (convert \n, \t, etc. to actual characters)
+    private func unescapeString(_ string: String) -> String {
+        var result = ""
+        var i = string.startIndex
+        
+        while i < string.endIndex {
+            if string[i] == "\\" && string.index(after: i) < string.endIndex {
+                let next = string.index(after: i)
+                switch string[next] {
+                case "n":
+                    result.append("\n")
+                    i = string.index(after: next)
+                case "t":
+                    result.append("\t")
+                    i = string.index(after: next)
+                case "r":
+                    result.append("\r")
+                    i = string.index(after: next)
+                case "\\":
+                    result.append("\\")
+                    i = string.index(after: next)
+                case "\"":
+                    result.append("\"")
+                    i = string.index(after: next)
+                default:
+                    result.append(string[i])
+                    i = string.index(after: i)
+                }
+            } else {
+                result.append(string[i])
+                i = string.index(after: i)
+            }
+        }
+        
+        return result
+    }
+    
+    // Format output value (handle JSON and other formats)
+    private func formatOutputValue(_ value: Any) -> String {
+        // If it's an array of message objects (typical tool output format)
+        if let array = value as? [[String: Any]] {
+            // Extract text from messages marked for "user" audience
+            var outputTexts: [String] = []
+            
+            for item in array {
+                // Check if this is a text message for the user
+                if let text = item["text"] as? String,
+                   let annotations = item["annotations"] as? [String: Any],
+                   let audience = annotations["audience"] as? [String],
+                   audience.contains("user") {
+                    if !text.isEmpty {
+                        outputTexts.append(unescapeString(text))
+                    }
+                }
+            }
+            
+            // If we found user-facing text, return it
+            if !outputTexts.isEmpty {
+                return outputTexts.joined(separator: "\n")
+            }
+            
+            // Otherwise, check for any non-empty text
+            for item in array {
+                if let text = item["text"] as? String, !text.isEmpty {
+                    outputTexts.append(unescapeString(text))
+                }
+            }
+            
+            if !outputTexts.isEmpty {
+                return outputTexts.joined(separator: "\n")
+            }
+            
+            // If no text found, fall back to formatted JSON
+            if let jsonData = try? JSONSerialization.data(withJSONObject: array, options: .prettyPrinted),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                return jsonString
+            }
+        }
+        
+        // If it's a dictionary, try to extract text or format as JSON
+        if let dict = value as? [String: Any] {
+            // Check if it's a single message object with text
+            if let text = dict["text"] as? String, !text.isEmpty {
+                return unescapeString(text)
+            }
+            
+            if let jsonData = try? JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                return jsonString
+            }
+        }
+        
+        // If it's a string, check if it's already formatted JSON
+        if let string = value as? String {
+            // If it starts with { or [, it might be JSON
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            if (trimmed.hasPrefix("{") || trimmed.hasPrefix("[")) {
+                // Try to parse and reformat
+                if let data = trimmed.data(using: .utf8),
+                   let jsonObject = try? JSONSerialization.jsonObject(with: data),
+                   let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
+                   let prettyString = String(data: prettyData, encoding: .utf8) {
+                    return prettyString
+                }
+            }
+            return unescapeString(string)
+        }
+        
+        // Fallback to string description
+        return String(describing: value)
+    }
+    
     var body: some View {
         ZStack(alignment: .topLeading) {
             ScrollView {
@@ -58,7 +170,7 @@ struct TaskDetailView: View {
                         .font(.system(size: 12))
                         .foregroundColor(themeManager.secondaryTextColor)
                         .padding(.bottom, 4)
-                        .padding(.top, 56) // Add padding for custom nav bar (matches main chat)
+                        .padding(.top, 100) // Add padding for custom nav bar
                 
                 // Show the conversation/reasoning text
                 if !messageText.isEmpty {
@@ -129,7 +241,7 @@ struct TaskDetailView: View {
                                         .foregroundColor(themeManager.primaryTextColor)
                                         .padding(.bottom, 4)
                                     
-                                    Text(String(describing: value.value))
+                                    MarkdownText(text: formatOutputValue(value.value), isUserMessage: false)
                                         .font(.system(size: 12, design: .monospaced))
                                         .foregroundColor(themeManager.primaryTextColor)
                                         .textSelection(.enabled)
@@ -194,7 +306,7 @@ struct TaskDetailView: View {
                 }
                 .padding(.horizontal, 0)
                 .padding(.top, 56)
-                .padding(.bottom, 24)
+                .padding(.bottom, 12)
             }
             .background(
                 ZStack {
@@ -206,7 +318,6 @@ struct TaskDetailView: View {
                 .ignoresSafeArea()
             )
             .frame(maxWidth: .infinity, alignment: .top)
-            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .top)
@@ -496,7 +607,6 @@ struct TaskOutputDetailView: View {
                 .ignoresSafeArea()
             )
             .frame(maxWidth: .infinity, alignment: .top)
-            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .top)
