@@ -117,8 +117,14 @@ struct SidebarView: View {
                             // Spacer to push sessions further down
                             Color.clear
                                 .frame(height: 48)
+                            
+                            // Push sessions to bottom if fewer than 5
+                            if cachedSessions.count < 5 {
+                                Spacer()
+                            }
 
-                            ForEach(cachedSessions) { session in
+                            ForEach(cachedSessions)
+ { session in
                                 SessionRowView(session: session)
                                     .onTapGesture {
                                         onSessionSelect(session.id)
