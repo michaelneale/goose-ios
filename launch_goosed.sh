@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-SECRET="temp_cIo0W4vH0EdxMkOC3gD0M1O0vEwcXo"
+SECRET="test"
 
 # Check if goosed is available in PATH
 if ! command -v goosed &> /dev/null; then
