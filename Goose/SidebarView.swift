@@ -79,8 +79,9 @@ struct SidebarView: View {
                     Divider()
 
                     // Sessions list with placeholders at top
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
+                    GeometryReader { scrollGeometry in
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
                             // PLACEHOLDER SPACE 1 - Server status area
                             HStack(spacing: 12) {
                                 Image("ServerIcon")
@@ -120,7 +121,8 @@ struct SidebarView: View {
                             
                             // Push sessions to bottom if fewer than 5
                             if cachedSessions.count < 5 {
-                                Spacer()
+                                Color.clear
+                                    .frame(height: scrollGeometry.size.height * 0.3)
                             }
 
                             ForEach(cachedSessions)
