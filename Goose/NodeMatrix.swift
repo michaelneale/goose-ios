@@ -560,7 +560,7 @@ struct PreviewContainer: View {
             ],
             selectedSessionId: "2",
             onNodeTap: { session, position in
-                print("Tapped session: \(session.name) at position: \(position)")
+                print("Tapped session: \(session.description) at position: \(position)")
             },
             onDayChange: { daysOffset in
                 print("Day changed to offset: \(daysOffset)")
