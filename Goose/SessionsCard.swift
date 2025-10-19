@@ -76,7 +76,7 @@ struct SessionsCard: View {
             // Session title and metadata
             VStack(alignment: .leading, spacing: 12) {
                 // Session description/title
-                Text(session.description.isEmpty ? "Untitled Session" : session.description)
+                Text(session.name.isEmpty ? "Untitled Session" : session.name)
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(.primary)
                     .lineLimit(2)
@@ -258,7 +258,7 @@ struct SimulatedMessageNodesView: View {
             SessionsCard(
                 session: ChatSession(
                     id: "123",
-                    description: "Building a SwiftUI app with node visualization",
+                    name: "Building a SwiftUI app with node visualization",
                     messageCount: 42,
                     createdAt: formatter.string(from: twoHoursAgo),
                     updatedAt: formatter.string(from: twoHoursAgo)
