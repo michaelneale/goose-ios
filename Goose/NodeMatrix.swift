@@ -540,7 +540,7 @@ struct SimulatedMessageDotsOverlay: View {
         return formatter.string(from: date)
     }
     
-    return ZStack {
+    ZStack {
         Color(UIColor.systemBackground)
             .ignoresSafeArea()
         
