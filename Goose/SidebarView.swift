@@ -140,6 +140,7 @@ struct SidebarView: View {
                             }
                         }
                     }
+                    }
 
                     Spacer()
 
