@@ -14,16 +14,6 @@ struct ContentView: View {
     
     // Shared voice manager across WelcomeView and ChatView
     @StateObject private var sharedVoiceManager = EnhancedVoiceManager()
-    
-    // Dynamic sidebar width based on device
-    private var sidebarWidth: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return screenWidth * 0.5 // 50% on iPad
-        } else {
-            return screenWidth // 100% on iPhone
-        }
-    }
 
     var body: some View {
         if showingSplash {
@@ -96,9 +86,9 @@ struct ContentView: View {
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .background(Color(UIColor.systemBackground))
-                    .offset(x: showingSidebar ? sidebarWidth : 0) // Offset content when sidebar shows
+                    .offset(x: showingSidebar ? 280 : 0) // Offset content when sidebar shows
                     .animation(.easeInOut(duration: 0.3), value: showingSidebar)
-                                    }
+                }
                 .edgesIgnoringSafeArea(.all)
                 
                 // Sidebar overlay
