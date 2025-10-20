@@ -175,12 +175,8 @@ struct ContentView: View {
                         hasMoreSessions: hasMoreSessions
                     )
                     .transition(.move(edge: .leading))
-                    .onAppear {
-                        // Refresh sessions when sidebar opens
-                        Task {
-                            await preloadSessions()
-                        }
-                    }
+                    // Note: Removed onAppear preload to preserve loaded sessions
+                    // Sessions are loaded on app launch and via "Load More" button
                 }
             }
             .overlay(alignment: .top) {
