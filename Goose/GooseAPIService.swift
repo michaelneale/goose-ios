@@ -257,6 +257,9 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Config Management
     func readConfigValue(key: String, isSecret: Bool = false) async -> String? {
+        let startTime = Date()
+        print("⏱️ [PERF] readConfigValue(\(key)) started")
+        
         guard let url = URL(string: "\(baseURL)/config/read") else {
             print("⚠️ Invalid URL for config read")
             return nil
@@ -275,6 +278,8 @@ class GooseAPIService: ObservableObject {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             let (data, response) = try await URLSession.shared.data(for: request)
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("⏱️ [PERF] readConfigValue(\(key)) completed in \(String(format: "%.2f", elapsed))s")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("⚠️ Invalid response reading config")
@@ -433,6 +438,9 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Sessions Management
     func fetchInsights() async -> SessionInsights? {
+        let startTime = Date()
+        print("⏱️ [PERF] fetchInsights() started")
+        
         // In trial mode, return mock insights
         if isTrialMode {
             return SessionInsights(totalSessions: 5, totalTokens: 450_000_000)
@@ -448,6 +456,8 @@ class GooseAPIService: ObservableObject {
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("⏱️ [PERF] fetchInsights() completed in \(String(format: "%.2f", elapsed))s")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("🚨 Invalid response when fetching insights")
@@ -470,6 +480,9 @@ class GooseAPIService: ObservableObject {
     }
     
     func fetchSessions() async -> [ChatSession] {
+        let startTime = Date()
+        print("⏱️ [PERF] fetchSessions() started")
+        
         // In trial mode, return mock sessions
         if isTrialMode {
             return getMockSessions()
@@ -485,6 +498,8 @@ class GooseAPIService: ObservableObject {
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("⏱️ [PERF] fetchSessions() completed in \(String(format: "%.2f", elapsed))s")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("🚨 Invalid response when fetching sessions")
