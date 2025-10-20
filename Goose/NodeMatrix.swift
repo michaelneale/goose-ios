@@ -13,6 +13,51 @@ struct NodeMatrix: View {
     @State private var pulseAnimation = false // For draft node pulsing
     @State private var dashPhase: CGFloat = 0 // For draft line animation
     
+    // MARK: - Size Constants
+    private let minNodeSize: CGFloat = 8
+    private let maxNodeSize: CGFloat = 16
+    private let minTapTarget: CGFloat = 32
+    private let messageDotSize: CGFloat = 4
+    private let baseMessageDotRadius: CGFloat = 30
+    
+    // MARK: - Node Size Calculation
+    /// Calculate node size based on message count with graceful scaling
+    private func nodeSize(for messageCount: Int) -> CGFloat {
+        // Define thresholds for scaling
+        let lowThreshold = 5      // Below this, use minimum size
+        let highThreshold = 50    // Above this, use maximum size
+        
+        if messageCount <= lowThreshold {
+            return minNodeSize
+        } else if messageCount >= highThreshold {
+            return maxNodeSize
+        } else {
+            // Logarithmic scaling for smooth growth
+            let progress = CGFloat(messageCount - lowThreshold) / CGFloat(highThreshold - lowThreshold)
+            // Use ease-out curve for more gradual growth
+            let easedProgress = 1 - pow(1 - progress, 2)
+            return minNodeSize + (maxNodeSize - minNodeSize) * easedProgress
+        }
+    }
+    
+    /// Calculate tap target size based on node size
+    private func tapTargetSize(for nodeSize: CGFloat) -> CGFloat {
+        // Ensure tap target is always at least minTapTarget
+        return max(minTapTarget, nodeSize * 3)
+    }
+    
+    /// Calculate highlight ring size based on node size
+    private func highlightRingSize(for nodeSize: CGFloat) -> CGFloat {
+        return nodeSize * 2.5
+    }
+    
+    /// Calculate message dot radius based on node size
+    private func messageDotRadius(for nodeSize: CGFloat) -> CGFloat {
+        // Scale the radius proportionally with node size
+        let sizeRatio = nodeSize / minNodeSize
+        return baseMessageDotRadius * sizeRatio
+    }
+    
     // Get the date for the current offset
     private var targetDate: Date {
         let calendar = Calendar.current
@@ -142,10 +187,13 @@ struct NodeMatrix: View {
                             .transition(.opacity)
                         }
                         
-                        // Draw session nodes (now tappable with highlight)
+                        // Draw session nodes (now tappable with highlight and dynamic sizing)
                         ForEach(Array(daySessions.enumerated()), id: \.element.id) { index, session in
                             let position = nodePosition(for: index, session: session, in: nodeGeometry.size, allSessions: daySessions)
                             let isSelected = selectedSessionId == session.id
+                            let currentNodeSize = nodeSize(for: session.messageCount)
+                            let currentTapTarget = tapTargetSize(for: currentNodeSize)
+                            let currentHighlightRing = highlightRingSize(for: currentNodeSize)
                             
                             Button(action: {
                                 onNodeTap(session, position)
@@ -154,17 +202,17 @@ struct NodeMatrix: View {
                                     // Outer tap target (invisible)
                                     Circle()
                                         .fill(Color.clear)
-                                        .frame(width: 32, height: 32)
+                                        .frame(width: currentTapTarget, height: currentTapTarget)
                                     
                                     // Highlight ring for selected node
                                     if isSelected {
                                         Circle()
                                             .stroke(Color.blue, lineWidth: 2)
-                                            .frame(width: 20, height: 20)
+                                            .frame(width: currentHighlightRing, height: currentHighlightRing)
                                             .transition(.scale.combined(with: .opacity))
                                     }
                                     
-                                    // Inner node
+                                    // Inner node with dynamic size
                                     Circle()
                                         .fill(
                                             isSelected ?
@@ -173,7 +221,7 @@ struct NodeMatrix: View {
                                              Color.white.opacity(0.5) :
                                              Color.black.opacity(0.3))
                                         )
-                                        .frame(width: 8, height: 8)
+                                        .frame(width: currentNodeSize, height: currentNodeSize)
                                 }
                             }
                             .buttonStyle(.plain)
@@ -183,19 +231,21 @@ struct NodeMatrix: View {
                         // Draw draft node (pulsing animation)
                         if showDraftNode && daysOffset == 0 {
                             let draftPosition = draftNodePosition(in: nodeGeometry.size)
+                            let draftSize = minNodeSize // Draft node uses minimum size
+                            let draftPulseRing = highlightRingSize(for: draftSize)
                             
                             ZStack {
                                 // Pulsing outer ring
                                 Circle()
                                     .stroke(Color.green.opacity(0.3), lineWidth: 2)
-                                    .frame(width: 20, height: 20)
+                                    .frame(width: draftPulseRing, height: draftPulseRing)
                                     .scaleEffect(pulseAnimation ? 1.8 : 1.0)
                                     .opacity(pulseAnimation ? 0.0 : 0.5)
                                 
                                 // Inner draft node
                                 Circle()
                                     .fill(Color.green)
-                                    .frame(width: 8, height: 8)
+                                    .frame(width: draftSize, height: draftSize)
                             }
                             .position(draftPosition)
                             .transition(.scale.combined(with: .opacity))
@@ -221,12 +271,16 @@ struct NodeMatrix: View {
                            let sessionIndex = daySessions.firstIndex(where: { $0.id == selectedId }) {
                             
                             let sessionPosition = nodePosition(for: sessionIndex, session: selectedSession, in: nodeGeometry.size, allSessions: daySessions)
+                            let currentNodeSize = nodeSize(for: selectedSession.messageCount)
+                            let currentDotRadius = messageDotRadius(for: currentNodeSize)
                             
                             // Show simulated message dots based on messageCount
                             SimulatedMessageDotsOverlay(
                                 messageCount: selectedSession.messageCount,
                                 centerPosition: sessionPosition,
-                                colorScheme: colorScheme
+                                colorScheme: colorScheme,
+                                radius: currentDotRadius,
+                                dotSize: messageDotSize
                             )
                         }
                     }
@@ -455,6 +509,8 @@ struct SimulatedMessageDotsOverlay: View {
     let messageCount: Int
     let centerPosition: CGPoint
     let colorScheme: ColorScheme
+    let radius: CGFloat
+    let dotSize: CGFloat
     
     // Calculate how many dots to show based on message count
     private var displayedDotCount: Int {
@@ -490,7 +546,7 @@ struct SimulatedMessageDotsOverlay: View {
             ForEach(0..<displayedDotCount, id: \.self) { index in
                 Circle()
                     .fill(dotColor(for: index))
-                    .frame(width: 4, height: 4)
+                    .frame(width: dotSize, height: dotSize)
                     .position(dotPosition(for: index))
             }
         }
@@ -498,7 +554,6 @@ struct SimulatedMessageDotsOverlay: View {
     
     // Calculate position for each dot in a circle around the session node
     private func dotPosition(for index: Int) -> CGPoint {
-        let radius: CGFloat = 30
         let angleStep = (2 * .pi) / CGFloat(displayedDotCount)
         let angle = angleStep * CGFloat(index) - (.pi / 2) // Start from top
         
@@ -553,10 +608,11 @@ struct PreviewContainer: View {
         
         NodeMatrix(
             sessions: [
-                // Today
-                ChatSession(id: "1", description: "Early Morning", messageCount: 5, createdAt: dateString(daysAgo: 0, hoursAgo: 8), updatedAt: dateString(daysAgo: 0, hoursAgo: 8)),
-                ChatSession(id: "2", description: "Morning", messageCount: 12, createdAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30), updatedAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30)),
-                ChatSession(id: "3", description: "Late Morning", messageCount: 8, createdAt: dateString(daysAgo: 0, hoursAgo: 7), updatedAt: dateString(daysAgo: 0, hoursAgo: 7)),
+                // Today - varying message counts to show size differences
+                ChatSession(id: "1", description: "Small Session", messageCount: 3, createdAt: dateString(daysAgo: 0, hoursAgo: 8), updatedAt: dateString(daysAgo: 0, hoursAgo: 8)),
+                ChatSession(id: "2", description: "Medium Session", messageCount: 15, createdAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30), updatedAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30)),
+                ChatSession(id: "3", description: "Large Session", messageCount: 45, createdAt: dateString(daysAgo: 0, hoursAgo: 7), updatedAt: dateString(daysAgo: 0, hoursAgo: 7)),
+                ChatSession(id: "4", description: "Extra Large Session", messageCount: 80, createdAt: dateString(daysAgo: 0, hoursAgo: 6), updatedAt: dateString(daysAgo: 0, hoursAgo: 6)),
             ],
             selectedSessionId: "2",
             onNodeTap: { session, position in
