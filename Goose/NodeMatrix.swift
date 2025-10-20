@@ -9,6 +9,7 @@ struct NodeMatrix: View {
     @Environment(\.colorScheme) var colorScheme
     @State private var daysOffset: Int = 0 // 0 = today, 1 = yesterday, etc.
     @State private var dragOffset: CGFloat = 0
+    @State private var swipeDirection: CGFloat = 0 // Track the direction of the last swipe
     @GestureState private var isDragging: Bool = false
     @State private var pulseAnimation = false // For draft node pulsing
     @State private var dashPhase: CGFloat = 0 // For draft line animation
@@ -288,8 +289,8 @@ struct NodeMatrix: View {
                 .padding(.horizontal, 16)
                 .id(daysOffset)
                 .transition(.asymmetric(
-                    insertion: .move(edge: dragOffset > 0 ? .trailing : .leading).combined(with: .opacity),
-                    removal: .move(edge: dragOffset > 0 ? .leading : .trailing).combined(with: .opacity)
+                    insertion: .move(edge: swipeDirection > 0 ? .leading : .trailing).combined(with: .opacity),
+                    removal: .move(edge: swipeDirection > 0 ? .trailing : .leading).combined(with: .opacity)
                 ))
                 .offset(x: dragOffset)
                 
@@ -351,6 +352,9 @@ struct NodeMatrix: View {
                         if abs(horizontalAmount) > verticalAmount {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 if abs(horizontalAmount) > threshold {
+                                    // Store the swipe direction BEFORE resetting dragOffset
+                                    swipeDirection = horizontalAmount
+                                    
                                     if horizontalAmount > 0 {
                                         daysOffset += 1
                                     } else if daysOffset > 0 {
