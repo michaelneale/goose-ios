@@ -35,6 +35,7 @@
 		D3BC34002EA1713D0057E748 /* NodeMatrix.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */; };
 		D3BC34022EA18E160057E748 /* SessionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC34012EA18E160057E748 /* SessionsCard.swift */; };
 		D3BC34042EA19D990057E748 /* NodeFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC34032EA19D990057E748 /* NodeFocus.swift */; };
+		D3C59CDF2EA680C300FC71AE /* ContinuousVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C59CDE2EA680C300FC71AE /* ContinuousVoiceManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +69,7 @@
 		D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeMatrix.swift; sourceTree = "<group>"; };
 		D3BC34012EA18E160057E748 /* SessionsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsCard.swift; sourceTree = "<group>"; };
 		D3BC34032EA19D990057E748 /* NodeFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeFocus.swift; sourceTree = "<group>"; };
+		D3C59CDE2EA680C300FC71AE /* ContinuousVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousVoiceManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +122,7 @@
 				83ACD8A92E827DB500379D0E /* Info.plist */,
 				A1234567890ABCDEF000 /* GooseApp.swift */,
 				A1234567890ABCDEF002 /* ContentView.swift */,
+				D3C59CDE2EA680C300FC71AE /* ContinuousVoiceManager.swift */,
 				A1234567890ABCDEF009 /* ChatView.swift */,
 				0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */,
 				A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */,
@@ -241,6 +244,7 @@
 				838F2DEE2E9E24E200E2FC48 /* SidebarView.swift in Sources */,
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,
 				D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */,
+				D3C59CDF2EA680C300FC71AE /* ContinuousVoiceManager.swift in Sources */,
 				D3BC34022EA18E160057E748 /* SessionsCard.swift in Sources */,
 				A1234567890ABCDEF001 /* GooseApp.swift in Sources */,
 			);
