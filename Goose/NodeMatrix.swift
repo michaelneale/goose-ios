@@ -53,12 +53,12 @@ struct NodeMatrix: View {
     
     // MARK: - Date Helpers
     private func targetDate(for offset: Int) -> Date {
-        let calendar = Calendar.current
+        let calendar = Calendar.utc  // FIX: Use UTC calendar
         return calendar.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
     }
     
     private func daySessions(for offset: Int) -> [ChatSession] {
-        let calendar = Calendar.current
+        let calendar = Calendar.utc  // FIX: Use UTC calendar
         let target = targetDate(for: offset)
         
         let filtered = sessions.filter { session in
@@ -84,7 +84,7 @@ struct NodeMatrix: View {
     }
     
     private func dateLabel(for offset: Int) -> String {
-        let calendar = Calendar.current
+        let calendar = Calendar.utc  // FIX: Use UTC calendar
         let target = targetDate(for: offset)
         let formatter = DateFormatter()
         
@@ -679,7 +679,7 @@ struct SimulatedMessageDotsOverlay: View {
 
 struct PreviewContainer: View {
     let formatter = ISO8601DateFormatter()
-    let calendar = Calendar.current
+    let calendar = Calendar.utc  // FIX: Use UTC calendar
     let now = Date()
     
     init() {

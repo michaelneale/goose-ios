@@ -25,7 +25,7 @@ struct WelcomeView: View {
     @State private var showTrialModeCard = false
     @State private var currentDaysOffset: Int = 0 // Track current day being viewed in NodeMatrix
     @State private var lastLoadTriggeredAtOffset: Int = 0  // Track last load to prevent duplicates
-    @State private var maxDaysToLoad: Int = 90  // Only load sessions from last 90 days
+    @State private var maxDaysToLoad: Int = 90  // Only load sessions from last 10 days - next step being a chatmeta query but i dont think we get that data from goosed
     
     // Session card state
     @State private var selectedSession: ChatSession? = nil

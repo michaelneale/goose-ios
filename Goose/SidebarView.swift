@@ -35,7 +35,7 @@ struct SidebarView: View {
     
     // Group sessions by date
     private var groupedSessions: [(String, [ChatSession])] {
-        let calendar = Calendar.current
+        let calendar = Calendar.utc  // FIX: Use UTC calendar
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         
@@ -72,7 +72,7 @@ struct SidebarView: View {
     }
     
     private func formatDateHeader(_ date: Date) -> String {
-        let calendar = Calendar.current
+        let calendar = Calendar.utc  // FIX: Use UTC calendar
         
         if calendar.isDateInToday(date) {
             return "TODAY"
