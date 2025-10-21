@@ -292,6 +292,23 @@ struct ChatView: View {
                 }
             }
         }
+        .onDisappear {
+            // Critical: Clean up when leaving the view
+            print("🚪 ChatView disappearing - cleaning up tasks")
+            
+            // Stop any active streaming
+            if let task = currentStreamTask {
+                print("🛑 Cancelling active stream on view disappear")
+                task.cancel()
+                currentStreamTask = nil
+            }
+            
+            // Stop polling
+            stopPollingForUpdates()
+            
+            // Clear loading state
+            isLoading = false
+        }
     }
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         var lastId: String?
@@ -618,13 +635,24 @@ struct ChatView: View {
 
         print("🔍 Last message role: \(lastMessage.role), age: \(Int(age))s")
 
-        // Poll if last message is recent (< 2 minutes)
-        // This catches both waiting-for-response and mid-response scenarios
-        let shouldPoll = age < 120 && age > -60  // 2 minutes, but also check for future dates
-        if shouldPoll {
-            print("🔍 ✅ Will start polling (recent activity)")
-        } else {
+        // Only poll if:
+        // 1. Message is recent (< 2 minutes)
+        // 2. AND last message is from user (waiting for assistant response)
+        //    OR has active tool calls (assistant is still working)
+        guard age < 120 && age > -60 else {
             print("🔍 ❌ Too old (\(Int(age))s), won't poll")
+            return false
+        }
+        
+        // Check if we're actually waiting for a response
+        let isWaitingForResponse = lastMessage.role == .user
+        let hasActiveToolCalls = !activeToolCalls.isEmpty
+        
+        let shouldPoll = isWaitingForResponse || hasActiveToolCalls
+        if shouldPoll {
+            print("🔍 ✅ Will start polling (waiting for response: \(isWaitingForResponse), active tools: \(hasActiveToolCalls))")
+        } else {
+            print("🔍 ❌ Session appears complete (last message from assistant, no active tools)")
         }
         return shouldPoll
     }
@@ -974,6 +1002,10 @@ struct ChatView: View {
                     // Force UI refresh by clearing and setting messages
                     messages.removeAll()
                     messages = sessionMessages
+
+                    // Rebuild tool call state BEFORE checking if we should poll
+                    // (since shouldPollForUpdates checks activeToolCalls)
+                    rebuildToolCallState(from: sessionMessages)
 
                     print("📊 Messages array now has \(messages.count) messages")
                     print("📊 First message ID: \(messages.first?.id ?? "none")")
