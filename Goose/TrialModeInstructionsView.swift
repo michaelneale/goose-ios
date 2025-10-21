@@ -3,6 +3,10 @@ import SwiftUI
 struct TrialModeInstructionsView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @State private var showingDownloadSheet = false
+    
+    // Download URL for Goose Desktop - always redirects to latest version
+    private let gooseDesktopDownloadURL = "https://github.com/block/goose/releases/latest/download/Goose.zip"
     
     var body: some View {
         NavigationView {
@@ -23,12 +27,32 @@ struct TrialModeInstructionsView: View {
                     
                     // Steps
                     VStack(alignment: .leading, spacing: 20) {
-                        InstructionStep(
-                            number: 1,
-                            title: "Install Goose Desktop",
-                            description: "Download and install the Goose desktop application on your computer if you haven't already.",
-                            icon: "desktopcomputer"
-                        )
+                        VStack(alignment: .leading, spacing: 12) {
+                            InstructionStep(
+                                number: 1,
+                                title: "Install Goose Desktop",
+                                description: "Download and install the Goose desktop application on your computer if you haven't already.",
+                                icon: "desktopcomputer"
+                            )
+                            
+                            // Download button
+                            Button(action: {
+                                showingDownloadSheet = true
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .font(.system(size: 16))
+                                    Text("Send Download to Computer")
+                                        .font(.system(size: 15, weight: .medium))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                            }
+                            .padding(.leading, 48) // Align with step content
+                        }
                         
                         InstructionStep(
                             number: 2,
@@ -105,6 +129,9 @@ struct TrialModeInstructionsView: View {
                     .font(.system(size: 17, weight: .medium))
                 }
             }
+            .sheet(isPresented: $showingDownloadSheet) {
+                DownloadLinkSheet(downloadURL: gooseDesktopDownloadURL)
+            }
         }
     }
 }
@@ -170,6 +197,155 @@ struct FeatureRow: View {
             Spacer()
         }
     }
+}
+
+// MARK: - Download Link Sheet
+struct DownloadLinkSheet: View {
+    let downloadURL: String
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
+    @State private var showingShareSheet = false
+    @State private var linkCopied = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                Spacer()
+                
+                // Content
+                VStack(spacing: 40) {
+                    // Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "desktopcomputer")
+                            .font(.system(size: 70))
+                            .foregroundColor(.blue)
+                        
+                        Text("Get Goose Desktop")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.primary)
+                        
+                        Text("Send the installer to your Mac to get started")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                    
+                    // Action Buttons
+                    VStack(spacing: 16) {
+                        // Share button (primary action - includes AirDrop)
+                        Button(action: {
+                            showingShareSheet = true
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 20, weight: .semibold))
+                                Text("Share to Mac")
+                                    .font(.system(size: 18, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.blue.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .shadow(color: Color.blue.opacity(0.4), radius: 12, x: 0, y: 6)
+                        }
+                        
+                        // Copy link button (secondary)
+                        Button(action: {
+                            copyToClipboard()
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: linkCopied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 17))
+                                Text(linkCopied ? "Link Copied!" : "Copy Link")
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            .foregroundColor(linkCopied ? .green : .blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .strokeBorder(linkCopied ? Color.green : Color.blue, lineWidth: 2)
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                    
+                    // Info text
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 14))
+                            Text("AirDrop makes it easy to send to nearby Macs")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(.system(size: 17))
+                }
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let url = URL(string: downloadURL) {
+                ShareSheet(items: [url])
+            }
+        }
+    }
+    
+    private func copyToClipboard() {
+        UIPasteboard.general.string = downloadURL
+        
+        // Show confirmation with haptic feedback
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        
+        withAnimation {
+            linkCopied = true
+        }
+        
+        // Reset after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                linkCopied = false
+            }
+        }
+    }
+}
+
+// MARK: - ShareSheet wrapper for UIActivityViewController
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: items,
+            applicationActivities: nil
+        )
+        
+        // Customize to highlight AirDrop
+        controller.excludedActivityTypes = []
+        
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {
