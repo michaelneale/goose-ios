@@ -283,7 +283,7 @@ struct DownloadLinkSheet: View {
                         HStack(spacing: 6) {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 14))
-                            Text("AirDrop makes it easy to send to nearby Macs")
+                            Text("Look for your Mac's name in AirDrop")
                                 .font(.system(size: 14))
                         }
                         .foregroundColor(.secondary)
@@ -304,7 +304,8 @@ struct DownloadLinkSheet: View {
         }
         .sheet(isPresented: $showingShareSheet) {
             if let url = URL(string: downloadURL) {
-                ShareSheet(items: [url])
+                let activityItem = DownloadActivityItemSource(url: url)
+                ShareSheet(items: [activityItem])
             }
         }
     }
@@ -329,6 +330,44 @@ struct DownloadLinkSheet: View {
     }
 }
 
+// MARK: - Custom Activity Item for better share sheet presentation
+class DownloadActivityItemSource: NSObject, UIActivityItemSource {
+    let url: URL
+    
+    init(url: URL) {
+        self.url = url
+        super.init()
+    }
+    
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
+        return url
+    }
+    
+    func activityViewController(_ activityViewController: UIActivityViewController, itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
+        // Exclude Reminders and other task apps by checking the activity type string
+        if let activityType = activityType {
+            let typeString = activityType.rawValue.lowercased()
+            // Filter out Reminders, Calendar, and other productivity apps
+            if typeString.contains("reminder") || 
+               typeString.contains("calendar") ||
+               typeString.contains("todo") ||
+               typeString.contains("task") {
+                return nil
+            }
+        }
+        return url
+    }
+    
+    func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
+        return "Download Goose Desktop"
+    }
+    
+    // Provide a descriptive message for sharing
+    func activityViewController(_ activityViewController: UIActivityViewController, dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String {
+        return "public.url"
+    }
+}
+
 // MARK: - ShareSheet wrapper for UIActivityViewController
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
@@ -339,8 +378,24 @@ struct ShareSheet: UIViewControllerRepresentable {
             applicationActivities: nil
         )
         
-        // Customize to highlight AirDrop
-        controller.excludedActivityTypes = []
+        // Exclude social media and other irrelevant sharing options to make AirDrop more prominent
+        controller.excludedActivityTypes = [
+            .postToFacebook,
+            .postToTwitter,
+            .postToWeibo,
+            .postToVimeo,
+            .postToFlickr,
+            .postToTencentWeibo,
+            .assignToContact,
+            .saveToCameraRoll,
+            .addToReadingList,
+            .openInIBooks,
+            .markupAsPDF,
+            .print,
+            .sharePlay
+        ]
+        
+        // Note: We keep Messages, Mail, Notes, and AirDrop as these are useful for sharing download links
         
         return controller
     }
