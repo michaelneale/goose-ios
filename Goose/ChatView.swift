@@ -353,8 +353,8 @@ struct ChatView: View {
             do {
                 // Create session if we don't have one
                 if currentSessionId == nil {
-                    let (sessionId, initialMessages) = try await apiService.startAgent(
-                        workingDir: "/tmp")
+                    // workingDir will default to home directory (matches desktop behavior)
+                    let (sessionId, initialMessages) = try await apiService.startAgent()
                     print("✅ SESSION CREATED: \(sessionId)")
 
                     // Load any initial messages from the session

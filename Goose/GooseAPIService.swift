@@ -155,7 +155,7 @@ class GooseAPIService: ObservableObject {
     }
 
     // MARK: - Session Creation
-    func startAgent(workingDir: String = "/tmp") async throws -> (
+    func startAgent(workingDir: String? = nil) async throws -> (
         sessionId: String, messages: [Message]
     ) {
         do {
@@ -168,7 +168,12 @@ class GooseAPIService: ObservableObject {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
 
-            let body: [String: Any] = ["working_dir": workingDir]
+            // For remote goosed: use "." (current directory where goosed is running)
+            // This matches CLI behavior which uses std::env::current_dir()
+            let effectiveWorkingDir = workingDir ?? "."
+            print("🏠 Starting agent with working directory: \(effectiveWorkingDir)")
+            
+            let body: [String: Any] = ["working_dir": effectiveWorkingDir]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
             let (data, response) = try await URLSession.shared.data(for: request)
