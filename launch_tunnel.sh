@@ -15,9 +15,10 @@ NC='\033[0m' # No Color
 PREFERRED_PORT=62998
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GOOSED_URL="https://github.com/michaelneale/goose-tunnel/releases/download/test/goosed"
-GOOSED_LOCAL_PATH="${SCRIPT_DIR}/goosed"
-TUNNEL_CLIENT_PATH="${SCRIPT_DIR}/utils/tunnel_client.js"
-UTILS_DIR="${SCRIPT_DIR}/utils"
+TUNNEL_DIR="${HOME}/.goose-tunnel"
+GOOSED_LOCAL_PATH="${TUNNEL_DIR}/goosed"
+TUNNEL_REPO="https://github.com/michaelneale/lapstone-tunnel"
+TUNNEL_CLIENT_PATH="${TUNNEL_DIR}/client.js"
 WORKER_URL="https://cloudflare-tunnel-proxy.michael-neale.workers.dev"
 
 # Function to find an available port starting from the preferred port
@@ -65,6 +66,9 @@ download_goosed() {
     echo -e "${BOLD}${CYAN}⬇️  Fetching from: ${GOOSED_URL}${NC}"
     echo -e "${BOLD}${CYAN}📦 Saving to: ${GOOSED_LOCAL_PATH}${NC}"
     echo ""
+    
+    # Ensure tunnel directory exists
+    mkdir -p "$TUNNEL_DIR"
     
     if curl -L -o "$GOOSED_LOCAL_PATH" "$GOOSED_URL"; then
         chmod +x "$GOOSED_LOCAL_PATH"
@@ -147,24 +151,71 @@ if ! command -v qrencode &> /dev/null; then
     fi
 fi
 
-# Check if tunnel client exists
-if [ ! -f "$TUNNEL_CLIENT_PATH" ]; then
-    echo -e "${RED}Error: Tunnel client not found at: $TUNNEL_CLIENT_PATH${NC}"
-    echo -e "${YELLOW}This file should have been included with the repository.${NC}"
+# Function to setup tunnel client
+setup_tunnel_client() {
+    # Check if it's a proper git repository
+    if [ ! -d "$TUNNEL_DIR/.git" ]; then
+        # Directory might exist but not be a git repo, or not exist at all
+        if [ -d "$TUNNEL_DIR" ]; then
+            echo -e "${YELLOW}$TUNNEL_DIR exists but is not a git repository${NC}"
+            echo -e "${YELLOW}Saving existing binary and re-cloning...${NC}"
+            # Move the binary if it exists
+            if [ -f "$TUNNEL_DIR/goosed" ]; then
+                mv "$TUNNEL_DIR/goosed" /tmp/goosed.backup
+            fi
+            rm -rf "$TUNNEL_DIR"
+        fi
+        
+        echo -e "${YELLOW}Cloning lapstone-tunnel repository...${NC}"
+        if git clone "$TUNNEL_REPO" "$TUNNEL_DIR"; then
+            echo -e "${GREEN}✓ Repository cloned successfully${NC}"
+            # Restore the binary if we backed it up
+            if [ -f /tmp/goosed.backup ]; then
+                mv /tmp/goosed.backup "$TUNNEL_DIR/goosed"
+                chmod +x "$TUNNEL_DIR/goosed"
+            fi
+        else
+            echo -e "${RED}Error: Failed to clone tunnel repository${NC}"
+            return 1
+        fi
+    else
+        echo -e "${GREEN}✓ Tunnel repository already exists at $TUNNEL_DIR${NC}"
+        # Optionally pull latest changes
+        echo -e "${YELLOW}Updating tunnel client...${NC}"
+        (cd "$TUNNEL_DIR" && git pull --quiet) || echo -e "${YELLOW}Note: Could not update repository (may be modified)${NC}"
+    fi
+    
+    # Check if client.js exists
+    if [ ! -f "$TUNNEL_CLIENT_PATH" ]; then
+        echo -e "${RED}Error: client.js not found in tunnel repository${NC}"
+        echo -e "${YELLOW}Try removing $TUNNEL_DIR and run the script again${NC}"
+        return 1
+    fi
+    
+    # Install npm dependencies if needed
+    if [ ! -d "$TUNNEL_DIR/node_modules" ]; then
+        echo -e "${YELLOW}Installing tunnel client dependencies...${NC}"
+        (cd "$TUNNEL_DIR" && npm install)
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to install npm dependencies${NC}"
+            return 1
+        fi
+        echo -e "${GREEN}✓ Dependencies installed${NC}"
+    fi
+    
+    return 0
+}
+
+# Setup tunnel client
+if ! setup_tunnel_client; then
+    echo -e "${RED}Error: Failed to setup tunnel client${NC}"
     exit 1
 fi
 
-# Check if node_modules exists in utils directory
-if [ ! -d "$UTILS_DIR/node_modules" ]; then
-    echo -e "${YELLOW}Installing tunnel client dependencies...${NC}"
-    cd "$UTILS_DIR"
-    npm install
-    cd "$SCRIPT_DIR"
-    echo -e "${GREEN}✓ Dependencies installed${NC}"
-fi
-
-# Generate a random agent ID
-AGENT_ID="goose-$(openssl rand -hex 8)"
+# Generate a deterministic agent ID based on hostname/username
+# This ensures the same tunnel URL each time the script is run
+MACHINE_ID=$(echo -n "$(hostname)-$(whoami)" | openssl dgst -sha256 | cut -d' ' -f2 | cut -c1-16)
+AGENT_ID="goose-${MACHINE_ID}"
 SECRET="tunnel_$(openssl rand -hex 16)"
 
 echo ""
