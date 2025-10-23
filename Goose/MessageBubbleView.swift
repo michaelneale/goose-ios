@@ -35,7 +35,7 @@ if !filteredContent.isEmpty {
                         )
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(message.role == .user ? EdgeInsets(top: 6, leading: 8, bottom: 2, trailing: 8) : EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                    .padding(message.role == .user ? EdgeInsets(top: 6, leading: 8, bottom: 0, trailing: 8) : EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
                     .background(
                         message.role == .user 
                             ? Color.blue.opacity(0.15)
@@ -299,9 +299,6 @@ if isUserMessage {
                     .baselineOffset(0)
                     .background(Color.green.opacity(0.3))
                     .fixedSize(horizontal: false, vertical: true)
-                    .clipped()
-                    .offset(y: -4)
-                    .frame(idealHeight: 20)
             } else {
                 Text(cachedAttributedText ?? AttributedString(text))
                     .font(.system(size: 16, weight: .regular))
