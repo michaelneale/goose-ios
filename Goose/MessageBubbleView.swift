@@ -18,14 +18,14 @@ var body: some View {
                 Spacer(minLength: 16)
             }
             
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 4 : 8) {
                 // Message content - filter out tool responses AND tool requests (we'll show them as pills)
                 let filteredContent = message.content.filter { 
                     !isToolResponse($0) && !isToolRequest($0)
                 }
                 
                 if !filteredContent.isEmpty {
-                    VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
+                    VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 4 : 8) {
                         ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
                             TruncatableMessageContentView(
                                 content: content,
@@ -37,7 +37,7 @@ var body: some View {
                         }
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(12)
+                    .padding(message.role == .user ? 8 : 12)
                     .background(
                         message.role == .user 
                             ? Color.blue.opacity(0.15)
@@ -725,9 +725,10 @@ struct TruncatableMessageContentView: View {
         case .text(let textContent):
             // Use MarkdownText for proper markdown rendering  
             MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
-                .lineSpacing(8)
+                .lineSpacing(4)
                 .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: isUserMessage ? .trailing : .leading)
+                .fixedSize(horizontal: false, vertical: true)
             
         case .toolRequest(_):
             // Hide tool requests - they'll be shown as consolidated pills
@@ -747,9 +748,10 @@ struct TruncatableMessageContentView: View {
         case .conversationCompacted(let content):
             // Show compacted conversation message  
             MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
-                .lineSpacing(8)
+                .lineSpacing(4)
                 .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: isUserMessage ? .trailing : .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
