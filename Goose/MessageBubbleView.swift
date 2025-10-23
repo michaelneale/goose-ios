@@ -12,14 +12,20 @@ struct MessageBubbleView: View {
     private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        HStack {
+            // Add spacer on left for user messages (push to right)
+            if message.role == .user {
+                Spacer(minLength: 50)
+            }
+            
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
             // Message content - filter out tool responses AND tool requests (we'll show them as pills)
             let filteredContent = message.content.filter { 
                 !isToolResponse($0) && !isToolRequest($0)
             }
             
             if !filteredContent.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
                     ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
                         TruncatableMessageContentView(
                             content: content,
@@ -28,6 +34,13 @@ struct MessageBubbleView: View {
                             isTruncated: $isTruncated,
                             isUserMessage: message.role == .user
                         )
+                        .padding(12)
+                        .background(
+                            message.role == .user 
+                                ? Color.blue.opacity(0.15)
+                                : Color.clear
+                        )
+                        .cornerRadius(16)
                     }
                 }
             }
@@ -82,7 +95,14 @@ struct MessageBubbleView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity)
+        
+        // Add spacer on right for assistant messages (push to left)
+        if message.role != .user {
+            Spacer(minLength: 50)
+        }
+    }
+    .frame(maxWidth: .infinity)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
