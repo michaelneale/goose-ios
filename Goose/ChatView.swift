@@ -240,11 +240,24 @@ struct ChatView: View {
             }
         }
         .onAppear {
-            // Set up voice manager callback
+            // Set up voice manager callbacks
             voiceManager.onSubmitMessage = { transcribedText in
                 // Create the message and send it
                 inputText = transcribedText
                 sendMessage()
+                
+                // Exit audio mode after manual send (iOS convention)
+                if voiceManager.voiceMode == .audio {
+                    voiceManager.setMode(.normal)
+                }
+            }
+            
+            voiceManager.onCancelRequest = {
+                // Cancel the current streaming request
+                currentStreamTask?.cancel()
+                currentStreamTask = nil
+                isLoading = false
+                print("🛑 API request cancelled by voice command")
             }
 
             Task {

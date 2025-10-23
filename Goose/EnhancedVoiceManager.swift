@@ -41,6 +41,7 @@ class EnhancedVoiceManager: ObservableObject {
     enum State: String {
         case idle = "Idle"
         case listening = "Listening"
+        case awaitingConfirmation = "Confirm?"  // NEW: Waiting for yes/no
         case processing = "Processing"
         case speaking = "Speaking"
         case error = "Error"
@@ -49,6 +50,7 @@ class EnhancedVoiceManager: ObservableObject {
             switch self {
             case .idle: return "mic.slash"
             case .listening: return "mic.fill"
+            case .awaitingConfirmation: return "questionmark.circle"
             case .processing: return "ellipsis.circle"
             case .speaking: return "speaker.wave.2.fill"
             case .error: return "exclamationmark.triangle"
@@ -59,6 +61,7 @@ class EnhancedVoiceManager: ObservableObject {
             switch self {
             case .idle: return .gray
             case .listening: return .red
+            case .awaitingConfirmation: return .orange
             case .processing: return .blue
             case .speaking: return .green
             case .error: return .orange
@@ -75,6 +78,7 @@ class EnhancedVoiceManager: ObservableObject {
     @Published var state: State = .idle
     @Published var transcribedText = ""
     @Published var errorMessage: String?
+    @Published var currentVolume: Float = 0.0  // RMS volume level 0.0-1.0
     
     var isListening: Bool {
         return voiceMode != .normal && state == .listening
@@ -92,14 +96,28 @@ class EnhancedVoiceManager: ObservableObject {
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var speechCoordinator: SpeechCoordinator?
     
-    // Silence detection
+    // RMS-based silence detection  
     private var silenceTimer: Timer?
     private var lastSpeechTime = Date()
     private var hasDetectedSpeech = false
-    private let silenceThreshold: TimeInterval = 1.5
+    private let silenceThreshold: TimeInterval = 0.8  // Time after silence before submitting
+    private var volumeHistory: [Float] = []
+    private let volumeHistorySize = 10  // ~0.5 second of history
+    private let silenceVolumeThreshold: Float = 0.03  // Volume level that counts as speech
     
-    // Callback for sending messages
+    // Stop word detection
+    private let stopWords = ["goose", "hey goose", "stop", "cancel"]
+    private var lastStopWordCheck = Date()
+    
+    // Confirmation feature (NOT YET ENABLED)
+    var requireConfirmation = false  // Set to true to enable "would you like to send?" flow
+    private var pendingMessage: String?  // Holds message awaiting confirmation
+    private let confirmWords = ["yes", "yeah", "yep", "sure", "send", "go ahead", "send it"]
+    private let cancelWords = ["no", "nope", "cancel", "don't send", "never mind"]
+    
+    // Callbacks
     var onSubmitMessage: ((String) -> Void)?
+    var onCancelRequest: (() -> Void)?  // Cancel pending API request
     
     // MARK: - Initialization
     init() {
@@ -175,20 +193,17 @@ class EnhancedVoiceManager: ObservableObject {
         }
         
         print("🎤 Speaking response: \(text.prefix(50))...")
+        
+        // Keep listening running so we can detect "stop" commands during speech
+        // The .playAndRecord audio session with .voiceChat mode provides echo cancellation
         state = .speaking
         playSound(.responseReady)
         
         // Clean the text for speech
         let cleanedText = cleanTextForSpeech(text)
         
-        // Configure audio session
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .spokenAudio, options: .duckOthers)
-            try audioSession.setActive(true)
-        } catch {
-            print("Failed to configure audio for playback: \(error)")
-        }
+        // Don't change audio session - keep it in .playAndRecord mode so we can still hear "stop" commands
+        // The audio session was already configured in startListening() with echo cancellation
         
         let utterance = AVSpeechUtterance(string: cleanedText)
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
@@ -212,23 +227,29 @@ class EnhancedVoiceManager: ObservableObject {
                 stopListening()
                 transcribedText = ""
                 hasDetectedSpeech = false
-                lastSpeechTime = Date()
+                volumeHistory.removeAll()
                 state = .listening
                 
                 playSound(.startListening)
                 
-                // Configure audio session
+                // Configure audio session with better settings for voice chat
                 let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+                if voiceMode == .fullAudio {
+                    // Use playAndRecord with voiceChat mode for echo cancellation
+                    try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothA2DP])
+                } else {
+                    try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+                }
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
                 
-                // Create recognition request
+                // Create recognition request with on-device recognition
                 recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
                 guard let recognitionRequest = recognitionRequest else {
                     throw VoiceError.recognitionRequestFailed
                 }
                 
                 recognitionRequest.shouldReportPartialResults = true
+                recognitionRequest.requiresOnDeviceRecognition = true  // Privacy + speed
                 
                 // Setup audio engine
                 audioEngine = AVAudioEngine()
@@ -239,8 +260,14 @@ class EnhancedVoiceManager: ObservableObject {
                 let inputNode = audioEngine.inputNode
                 let recordingFormat = inputNode.outputFormat(forBus: 0)
                 
-                inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+                // Install tap with RMS calculation
+                inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
                     recognitionRequest.append(buffer)
+                    
+                    // Calculate RMS volume level
+                    Task { @MainActor in
+                        self?.calculateAndUpdateRMS(buffer: buffer)
+                    }
                 }
                 
                 audioEngine.prepare()
@@ -256,6 +283,37 @@ class EnhancedVoiceManager: ObservableObject {
                 handleError(error)
             }
         }
+    }
+    
+    // MARK: - RMS Volume Calculation
+    private func calculateAndUpdateRMS(buffer: AVAudioPCMBuffer) {
+        guard let channelData = buffer.floatChannelData?[0] else { return }
+        let frameLength = Int(buffer.frameLength)
+        
+        // Calculate RMS (Root Mean Square)
+        var sum: Float = 0.0
+        for i in 0..<frameLength {
+            let sample = channelData[i]
+            sum += sample * sample
+        }
+        let rms = sqrtf(sum / Float(frameLength))
+        
+        // Normalize and smooth
+        let normalizedRMS = min(rms * 10.0, 1.0)  // Scale up and cap at 1.0
+        currentVolume = normalizedRMS * 0.7 + currentVolume * 0.3  // Smoothing
+        
+        // Track volume history for silence detection
+        volumeHistory.append(normalizedRMS)
+        if volumeHistory.count > volumeHistorySize {
+            volumeHistory.removeFirst()
+        }
+    }
+    
+    private func isVolumeSilent() -> Bool {
+        guard volumeHistory.count >= volumeHistorySize / 2 else { return false }
+        let recentVolumes = volumeHistory.suffix(volumeHistorySize / 2)
+        let avgVolume = recentVolumes.reduce(0.0, +) / Float(recentVolumes.count)
+        return avgVolume < silenceVolumeThreshold
     }
     
     private func stopListening() {
@@ -289,6 +347,11 @@ class EnhancedVoiceManager: ObservableObject {
                     if !hasDetectedSpeech {
                         hasDetectedSpeech = true
                     }
+                    
+                    // Check for stop words in Full Audio mode
+                    if voiceMode == .fullAudio {
+                        checkForStopWords(in: newText)
+                    }
                 }
                 
                 if result.isFinal {
@@ -309,6 +372,77 @@ class EnhancedVoiceManager: ObservableObject {
         }
     }
     
+    // MARK: - Stop Word Detection
+    private func checkForStopWords(in text: String) {
+        // Throttle checks to avoid too frequent processing
+        let now = Date()
+        guard now.timeIntervalSince(lastStopWordCheck) > 0.3 else { return }
+        lastStopWordCheck = now
+        
+        let lowercased = text.lowercased()
+        let words = lowercased.split(separator: " ")
+        let lastFewWords = words.suffix(3).joined(separator: " ")
+        
+        for stopWord in stopWords {
+            if lastFewWords.contains(stopWord) {
+                print("🛑 Stop word detected: '\(stopWord)' in '\(lastFewWords)'")
+                handleStopCommand(context: state)
+                return
+            }
+        }
+    }
+    
+    private func handleStopCommand(context: State) {
+        print("🛑 Handling stop command in state: \(context)")
+        playSound(.error)  // Audio feedback
+        
+        switch context {
+        case .listening:
+            // Clear current transcription and restart
+            print("🛑 Clearing transcription")
+            transcribedText = ""
+            hasDetectedSpeech = false
+            lastSpeechTime = Date()
+            
+        case .processing:
+            // Cancel the pending API request
+            print("🛑 Cancelling API request")
+            onCancelRequest?()
+            // Already listening in fullAudio mode - just update state and reset buffer
+            state = .listening
+            transcribedText = ""
+            hasDetectedSpeech = false
+            lastSpeechTime = Date()
+            
+        case .speaking:
+            // Stop speaking and return to listening
+            print("🛑 Stopping speech")
+            stopSpeaking()
+            // Audio engine is already running, just transition state back to listening
+            state = .listening
+            // Clear the stop word from transcription but keep timing for auto-submit
+            // Remove the stop word that was detected
+            let lowercased = transcribedText.lowercased()
+            for stopWord in stopWords {
+                if lowercased.contains(stopWord) {
+                    // Remove the stop word and any text before it (likely part of response echo)
+                    if let range = lowercased.range(of: stopWord) {
+                        transcribedText = String(transcribedText[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    }
+                    break
+                }
+            }
+            // If there's no remaining text, reset everything
+            if transcribedText.isEmpty {
+                hasDetectedSpeech = false
+            }
+            // Don't reset lastSpeechTime - let it track actual speech for auto-submit
+            
+        default:
+            break
+        }
+    }
+    
     // MARK: - Silence Detection
     private func startSilenceDetection() {
         silenceTimer?.invalidate()
@@ -320,7 +454,8 @@ class EnhancedVoiceManager: ObservableObject {
     }
     
     private func checkForSilence() {
-        guard voiceMode != .normal, state == .listening, hasDetectedSpeech else { return }
+        // Only auto-submit in fullAudio mode - audio mode requires manual send
+        guard voiceMode == .fullAudio, state == .listening, hasDetectedSpeech else { return }
         
         let timeSinceLastSpeech = Date().timeIntervalSince(lastSpeechTime)
         
@@ -336,22 +471,23 @@ class EnhancedVoiceManager: ObservableObject {
         transcribedText = ""
         hasDetectedSpeech = false
         
-        stopListening()
-        state = .processing
-        playSound(.submit)
+        // In fullAudio mode, keep listening even while processing (for "stop" commands)
+        if voiceMode == .fullAudio {
+            state = .processing
+            playSound(.submit)
+            // Keep the recognition running but reset the transcription buffer
+            lastSpeechTime = Date()
+        } else {
+            // In audio mode, stop listening (but this shouldn't be called in audio mode anyway)
+            stopListening()
+            state = .processing
+            playSound(.submit)
+        }
         
         // Send the message via callback
         onSubmitMessage?(message)
         
-        // In audio mode, immediately go back to listening
-        if voiceMode == .audio {
-            Task {
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
-                if voiceMode == .audio {
-                    startListening()
-                }
-            }
-        }
+        // Note: This is only called from checkForSilence() which only runs in fullAudio mode
         // In full audio mode, we'll wait for the response to be spoken before listening again
     }
     
@@ -435,13 +571,12 @@ class EnhancedVoiceManager: ObservableObject {
     fileprivate func didFinishSpeaking() {
         print("🔊 Speech synthesis finished")
         if voiceMode == .fullAudio {
-            Task {
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                if voiceMode == .fullAudio {
-                    print("🎤 Restarting listening after speech")
-                    startListening()
-                }
-            }
+            // Audio engine is already running, just transition state back to listening
+            print("🎤 Returning to listening state after speech")
+            state = .listening
+            transcribedText = ""
+            hasDetectedSpeech = false
+            lastSpeechTime = Date()
         } else {
             state = .idle
         }
