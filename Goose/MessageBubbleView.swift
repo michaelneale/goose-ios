@@ -297,6 +297,7 @@ if isUserMessage {
                     .minimumScaleFactor(1.0)
                     .multilineTextAlignment(.trailing)
                     .baselineOffset(0)
+                    .background(Color.green.opacity(0.3))
             } else {
                 Text(cachedAttributedText ?? AttributedString(text))
                     .font(.system(size: 16, weight: .regular))
