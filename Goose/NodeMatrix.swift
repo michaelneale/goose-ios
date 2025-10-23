@@ -20,6 +20,11 @@ struct NodeMatrix: View {
 /// cacheKey format: "dateLabel-widthxheight"
 @State private var positionCache: [String: [String: CGPoint]] = [:]
     
+    // MARK: - Session Cache
+    /// Cache filtered/sorted sessions by day offset to avoid expensive filtering on every render
+    /// Key: daysOffset, Value: filtered and sorted sessions for that day
+    @State private var sessionCache: [Int: [ChatSession]] = [:]
+    
     // MARK: - Size Constants
     private let minNodeSize: CGFloat = 8
     private let maxNodeSize: CGFloat = 16
@@ -63,6 +68,12 @@ struct NodeMatrix: View {
     }
     
     private func daySessions(for offset: Int) -> [ChatSession] {
+        // Check cache first
+        if let cached = sessionCache[offset] {
+            return cached
+        }
+        
+        // If not cached, calculate it
         let calendar = Calendar.utc  // FIX: Use UTC calendar
         let target = targetDate(for: offset)
         
@@ -77,7 +88,7 @@ struct NodeMatrix: View {
             return calendar.isDate(sessionDate, inSameDayAs: target)
         }
         
-        return filtered.sorted { session1, session2 in
+        let sorted = filtered.sorted { session1, session2 in
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime]
             guard let date1 = formatter.date(from: session1.updatedAt),
@@ -86,6 +97,45 @@ struct NodeMatrix: View {
             }
             return date1 < date2
         }
+        
+        // Note: We can't cache here because this is called during body rendering
+        // Caching will happen in precalculateSessions()
+        return sorted
+    }
+    
+    /// Pre-calculate and cache sessions for a day offset
+    private func precalculateSessions(for offset: Int) {
+        // Skip if already cached
+        if sessionCache[offset] != nil {
+            return
+        }
+        
+        let calendar = Calendar.utc
+        let target = targetDate(for: offset)
+        
+        let filtered = sessions.filter { session in
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            guard let sessionDate = formatter.date(from: session.updatedAt) else {
+                return false
+            }
+            
+            return calendar.isDate(sessionDate, inSameDayAs: target)
+        }
+        
+        let sorted = filtered.sorted { session1, session2 in
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            guard let date1 = formatter.date(from: session1.updatedAt),
+                  let date2 = formatter.date(from: session2.updatedAt) else {
+                return false
+            }
+            return date1 < date2
+        }
+        
+        sessionCache[offset] = sorted
+        print("💾 Cached \(sorted.count) sessions for day offset \(offset)")
     }
     
     private func dateLabel(for offset: Int) -> String {
@@ -191,6 +241,13 @@ struct NodeMatrix: View {
                     }
                     .offset(x: -nodeGeometry.size.width + containerOffset + dragOffset)
                 .onAppear {
+                    // Pre-calculate sessions first (must happen before positions)
+                    precalculateSessions(for: daysOffset + 1)
+                    precalculateSessions(for: daysOffset)
+                    if daysOffset > 0 {
+                        precalculateSessions(for: daysOffset - 1)
+                    }
+                    
                     // Store geometry size and pre-calculate positions for visible days
                     let size = nodeGeometry.size
                     geometrySize = size
@@ -331,6 +388,12 @@ struct NodeMatrix: View {
         }
         .onChange(of: daysOffset) { oldValue, newValue in
             onDayChange?(newValue)
+            // Pre-calculate sessions first
+            precalculateSessions(for: newValue + 1)
+            precalculateSessions(for: newValue)
+            if newValue > 0 {
+                precalculateSessions(for: newValue - 1)
+            }
             // Pre-calculate positions for the new day
             if geometrySize != .zero {
                 precalculatePositions(for: dateLabel(for: newValue + 1), sessions: daySessions(for: newValue + 1), size: geometrySize)
@@ -342,6 +405,11 @@ struct NodeMatrix: View {
         }
         .onAppear {
             onDayChange?(daysOffset)
+        }
+        .onChange(of: sessions) { oldValue, newValue in
+            // Clear session cache when sessions array changes
+            sessionCache.removeAll()
+            print("🔄 Session cache cleared due to sessions update")
         }
     }
 
