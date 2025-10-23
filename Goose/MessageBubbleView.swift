@@ -15,7 +15,7 @@ var body: some View {
         HStack(alignment: .top, spacing: 0) {
             // Add spacer on left for user messages (push to right)
             if message.role == .user {
-                Spacer(minLength: 50)
+                Spacer(minLength: 16)
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
@@ -36,6 +36,7 @@ var body: some View {
                             )
                         }
                     }
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(12)
                     .background(
                         message.role == .user 
@@ -95,11 +96,12 @@ var body: some View {
                     }
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity)
             
             // Add spacer on right for assistant messages (push to left)
             if message.role != .user {
-                Spacer(minLength: 50)
+                Spacer(minLength: 16)
             }
         }
         .sheet(isPresented: $showFullText) {
