@@ -28,7 +28,7 @@ struct ContentView: View {
         
         await MainActor.run {
             // Calculate current date range
-            let calendar = Calendar.utc
+            let calendar = Calendar.current  // Use local timezone
             let now = Date()
             
             // Increment the days loaded
@@ -76,7 +76,7 @@ struct ContentView: View {
             return initialDaysBack
         }
         
-        let calendar = Calendar.utc
+        let calendar = Calendar.current  // Use local timezone
         let days = calendar.dateComponents([.day], from: oldestDate, to: Date()).day ?? initialDaysBack
         return max(days, initialDaysBack)
     }
@@ -260,7 +260,7 @@ struct ContentView: View {
         
         await MainActor.run {
             // Use UTC calendar for date comparison
-            let calendar = Calendar.utc
+            let calendar = Calendar.current  // Use local timezone
             let now = Date()
             
             // Use the tracked days loaded value
@@ -293,7 +293,7 @@ struct ContentView: View {
         
         await MainActor.run {
             // Use UTC calendar for date comparison to match session timestamps
-            let calendar = Calendar.utc
+            let calendar = Calendar.current  // Use local timezone
             let now = Date()
             let cutoffDate = calendar.date(byAdding: .day, value: -initialDaysBack, to: now) ?? now
             

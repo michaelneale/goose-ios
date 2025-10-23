@@ -63,8 +63,9 @@ struct NodeMatrix: View {
     
     // MARK: - Date Helpers
     private func targetDate(for offset: Int) -> Date {
-        let calendar = Calendar.utc  // FIX: Use UTC calendar
-        return calendar.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
+        let calendar = Calendar.current  // Use local calendar for user's timezone
+        let today = calendar.startOfDay(for: Date())
+        return calendar.date(byAdding: .day, value: -offset, to: today) ?? today
     }
     
     private func daySessions(for offset: Int) -> [ChatSession] {
@@ -74,7 +75,7 @@ struct NodeMatrix: View {
         }
         
         // If not cached, calculate it
-        let calendar = Calendar.utc  // FIX: Use UTC calendar
+        let calendar = Calendar.current  // Use local calendar for user's timezone
         let target = targetDate(for: offset)
         
         let filtered = sessions.filter { session in
@@ -110,7 +111,7 @@ struct NodeMatrix: View {
             return
         }
         
-        let calendar = Calendar.utc
+        let calendar = Calendar.current  // Use local timezone
         let target = targetDate(for: offset)
         
         let filtered = sessions.filter { session in
@@ -139,7 +140,7 @@ struct NodeMatrix: View {
     }
     
     private func dateLabel(for offset: Int) -> String {
-        let calendar = Calendar.utc  // FIX: Use UTC calendar
+        let calendar = Calendar.current  // Use local timezone
         let target = targetDate(for: offset)
         let formatter = DateFormatter()
         
@@ -838,7 +839,7 @@ struct DayContentView: View {
     
     struct PreviewContainer: View {
         let formatter = ISO8601DateFormatter()
-        let calendar = Calendar.utc  // FIX: Use UTC calendar
+        let calendar = Calendar.current  // Use local timezone
         let now = Date()
         
         init() {
