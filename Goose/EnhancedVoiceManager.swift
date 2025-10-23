@@ -28,7 +28,7 @@ enum VoiceMode: String, CaseIterable {
     var description: String {
         switch self {
         case .normal: return "Type messages"
-        case .audio: return "Listen only, no speech"
+        case .audio: return "Continuous transcription"
         case .fullAudio: return "Listen and speak back"
         }
     }
@@ -92,13 +92,16 @@ class EnhancedVoiceManager: ObservableObject {
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var speechCoordinator: SpeechCoordinator?
     
-    // Silence detection
+    // Silence detection - modified for continuous input
     private var silenceTimer: Timer?
     private var lastSpeechTime = Date()
     private var hasDetectedSpeech = false
-    private let silenceThreshold: TimeInterval = 1.5
+    private let silenceThreshold: TimeInterval = 2.0  // Increased for continuous mode
     
-    // Callback for sending messages
+    // Callback for updating text field (instead of auto-submitting)
+    var onTranscriptionUpdate: ((String) -> Void)?
+    
+    // Callback for sending messages (only used in fullAudio mode)
     var onSubmitMessage: ((String) -> Void)?
     
     // MARK: - Initialization
@@ -289,9 +292,15 @@ class EnhancedVoiceManager: ObservableObject {
                     if !hasDetectedSpeech {
                         hasDetectedSpeech = true
                     }
+                    
+                    // Update the text field in real-time (for audio mode)
+                    if voiceMode == .audio {
+                        onTranscriptionUpdate?(newText)
+                    }
                 }
                 
-                if result.isFinal {
+                // In fullAudio mode, auto-submit on final result
+                if result.isFinal && voiceMode == .fullAudio {
                     submitTranscription()
                 }
             }
@@ -324,11 +333,39 @@ class EnhancedVoiceManager: ObservableObject {
         
         let timeSinceLastSpeech = Date().timeIntervalSince(lastSpeechTime)
         
+        // In audio mode (continuous), we finalize text on silence but keep listening
+        // In fullAudio mode, we submit on silence
         if timeSinceLastSpeech > silenceThreshold && !transcribedText.isEmpty {
-            submitTranscription()
+            if voiceMode == .audio {
+                finalizeCurrentTranscription()
+            } else if voiceMode == .fullAudio {
+                submitTranscription()
+            }
         }
     }
     
+    // NEW: Finalize transcription without submitting (for audio mode)
+    private func finalizeCurrentTranscription() {
+        guard !transcribedText.isEmpty else { return }
+        
+        print("📝 Finalizing transcription (continuous mode): \(transcribedText)")
+        
+        // Update the text field with finalized text
+        onTranscriptionUpdate?(transcribedText)
+        
+        // Play a subtle sound to indicate text was captured
+        playSound(.submit)
+        
+        // Reset for next phrase but keep listening
+        transcribedText = ""
+        hasDetectedSpeech = false
+        lastSpeechTime = Date()
+        
+        // Stay in listening state - don't restart, just continue
+        print("🎤 Continuing to listen...")
+    }
+    
+    // MODIFIED: Only used in fullAudio mode now
     private func submitTranscription() {
         guard !transcribedText.isEmpty else { return }
         
@@ -340,18 +377,9 @@ class EnhancedVoiceManager: ObservableObject {
         state = .processing
         playSound(.submit)
         
-        // Send the message via callback
+        // Send the message via callback (only in fullAudio mode)
         onSubmitMessage?(message)
         
-        // In audio mode, immediately go back to listening
-        if voiceMode == .audio {
-            Task {
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
-                if voiceMode == .audio {
-                    startListening()
-                }
-            }
-        }
         // In full audio mode, we'll wait for the response to be spoken before listening again
     }
     

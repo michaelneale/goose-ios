@@ -233,18 +233,19 @@ struct ChatView: View {
             SettingsView()
                 .environmentObject(ConfigurationHandler.shared)
         }
-        .onChange(of: voiceManager.transcribedText) { newText in
-            // Update input text with transcribed text in real-time
-            if !newText.isEmpty && voiceManager.voiceMode != .normal {
-                inputText = newText
-            }
-        }
+
         .onAppear {
             // Set up voice manager callback
             voiceManager.onSubmitMessage = { transcribedText in
                 // Create the message and send it
                 inputText = transcribedText
                 sendMessage()
+            }
+            
+            // Set up transcription update callback for continuous input (audio mode)
+            voiceManager.onTranscriptionUpdate = { transcribedText in
+                // Update the input text field without sending
+                inputText = transcribedText
             }
 
             Task {

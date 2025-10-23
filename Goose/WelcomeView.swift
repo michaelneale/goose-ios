@@ -271,12 +271,7 @@ struct WelcomeView: View {
         .sheet(isPresented: $showTrialInstructions) {
             TrialModeInstructionsView()
         }
-        .onChange(of: voiceManager.transcribedText) { oldValue, newText in
-            // Update input text with transcribed text in real-time
-            if !newText.isEmpty && voiceManager.voiceMode != .normal {
-                inputText = newText
-            }
-        }
+
         .onChange(of: isInputFocused) { oldValue, newValue in
             if newValue {
                 // Input gained focus
@@ -304,6 +299,12 @@ struct WelcomeView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     handleSubmit()
                 }
+            }
+            
+            // Set up transcription update callback for continuous input (audio mode)
+            voiceManager.onTranscriptionUpdate = { transcribedText in
+                // Update the input text field without sending
+                inputText = transcribedText
             }
             
             // Load recent sessions
