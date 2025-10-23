@@ -35,7 +35,7 @@ if !filteredContent.isEmpty {
                         )
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(message.role == .user ? EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8) : EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                    .padding(message.role == .user ? EdgeInsets(top: 6, leading: 8, bottom: 2, trailing: 8) : EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
                     .background(
                         message.role == .user 
                             ? Color.blue.opacity(0.15)
@@ -290,10 +290,13 @@ struct MarkdownText: View {
     
 var body: some View {
         Group {
-            if isUserMessage {
+if isUserMessage {
                 Text(cachedAttributedText ?? AttributedString(text))
                     .font(.system(size: 16, weight: .bold))
+                    .lineLimit(nil)
+                    .minimumScaleFactor(1.0)
                     .multilineTextAlignment(.trailing)
+                    .baselineOffset(0)
             } else {
                 Text(cachedAttributedText ?? AttributedString(text))
                     .font(.system(size: 16, weight: .regular))
