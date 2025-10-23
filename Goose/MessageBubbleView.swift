@@ -18,25 +18,103 @@ struct MessageBubbleView: View {
                 Spacer()
             }
             
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 0 : 8) {
-                // Message content - filter out tool responses AND tool requests (we'll show them as pills)
+if message.role == .user {
+                // User messages - simplified structure without VStack wrapper
                 let filteredContent = message.content.filter { 
                     !isToolResponse($0) && !isToolRequest($0)
                 }
                 
                 if !filteredContent.isEmpty {
-                    VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 0 : 8) {
-                        ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
-                            TruncatableMessageContentView(
-                                content: content,
-                                maxHeight: maxHeight,
-                                showFullText: $showFullText,
-                                isTruncated: $isTruncated,
-                                isUserMessage: message.role == .user
-                            )
+                    ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
+                        TruncatableMessageContentView(
+                            content: content,
+                            maxHeight: maxHeight,
+                            showFullText: $showFullText,
+                            isTruncated: $isTruncated,
+                            isUserMessage: true
+                        )
+                    }
+                    .padding(EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8))
+                    .background(Color.blue.opacity(0.15))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                    )
+                    .cornerRadius(16)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                // Assistant messages - keep VStack structure
+                VStack(alignment: .leading, spacing: 8) {
+                    let filteredContent = message.content.filter { 
+                        !isToolResponse($0) && !isToolRequest($0)
+                    }
+                    
+                    if !filteredContent.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
+                                TruncatableMessageContentView(
+                                    content: content,
+                                    maxHeight: maxHeight,
+                                    showFullText: $showFullText,
+                                    isTruncated: $isTruncated,
+                                    isUserMessage: false
+                                )
+                            }
+                        }
+                        .padding(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                        .cornerRadius(16)
+                    }
+                    
+                    // Show consolidated task completion pill if there are completed tasks
+                    if !completedTasks.isEmpty {
+                        if completedTasks.count == 1 {
+                            NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(ThemeManager.shared)) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                    
+                                    Text(completedTasks[0].toolCall.name)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray6).opacity(0.85))
+                                .cornerRadius(16)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(ThemeManager.shared)) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                    
+                                    Text("\(completedTasks.count) Tasks completed")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray6).opacity(0.85))
+                                .cornerRadius(16)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
                     .padding(message.role == .user ? EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8) : EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
                     .background(
                         message.role == .user 
