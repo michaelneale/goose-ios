@@ -37,7 +37,7 @@ struct MessageBubbleView: View {
                         }
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(message.role == .user ? 8 : 12)
+                    .padding(message.role == .user ? 6 : 12)
                     .background(
                         message.role == .user 
                             ? Color.blue.opacity(0.15)
@@ -726,7 +726,6 @@ struct TruncatableMessageContentView: View {
             // Use MarkdownText for proper markdown rendering
             if isUserMessage {
                 MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
-                    .lineSpacing(4)
                     .foregroundColor(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -756,7 +755,6 @@ struct TruncatableMessageContentView: View {
             // Show compacted conversation message
             if isUserMessage {
                 MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
-                    .lineSpacing(4)
                     .foregroundColor(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
