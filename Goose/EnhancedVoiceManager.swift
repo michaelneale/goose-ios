@@ -97,6 +97,7 @@ class EnhancedVoiceManager: ObservableObject {
     private var lastSpeechTime = Date()
     private var hasDetectedSpeech = false
     private let silenceThreshold: TimeInterval = 2.0  // Increased for continuous mode
+    private var isManuallyStopping = false  // Track manual stops to prevent auto-submit
     
     // Callback for updating text field (instead of auto-submitting)
     var onTranscriptionUpdate: ((String) -> Void)?
@@ -120,9 +121,26 @@ class EnhancedVoiceManager: ObservableObject {
     private func handleModeChange(from oldMode: VoiceMode, to newMode: VoiceMode) {
         print("🔄 Voice mode changed from \(oldMode) to \(newMode)")
         
+        // Set flag to prevent auto-submit when manually stopping
+        if oldMode == .audio && newMode == .normal && !transcribedText.isEmpty {
+            print("📝 Preserving text without auto-submit: \(transcribedText)")
+            // Update the input field one last time before stopping
+            onTranscriptionUpdate?(transcribedText)
+            transcribedText = ""  // Clear to prevent any auto-submit
+        }
+        
+        // Mark that we're manually stopping
+        isManuallyStopping = true
+        
         // Stop any ongoing operations
         stopListening()
         stopSpeaking()
+        
+        // Reset the flag after a short delay
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            isManuallyStopping = false
+        }
         
         // Handle the new mode
         switch newMode {
@@ -330,6 +348,7 @@ class EnhancedVoiceManager: ObservableObject {
     
     private func checkForSilence() {
         guard voiceMode != .normal, state == .listening, hasDetectedSpeech else { return }
+        guard !isManuallyStopping else { return }  // Don't auto-submit during manual stop
         
         let timeSinceLastSpeech = Date().timeIntervalSince(lastSpeechTime)
         
