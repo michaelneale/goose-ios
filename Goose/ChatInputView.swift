@@ -63,7 +63,7 @@ struct ChatInputView: View {
                 if let vm = voiceManager,
                    vm.voiceMode != .normal && !vm.transcribedText.isEmpty {
                     HStack {
-                        Text("Transcribing: \"\(vm.transcribedText)\"")
+                        Text("Listening: \"\(vm.transcribedText)\"")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(2)
