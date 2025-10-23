@@ -11,98 +11,97 @@ struct MessageBubbleView: View {
     // Maximum height for truncation - about 70% of screen like PR #11
     private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7
     
-    var body: some View {
-        HStack {
+var body: some View {
+        HStack(alignment: .top, spacing: 0) {
             // Add spacer on left for user messages (push to right)
             if message.role == .user {
                 Spacer(minLength: 50)
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
-            // Message content - filter out tool responses AND tool requests (we'll show them as pills)
-            let filteredContent = message.content.filter { 
-                !isToolResponse($0) && !isToolRequest($0)
-            }
-            
-            if !filteredContent.isEmpty {
-                VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
-                    ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
-                        TruncatableMessageContentView(
-                            content: content,
-                            maxHeight: maxHeight,
-                            showFullText: $showFullText,
-                            isTruncated: $isTruncated,
-                            isUserMessage: message.role == .user
-                        )
+                // Message content - filter out tool responses AND tool requests (we'll show them as pills)
+                let filteredContent = message.content.filter { 
+                    !isToolResponse($0) && !isToolRequest($0)
+                }
+                
+                if !filteredContent.isEmpty {
+                    VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
+                        ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
+                            TruncatableMessageContentView(
+                                content: content,
+                                maxHeight: maxHeight,
+                                showFullText: $showFullText,
+                                isTruncated: $isTruncated,
+                                isUserMessage: message.role == .user
+                            )
+                        }
+                    }
+                    .padding(12)
+                    .background(
+                        message.role == .user 
+                            ? Color.blue.opacity(0.15)
+                            : Color.clear
+                    )
+                    .cornerRadius(16)
+                }
+                
+                // Show consolidated task completion pill if there are completed tasks
+                if !completedTasks.isEmpty {
+                    // For single task, go directly to output; for multiple, show combined view
+                    if completedTasks.count == 1 {
+                        // Single task - go directly to output
+                        NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(ThemeManager.shared)) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Text(completedTasks[0].toolCall.name)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6).opacity(0.85))
+                            .cornerRadius(16)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        // Multiple tasks - show all outputs in one view
+                        NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(ThemeManager.shared)) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Text("\(completedTasks.count) Tasks completed")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6).opacity(0.85))
+                            .cornerRadius(16)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .padding(12)
-                .background(
-                    message.role == .user 
-                        ? Color.blue.opacity(0.15)
-                        : Color.clear
-                )
-                .cornerRadius(16)
             }
+            .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity)
             
-            // Show consolidated task completion pill if there are completed tasks
-            if !completedTasks.isEmpty {
-                // For single task, go directly to output; for multiple, show combined view
-                if completedTasks.count == 1 {
-                    // Single task - go directly to output
-                    NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(ThemeManager.shared)) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Text(completedTasks[0].toolCall.name)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemGray6).opacity(0.85))
-                        .cornerRadius(16)
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    // Multiple tasks - show all outputs in one view
-                    NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(ThemeManager.shared)) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Text("\(completedTasks.count) Tasks completed")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemGray6).opacity(0.85))
-                        .cornerRadius(16)
-                    }
-                    .buttonStyle(.plain)
-                }
+            // Add spacer on right for assistant messages (push to left)
+            if message.role != .user {
+                Spacer(minLength: 50)
             }
         }
-        .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity, alignment: message.role == .user ? .topTrailing : .topLeading)
-        
-        // Add spacer on right for assistant messages (push to left)
-        if message.role != .user {
-            Spacer(minLength: 50)
-        }
-    }
-    .frame(maxWidth: .infinity)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
