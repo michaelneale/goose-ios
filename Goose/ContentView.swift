@@ -12,7 +12,7 @@ struct ContentView: View {
     @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
     @State private var isLoadingMore: Bool = false
     @State private var hasMoreSessions: Bool = true
-    private let initialDaysBack: Int = 15  // Load sessions from last 15 days initially
+    private let initialDaysBack: Int = 5  // Load sessions from last 5 days initially
     private let loadMoreDaysIncrement: Int = 15  // Load 15 more days when "Load More" is clicked
 
     // MARK: - Load More Sessions (load older sessions)
@@ -285,9 +285,9 @@ struct ContentView: View {
         }
     }
     
-    // Preload sessions from last 15 days on app launch
-    // Preload sessions from last 15 days on app launch
-    // Preload sessions from last 15 days on app launch
+    // Preload sessions from last 5 days on app launch
+    // Preload sessions from last 5 days on app launch
+    // Preload sessions from last 5 days on app launch
     private func preloadSessions() async {
         print("📥 Attempting to preload sessions...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
@@ -302,7 +302,7 @@ struct ContentView: View {
             formatter.formatOptions = [.withInternetDateTime]
             
             print("📅 DEBUG: Current time (UTC): \(formatter.string(from: now))")
-            print("📅 DEBUG: Cutoff date (15 days ago): \(formatter.string(from: cutoffDate))")
+            print("📅 DEBUG: Cutoff date (5 days ago): \(formatter.string(from: cutoffDate))")
             print("📅 DEBUG: Total sessions from API: \(fetchedSessions.count)")
             
             // Check for duplicate session IDs
@@ -361,8 +361,8 @@ struct ContentView: View {
             self.hasMoreSessions = fetchedSessions.count > recentSessions.count
             
             print("📅 DEBUG: Filtering results:")
-            print("   - Included (within 15 days): \(includedCount)")
-            print("   - Filtered (older than 15 days): \(filteredCount)")
+            print("   - Included (within 5 days): \(includedCount)")
+            print("   - Filtered (older than 5 days): \(filteredCount)")
             print("   - Parse errors: \(parseErrors)")
             print("✅ Preloaded \(self.cachedSessions.count) sessions from last \(initialDaysBack) days")
             print("   - Total sessions available: \(fetchedSessions.count)")
