@@ -34,15 +34,15 @@ struct MessageBubbleView: View {
                             isTruncated: $isTruncated,
                             isUserMessage: message.role == .user
                         )
-                        .padding(12)
-                        .background(
-                            message.role == .user 
-                                ? Color.blue.opacity(0.15)
-                                : Color.clear
-                        )
-                        .cornerRadius(16)
                     }
                 }
+                .padding(12)
+                .background(
+                    message.role == .user 
+                        ? Color.blue.opacity(0.15)
+                        : Color.clear
+                )
+                .cornerRadius(16)
             }
             
             // Show consolidated task completion pill if there are completed tasks
@@ -95,7 +95,7 @@ struct MessageBubbleView: View {
                 }
             }
         }
-        .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity)
+        .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity, alignment: message.role == .user ? .topTrailing : .topLeading)
         
         // Add spacer on right for assistant messages (push to left)
         if message.role != .user {
