@@ -103,7 +103,6 @@ struct MessageBubbleView: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity)
             
             if message.role != .user {
                 Spacer()
@@ -111,7 +110,9 @@ struct MessageBubbleView: View {
             
 
         }
+        .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
         .padding(.trailing, message.role == .user ? 12 : 0)
+        .padding(.leading, message.role == .user ? 0 : 12)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
