@@ -78,11 +78,10 @@ struct ChatInputView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 12)
                     
-                    // Spacer to extend behind input
+                    // Spacer to extend behind input - grows with text field
                     Spacer()
-                        .frame(height: 80)
+                        .frame(minHeight: 100)
                 }
-                .frame(height: 140) // Fixed total height
                 .background(
                     RoundedRectangle(cornerRadius: 32)
                         .fill(colorScheme == .dark ?
