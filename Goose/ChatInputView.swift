@@ -24,6 +24,9 @@ struct ChatInputView: View {
     var showTrialBanner: Bool = false
     var onTrialBannerTap: (() -> Void)? = nil
     
+    // Track input field height
+    @State private var inputHeight: CGFloat = 80
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             // Trial mode banner (behind the input)
@@ -58,7 +61,7 @@ struct ChatInputView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             
-            // Listening indicator banner (behind the input)
+            // Listening indicator banner (behind the input) - GROWS WITH INPUT
             if let vm = voiceManager,
                vm.voiceMode != .normal && vm.state == .listening {
                 VStack(spacing: 0) {
@@ -78,9 +81,9 @@ struct ChatInputView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 12)
                     
-                    // Spacer to extend behind input - grows with text field
+                    // Spacer that matches the input field height
                     Spacer()
-                        .frame(minHeight: 80)
+                        .frame(height: inputHeight)
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 32)
@@ -100,6 +103,7 @@ struct ChatInputView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .animation(.easeInOut(duration: 0.2), value: inputHeight)
             }
             
             VStack(spacing: 0) {
@@ -203,7 +207,17 @@ struct ChatInputView: View {
                 .padding(.leading, 14)
                 .padding(.trailing, 10)
                 .frame(maxWidth: .infinity)
-                .background(Color(UIColor.secondarySystemBackground))
+                .background(
+                    GeometryReader { geometry in
+                        Color(UIColor.secondarySystemBackground)
+                            .onAppear {
+                                inputHeight = geometry.size.height
+                            }
+                            .onChange(of: geometry.size.height) { newHeight in
+                                inputHeight = newHeight
+                            }
+                    }
+                )
                 .cornerRadius(32)
                 .overlay(
                     RoundedRectangle(cornerRadius: 32)
