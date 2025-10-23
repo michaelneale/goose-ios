@@ -82,7 +82,6 @@ struct ChatInputView: View {
                         .lineLimit(1...4)
                         .padding(.vertical, 8)
                         .focused($isFocused)
-                        .disabled(voiceManager?.voiceMode != .normal && voiceManager != nil)
                         .onSubmit {
                             onSubmit()
                         }
