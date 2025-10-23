@@ -61,26 +61,21 @@ struct ChatInputView: View {
             // Listening indicator banner (behind the input)
             if let vm = voiceManager,
                vm.voiceMode != .normal && vm.state == .listening {
-                VStack(spacing: 0) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "waveform")
-                            .font(.system(size: 20))
-                            .foregroundColor(.blue)
-                            .symbolEffect(.variableColor.iterative.reversing)
-                        
-                        Text("Listening...")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 12)
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                        .symbolEffect(.variableColor.iterative.reversing)
                     
-                    // Spacer to extend behind input - grows with text field
+                    Text("Listening...")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
                     Spacer()
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 80) // Extend behind input
                 .background(
                     RoundedRectangle(cornerRadius: 32)
                         .fill(colorScheme == .dark ?
