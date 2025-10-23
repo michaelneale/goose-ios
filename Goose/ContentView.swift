@@ -10,6 +10,77 @@ struct ContentView: View {
     @State private var selectedSessionId: String?
     @State private var sessionName: String = "New Session"
     @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
+    @State private var isLoadingMore: Bool = false
+    @State private var hasMoreSessions: Bool = true
+    @State private var currentDaysLoaded: Int = 5  // Track how many days we've loaded
+    private let initialDaysBack: Int = 5  // Load sessions from last 5 days initially
+    private let loadMoreDaysIncrement: Int = 5  // Load 5 more days when "Load More" is clicked
+
+    // MARK: - Load More Sessions (load older sessions)
+    func loadMoreSessions() async {
+        guard !isLoadingMore && hasMoreSessions else { return }
+        
+        await MainActor.run {
+            isLoadingMore = true
+        }
+        
+        let allSessions = await GooseAPIService.shared.fetchSessions()
+        
+        await MainActor.run {
+            // Calculate current date range
+            let calendar = Calendar.utc
+            let now = Date()
+            
+            // Increment the days loaded
+            let newDaysBack = currentDaysLoaded + loadMoreDaysIncrement
+            let cutoffDate = calendar.date(byAdding: .day, value: -newDaysBack, to: now) ?? now
+            
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            let sessionsInRange = allSessions.filter { session in
+                guard let sessionDate = formatter.date(from: session.updatedAt) else {
+                    return false
+                }
+                return sessionDate >= cutoffDate
+            }
+            
+            let previousCount = cachedSessions.count
+            self.cachedSessions = sessionsInRange
+            self.hasMoreSessions = allSessions.count > sessionsInRange.count
+            
+            let newCount = sessionsInRange.count - previousCount
+            
+            // Update the days loaded tracker
+            self.currentDaysLoaded = newDaysBack
+            
+            print("✅ Loaded \(newCount) more sessions (now showing last \(newDaysBack) days, total: \(sessionsInRange.count))")
+            
+            if newCount == 0 {
+                self.hasMoreSessions = false
+                print("✅ No more sessions to load")
+            }
+            
+            isLoadingMore = false
+        }
+    }
+    
+    // Helper to estimate days loaded based on session dates
+    private func calculateDaysLoaded(from sessions: [ChatSession]) -> Int {
+        guard let oldestSession = sessions.last else { return initialDaysBack }
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        guard let oldestDate = formatter.date(from: oldestSession.updatedAt) else {
+            return initialDaysBack
+        }
+        
+        let calendar = Calendar.utc
+        let days = calendar.dateComponents([.day], from: oldestDate, to: Date()).day ?? initialDaysBack
+        return max(days, initialDaysBack)
+    }
+    
     @EnvironmentObject var configurationHandler: ConfigurationHandler
     
     // Shared voice manager across WelcomeView and ChatView
@@ -63,6 +134,9 @@ struct ContentView: View {
                                 }
                             },
                                 cachedSessions: cachedSessions,  // Pass cached sessions
+                                onLoadMore: {  // Pass load more callback for NodeMatrix
+                                    await loadMoreSessions()
+                                },
                                 voiceManager: sharedVoiceManager
                             )
                             .navigationBarHidden(true)
@@ -81,9 +155,13 @@ struct ContentView: View {
                                     selectedSessionId = nil
                                 },
                                 onBackToWelcome: {
-                                    // Return to welcome screen
+                                    // Return to welcome screen and refresh sessions
                                     withAnimation {
                                         hasActiveChat = false
+                                    }
+                                    // Refresh sessions when returning to welcome view
+                                    Task {
+                                        await refreshSessionsAfterChat()
                                     }
                                 }
                             )
@@ -119,15 +197,16 @@ struct ContentView: View {
                             Task {
                                 await preloadSessions()
                             }
-                        }
+                        },
+                        onLoadMore: {
+                            await loadMoreSessions()
+                        },
+                        isLoadingMore: isLoadingMore,
+                        hasMoreSessions: hasMoreSessions
                     )
                     .transition(.move(edge: .leading))
-                    .onAppear {
-                        // Refresh sessions when sidebar opens
-                        Task {
-                            await preloadSessions()
-                        }
-                    }
+                    // Note: Removed onAppear preload to preserve loaded sessions
+                    // Sessions are loaded on app launch and via "Load More" button
                 }
             }
             .overlay(alignment: .top) {
@@ -172,14 +251,133 @@ struct ContentView: View {
         }
     }
     
-    // Preload sessions in background
+    // MARK: - Session Management
+    
+    /// Refresh sessions after returning from chat (to show new sessions)
+    private func refreshSessionsAfterChat() async {
+        print("🔄 Refreshing sessions after chat...")
+        let fetchedSessions = await GooseAPIService.shared.fetchSessions()
+        
+        await MainActor.run {
+            // Use UTC calendar for date comparison
+            let calendar = Calendar.utc
+            let now = Date()
+            
+            // Use the tracked days loaded value
+            let cutoffDate = calendar.date(byAdding: .day, value: -currentDaysLoaded, to: now) ?? now
+            
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            let sessionsInRange = fetchedSessions.filter { session in
+                guard let sessionDate = formatter.date(from: session.updatedAt) else {
+                    return false
+                }
+                return sessionDate >= cutoffDate
+            }
+            
+            self.cachedSessions = sessionsInRange
+            self.hasMoreSessions = fetchedSessions.count > sessionsInRange.count
+            
+            print("✅ Refreshed \(self.cachedSessions.count) sessions (last \(self.currentDaysLoaded) days)")
+            print("   - Total sessions available: \(fetchedSessions.count)")
+        }
+    }
+    
+    // Preload sessions from last 5 days on app launch
+    // Preload sessions from last 5 days on app launch
+    // Preload sessions from last 5 days on app launch
     private func preloadSessions() async {
         print("📥 Attempting to preload sessions...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
+        
         await MainActor.run {
-            // Limit to first 10 sessions for performance
-            self.cachedSessions = Array(fetchedSessions.prefix(10))
-            print("✅ Preloaded \(self.cachedSessions.count) sessions")
+            // Use UTC calendar for date comparison to match session timestamps
+            let calendar = Calendar.utc
+            let now = Date()
+            let cutoffDate = calendar.date(byAdding: .day, value: -initialDaysBack, to: now) ?? now
+            
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            print("📅 DEBUG: Current time (UTC): \(formatter.string(from: now))")
+            print("📅 DEBUG: Cutoff date (5 days ago): \(formatter.string(from: cutoffDate))")
+            print("📅 DEBUG: Total sessions from API: \(fetchedSessions.count)")
+            
+            // Check for duplicate session IDs
+            let sessionIds = fetchedSessions.map { $0.id }
+            let uniqueIds = Set(sessionIds)
+            if sessionIds.count != uniqueIds.count {
+                print("⚠️ DEBUG: DUPLICATE SESSION IDs DETECTED!")
+                print("   Total sessions: \(sessionIds.count)")
+                print("   Unique IDs: \(uniqueIds.count)")
+                print("   Duplicates: \(sessionIds.count - uniqueIds.count)")
+            }
+            
+            // Show ALL sessions from last 7 days for debugging
+            let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+            let recentForDebug = fetchedSessions.filter { session in
+                guard let sessionDate = formatter.date(from: session.updatedAt) else { return false }
+                return sessionDate >= sevenDaysAgo
+            }
+            
+            print("📅 DEBUG: ALL sessions from last 7 days (\(recentForDebug.count) total):")
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "yyyy-MM-dd (EEEE)"
+            dayFormatter.timeZone = TimeZone(identifier: "UTC")
+            
+            for session in recentForDebug.sorted(by: { $0.updatedAt > $1.updatedAt }) {
+                if let date = formatter.date(from: session.updatedAt) {
+                    let dayStr = dayFormatter.string(from: date)
+                    let desc = session.description.isEmpty ? "[Untitled]" : session.description
+                    print("   \(session.updatedAt) (\(dayStr)) - \(desc) [msgs: \(session.messageCount)]")
+                }
+            }
+            
+            var includedCount = 0
+            var filteredCount = 0
+            var parseErrors = 0
+            
+            let recentSessions = fetchedSessions.filter { session in
+                guard let sessionDate = formatter.date(from: session.updatedAt) else {
+                    print("⚠️ DEBUG: Failed to parse date: \(session.updatedAt) for session: \(session.description)")
+                    parseErrors += 1
+                    return false
+                }
+                
+                let isIncluded = sessionDate >= cutoffDate
+                if isIncluded {
+                    includedCount += 1
+                } else {
+                    filteredCount += 1
+                }
+                
+                return isIncluded
+            }
+            
+            // Load all sessions within the initial time window
+            self.cachedSessions = recentSessions
+            self.currentDaysLoaded = initialDaysBack
+            self.hasMoreSessions = fetchedSessions.count > recentSessions.count
+            
+            print("📅 DEBUG: Filtering results:")
+            print("   - Included (within 5 days): \(includedCount)")
+            print("   - Filtered (older than 5 days): \(filteredCount)")
+            print("   - Parse errors: \(parseErrors)")
+            print("✅ Preloaded \(self.cachedSessions.count) sessions from last \(initialDaysBack) days")
+            print("   - Total sessions available: \(fetchedSessions.count)")
+            print("   - Older sessions available: \(fetchedSessions.count - recentSessions.count)")
+            
+            // Show what we actually loaded
+            print("📅 DEBUG: Loaded sessions by date:")
+            let groupedByDate = Dictionary(grouping: recentSessions) { session -> String in
+                guard let date = formatter.date(from: session.updatedAt) else { return "unknown" }
+                return dayFormatter.string(from: date)
+            }
+            for (date, sessions) in groupedByDate.sorted(by: { $0.key > $1.key }) {
+                print("   \(date): \(sessions.count) sessions")
+            }
+            
             if self.cachedSessions.isEmpty {
                 print("⚠️ No sessions preloaded - server may not be connected or no sessions exist")
             }
@@ -212,6 +410,7 @@ struct ContentView: View {
                 }
             }
         }
+
     }
 }
 
@@ -321,6 +520,7 @@ struct ChatViewWithInitialMessage: View {
                 }
             }
     }
+
 }
 
 #Preview {
