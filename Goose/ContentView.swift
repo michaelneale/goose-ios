@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var cachedSessions: [ChatSession] = [] // Preloaded sessions
     @State private var isLoadingMore: Bool = false
     @State private var hasMoreSessions: Bool = true
+    @State private var currentDaysLoaded: Int = 5  // Track how many days we've loaded
     private let initialDaysBack: Int = 5  // Load sessions from last 5 days initially
     private let loadMoreDaysIncrement: Int = 5  // Load 5 more days when "Load More" is clicked
 
@@ -30,10 +31,7 @@ struct ContentView: View {
             let calendar = Calendar.utc
             let now = Date()
             
-            // Figure out how many days we've already loaded
-            let currentDaysLoaded = (cachedSessions.count > 0) ? 
-                calculateDaysLoaded(from: cachedSessions) : initialDaysBack
-            
+            // Increment the days loaded
             let newDaysBack = currentDaysLoaded + loadMoreDaysIncrement
             let cutoffDate = calendar.date(byAdding: .day, value: -newDaysBack, to: now) ?? now
             
@@ -52,6 +50,10 @@ struct ContentView: View {
             self.hasMoreSessions = allSessions.count > sessionsInRange.count
             
             let newCount = sessionsInRange.count - previousCount
+            
+            // Update the days loaded tracker
+            self.currentDaysLoaded = newDaysBack
+            
             print("✅ Loaded \(newCount) more sessions (now showing last \(newDaysBack) days, total: \(sessionsInRange.count))")
             
             if newCount == 0 {
@@ -261,10 +263,7 @@ struct ContentView: View {
             let calendar = Calendar.utc
             let now = Date()
             
-            // Calculate current date range (maintain what we've already loaded)
-            let currentDaysLoaded = (cachedSessions.count > 0) ? 
-                calculateDaysLoaded(from: cachedSessions) : initialDaysBack
-            
+            // Use the tracked days loaded value
             let cutoffDate = calendar.date(byAdding: .day, value: -currentDaysLoaded, to: now) ?? now
             
             let formatter = ISO8601DateFormatter()
@@ -280,7 +279,7 @@ struct ContentView: View {
             self.cachedSessions = sessionsInRange
             self.hasMoreSessions = fetchedSessions.count > sessionsInRange.count
             
-            print("✅ Refreshed \(self.cachedSessions.count) sessions (last \(currentDaysLoaded) days)")
+            print("✅ Refreshed \(self.cachedSessions.count) sessions (last \(self.currentDaysLoaded) days)")
             print("   - Total sessions available: \(fetchedSessions.count)")
         }
     }
@@ -358,6 +357,7 @@ struct ContentView: View {
             
             // Load all sessions within the initial time window
             self.cachedSessions = recentSessions
+            self.currentDaysLoaded = initialDaysBack
             self.hasMoreSessions = fetchedSessions.count > recentSessions.count
             
             print("📅 DEBUG: Filtering results:")
