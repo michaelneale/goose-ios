@@ -10,6 +10,7 @@ struct WelcomeCard: View {
     
     // Animation states
     @State private var displayedText = ""
+    @State private var typewriterGeneration = 0  // Track current animation generation
     @State private var showLogo = false
     @State private var showProgressSection = false
     @State private var progressValue: CGFloat = 0.0
@@ -296,12 +297,19 @@ struct WelcomeCard: View {
     
     // Typewriter effect for greeting text
     private func startTypewriterEffect(isInitialLoad: Bool = false) {
+        // Increment generation to cancel any in-progress animations
+        typewriterGeneration += 1
+        let currentGeneration = typewriterGeneration
+        
         displayedText = ""
         let fullText = "\(greeting)\n\(subheading)"
         
         // Fast typewriter effect - 20ms per character
         for (index, character) in fullText.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.02) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.02) { [currentGeneration] in
+                // Only update if this is still the current animation
+                guard currentGeneration == self.typewriterGeneration else { return }
+                
                 displayedText.append(character)
                 
                 // When text is complete, show logo and other sections (only on initial load)
