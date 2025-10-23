@@ -337,7 +337,7 @@ struct ChatView: View {
 
         // Stop voice input if active to prevent transcription after send
         if voiceManager.isListening {
-            voiceManager.stopVoiceInput()
+            voiceManager.setMode(.normal)
         }
 
         // Check if we're in a demo session - if so, start fresh

@@ -324,7 +324,7 @@ struct WelcomeView: View {
                 showTrialModeCard = apiService.isTrialMode
             }
         }
-        .onChange(of: cachedSessions) { newSessions in
+        .onChange(of: cachedSessions) { _, newSessions in
             // Update recentSessions when cachedSessions changes (e.g., from sidebar load more)
             recentSessions = newSessions
         }
@@ -337,7 +337,7 @@ struct WelcomeView: View {
 
         // Stop voice input if active to prevent transcription after send
         if voiceManager.isListening {
-            voiceManager.stopVoiceInput()
+            voiceManager.setMode(.normal)
         }
         
         if let focusedSession = focusedNodeSession {
