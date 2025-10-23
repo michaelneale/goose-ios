@@ -300,7 +300,8 @@ if isUserMessage {
                     .background(Color.green.opacity(0.3))
                     .fixedSize(horizontal: false, vertical: true)
                     .clipped()
-                    .padding(.bottom, -4)
+                    .offset(y: -4)
+                    .frame(idealHeight: 20)
             } else {
                 Text(cachedAttributedText ?? AttributedString(text))
                     .font(.system(size: 16, weight: .regular))
