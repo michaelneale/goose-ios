@@ -13,7 +13,7 @@ struct ContentView: View {
     @State private var isLoadingMore: Bool = false
     @State private var hasMoreSessions: Bool = true
     private let initialDaysBack: Int = 5  // Load sessions from last 5 days initially
-    private let loadMoreDaysIncrement: Int = 15  // Load 15 more days when "Load More" is clicked
+    private let loadMoreDaysIncrement: Int = 5  // Load 5 more days when "Load More" is clicked
 
     // MARK: - Load More Sessions (load older sessions)
     func loadMoreSessions() async {

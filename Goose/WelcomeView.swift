@@ -103,14 +103,14 @@ struct WelcomeView: View {
                                             currentDaysOffset = daysOffset
                                             
                                             // Smart loading: Only load if we need more sessions
-                                            // 1. Check if we've moved significantly (7+ days from last load)
+                                            // 1. Check if we've moved significantly (5+ days from last load)
                                             // 2. Check if we're within the 90-day boundary
                                             // 3. Check if we have more sessions to load
                                             let daysSinceLastLoad = abs(daysOffset - lastLoadTriggeredAtOffset)
                                             
-                                            if daysOffset > 7 && 
+                                            if daysOffset > 5 && 
                                                daysOffset <= maxDaysToLoad &&
-                                               daysSinceLastLoad >= 7 &&
+                                               daysSinceLastLoad >= 5 &&
                                                !cachedSessions.isEmpty {
                                                 // Update the trigger point to prevent immediate re-triggers
                                                 lastLoadTriggeredAtOffset = daysOffset
