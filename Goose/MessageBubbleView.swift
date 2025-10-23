@@ -37,7 +37,7 @@ struct MessageBubbleView: View {
                         }
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(message.role == .user ? 6 : 12)
+                    .padding(message.role == .user ? EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8) : EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
                     .background(
                         message.role == .user 
                             ? Color.blue.opacity(0.15)
@@ -294,7 +294,7 @@ struct MarkdownText: View {
         Text(cachedAttributedText ?? AttributedString(text))
             .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
             .multilineTextAlignment(isUserMessage ? .trailing : .leading)
-            .textSelection(.enabled)
+            .textSelection(isUserMessage ? .disabled : .enabled)
             .onAppear {
                 if cachedAttributedText == nil {
                     cachedAttributedText = MarkdownParser.parse(text)
@@ -738,6 +738,7 @@ struct TruncatableMessageContentView: View {
                 MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
                     .foregroundColor(.primary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(height: nil)
             } else {
                 MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
                     .lineSpacing(4)
