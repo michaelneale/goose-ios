@@ -13,19 +13,19 @@ struct MessageBubbleView: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            // Add spacer on left for user messages (push to right)
+            // Content
             if message.role == .user {
-                Spacer(minLength: 16)
+                Spacer()
             }
             
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 4 : 8) {
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 0 : 8) {
                 // Message content - filter out tool responses AND tool requests (we'll show them as pills)
                 let filteredContent = message.content.filter { 
                     !isToolResponse($0) && !isToolRequest($0)
                 }
                 
                 if !filteredContent.isEmpty {
-                    VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 4 : 8) {
+                    VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 0 : 8) {
                         ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
                             TruncatableMessageContentView(
                                 content: content,
@@ -99,11 +99,13 @@ struct MessageBubbleView: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: message.role == .user ? UIScreen.main.bounds.width * 0.7 : .infinity)
             
-            // Add spacer on right for assistant messages (push to left)
             if message.role != .user {
-                Spacer(minLength: 16)
+                Spacer()
             }
+            
+
         }
+        .padding(.trailing, message.role == .user ? 12 : 0)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
