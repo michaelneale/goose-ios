@@ -334,6 +334,13 @@ struct ChatView: View {
         let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty && !isLoading else { return }
 
+        // Check if we're in a demo session - if so, start fresh
+        if let sessionId = currentSessionId, TrialMode.shared.isDemoSession(sessionId) {
+            print("📺 Demo session detected - starting fresh session")
+            // Clear the demo session state
+            currentSessionId = nil
+        }
+
         let userMessage = Message(role: .user, text: trimmedText)
         messages.append(userMessage)
         inputText = ""
@@ -347,15 +354,31 @@ struct ChatView: View {
 
         startChatStream()
     }
+    
+    // MARK: - Trial Mode Session Management
+    
+    /// Get or create the single trial mode session - delegates to TrialMode
+    /// Returns session ID and initial messages
+    private func getOrCreateTrialSession() async throws -> (String, [Message]) {
+        return try await TrialMode.shared.getOrCreateTrialSession()
+    }
 
     private func startChatStream() {
         Task {
             do {
                 // Create session if we don't have one
                 if currentSessionId == nil {
-                    // workingDir will default to home directory (matches desktop behavior)
+                    // Always create a new session when starting from welcome screen
+                    print("🆕 Creating new session (trial mode: \(apiService.isTrialMode))")
                     let (sessionId, initialMessages) = try await apiService.startAgent()
-                    print("✅ SESSION CREATED: \(sessionId)")
+                    
+                    // In trial mode, save this as the "Current Session"
+                    if apiService.isTrialMode {
+                        TrialMode.shared.saveTrialSessionId(sessionId)
+                        print("💾 Saved as Current Session in trial mode")
+                    }
+                    
+                    print("✅ SESSION READY: \(sessionId)")
 
                     // Load any initial messages from the session
                     if !initialMessages.isEmpty {
@@ -926,43 +949,55 @@ struct ChatView: View {
             currentStreamTask = nil
         }
 
-        // Handle trial mode sessions differently
-        if apiService.isTrialMode && sessionId.starts(with: "trial-demo-") {
-            Task {
-                await MainActor.run {
-                    // Clear ALL old state first
-                    self.stopStreaming()
-                    activeToolCalls.removeAll()
-                    completedToolCalls.removeAll()
-                    toolCallMessageMap.removeAll()
-                    currentSessionId = nil  // Trial sessions don't have real session IDs
-
-                    // Load the mock messages
-                    messages = apiService.getMockMessages(for: sessionId)
-
-                    // Add a trial mode notice at the beginning
-                    let trialNotice = Message(
-                        role: .assistant,
-                        text:
-                            "🔔 **Trial Mode**: This is a trial session. To access persistent sessions and full functionality, connect to your personal goose agent."
-                    )
-                    messages.insert(trialNotice, at: 0)
-
-                    // Force scroll to bottom after loading
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        shouldAutoScroll = true
-                        scrollRefreshTrigger = UUID()
-                    }
-                }
-            }
-            return
-        }
-
         Task {
             do {
+                // Check if this is a demo session in trial mode
+                let isDemoSession = apiService.isTrialMode && TrialMode.shared.isDemoSession(sessionId)
+                
+                if isDemoSession {
+                    // Show demo messages for this session
+                    print("📺 Loading demo session: \(sessionId)")
+                    let demoMessages = TrialMode.shared.getMockMessages(for: sessionId)
+                    
+                    await MainActor.run {
+                        // Clear state
+                        self.stopStreaming()
+                        activeToolCalls.removeAll()
+                        completedToolCalls.removeAll()
+                        toolCallMessageMap.removeAll()
+                        
+                        // Set demo session ID (so we know to start fresh on message send)
+                        currentSessionId = sessionId
+                        
+                        // Load demo messages
+                        messages.removeAll()
+                        messages = demoMessages
+                        
+                        print("📺 Loaded \(demoMessages.count) demo messages")
+                        
+                        // Scroll to bottom
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            shouldAutoScroll = true
+                            scrollRefreshTrigger = UUID()
+                        }
+                    }
+                    return
+                }
+                
+                // For real trial session or normal sessions, resume as usual
+                let sessionIdToResume: String
+                if apiService.isTrialMode && !isDemoSession {
+                    // This is the real trial session - load it
+                    print("🎯 Trial mode: Loading real trial session")
+                    let (trialSessionId, _) = try await getOrCreateTrialSession()
+                    sessionIdToResume = trialSessionId
+                } else {
+                    sessionIdToResume = sessionId
+                }
+                
                 // Resume the session
                 let (resumedSessionId, sessionMessages) = try await apiService.resumeAgent(
-                    sessionId: sessionId)
+                    sessionId: sessionIdToResume)
                 print("✅ SESSION RESUMED: \(resumedSessionId)")
                 print("📝 Loaded \(sessionMessages.count) messages")
 

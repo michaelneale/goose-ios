@@ -490,7 +490,7 @@ class GooseAPIService: ObservableObject {
         
         // In trial mode, return mock sessions
         if isTrialMode {
-            return getMockSessions()
+            return TrialMode.shared.getMockSessions()
         }
 
         guard let url = URL(string: "\(baseURL)/sessions") else {
@@ -524,108 +524,6 @@ class GooseAPIService: ObservableObject {
             print("🚨 Error fetching sessions: \(error)")
 
             return []
-        }
-    }
-
-    // MARK: - Mock Sessions for Trial Mode
-    private func getMockSessions() -> [ChatSession] {
-        let now = Date()
-        let formatter = ISO8601DateFormatter()
-
-        return [
-            ChatSession(
-                id: "trial-demo-1",
-                description: "📝 Debugging my python app",
-                messageCount: 8,
-                createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 24)),
-                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 2))
-            ),
-            ChatSession(
-                id: "trial-demo-2",
-                description: "🚀 Deploy my home server",
-                messageCount: 15,
-                createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 48)),
-                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 12))
-            ),
-            ChatSession(
-                id: "trial-demo-3",
-                description: "🔍 Transcribe the latest podcast",
-                messageCount: 23,
-                createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 72)),
-                updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 24))
-            ),
-        ]
-    }
-
-    // Mock messages for trial mode sessions
-    func getMockMessages(for sessionId: String) -> [Message] {
-        switch sessionId {
-        case "trial-demo-1":
-            return [
-                Message(
-                    role: .user,
-                    text: "Can you help me work out why my script can't reach google.com"
-                ),
-                Message(
-                    role: .assistant,
-                    text:
-                        "I'd be happy to help you debug this... (this is just an example)"
-                ),
-            ]
-        case "trial-demo-2":
-            return [
-                Message(
-                    role: .user, text: "I need you to deploy and turn on my home automation server"
-                ),
-                Message(
-                    role: .assistant,
-                    text:
-                        "I'll deploy the latest server for you, it was to fly.io last time so I will try that and report back to you ..."
-                ),
-            ]
-        case "trial-demo-3":
-            return [
-                Message(
-                    role: .user,
-                    text:
-                        "Can you find the latest podcast, and transcripe it for me, picking out the important themes with time stamps"
-                ),
-                Message(
-                    role: .assistant,
-                    text:
-                        "No problem, I can see from your notes what podcast it is, I will install whisper and transcribe it, do you want me to email it when done?"
-                ),
-            ]
-        case "trial-demo-4":
-            return [
-                Message(
-                    role: .user,
-                    text: "My JavaScript app is throwing undefined errors, can you help debug?"),
-                Message(
-                    role: .assistant,
-                    text:
-                        "I'll help you debug those undefined errors. These are among the most common JavaScript issues. Let me guide you through a systematic debugging approach:\n\n1. **Check Variable Declarations**\n2. **Verify Object Properties**\n3. **Examine Async Operations**\n\nCan you share the specific error message and the relevant code?"
-                ),
-            ]
-        case "trial-demo-5":
-            return [
-                Message(
-                    role: .user, text: "I want to build a reusable React component for a data table"
-                ),
-                Message(
-                    role: .assistant,
-                    text:
-                        "Great! I'll help you build a reusable and flexible React data table component. We'll create something that's:\n\n- **Sortable** - Click column headers to sort\n- **Filterable** - Search across all columns\n- **Paginated** - Handle large datasets efficiently\n- **Customizable** - Easy to style and extend\n\nLet me show you a complete implementation..."
-                ),
-            ]
-        default:
-            return [
-                Message(
-                    role: .assistant,
-                    text:
-                        "This is a demo session. Connect to your own Goose agent to access your persistent sessions and full functionality."
-                )
-            ]
         }
     }
 }
