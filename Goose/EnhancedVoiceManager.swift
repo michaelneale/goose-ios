@@ -164,12 +164,11 @@ class EnhancedVoiceManager: ObservableObject {
     }
     
     func cycleVoiceMode() {
+        // Toggle between normal and audio (transcribe) only
         switch voiceMode {
         case .normal:
             setMode(.audio)
-        case .audio:
-            setMode(.fullAudio)
-        case .fullAudio:
+        case .audio, .fullAudio:
             setMode(.normal)
         }
     }

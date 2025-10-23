@@ -145,7 +145,7 @@ struct ChatInputView: View {
                         HStack(spacing: 10) {
                             // Voice mode indicator text (if voice manager provided)
                             if let vm = voiceManager, vm.voiceMode != .normal {
-                                Text(vm.voiceMode == .audio ? "Transcribe" : "Full Audio")
+                                Text("Transcribe")
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundColor(.blue)
