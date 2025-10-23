@@ -291,7 +291,7 @@ struct MarkdownText: View {
                     previousText = text
                 }
             }
-            .onChange(of: text) { newText in
+            .onChange(of: text) { _, newText in
                 // Only reparse if text changed significantly
                 if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
                     // Full reparse for significant changes
@@ -723,16 +723,19 @@ struct TruncatableMessageContentView: View {
     var body: some View {
         switch content {
         case .text(let textContent):
-            // Use MarkdownText for proper markdown rendering  
-            MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
-                .lineSpacing(4)
-                .foregroundColor(.primary)
-                .if(isUserMessage) { view in
-                    view.fixedSize(horizontal: false, vertical: true)
-                } elseTransform: { view in
-                    view.frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            // Use MarkdownText for proper markdown rendering
+            if isUserMessage {
+                MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
+                    .lineSpacing(4)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
+                    .lineSpacing(4)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             
         case .toolRequest(_):
             // Hide tool requests - they'll be shown as consolidated pills
@@ -750,16 +753,19 @@ struct TruncatableMessageContentView: View {
             EmptyView()
             
         case .conversationCompacted(let content):
-            // Show compacted conversation message  
-            MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
-                .lineSpacing(4)
-                .foregroundColor(.primary)
-                .if(isUserMessage) { view in
-                    view.fixedSize(horizontal: false, vertical: true)
-                } elseTransform: { view in
-                    view.frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            // Show compacted conversation message
+            if isUserMessage {
+                MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
+                    .lineSpacing(4)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
+                    .lineSpacing(4)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
@@ -896,18 +902,6 @@ struct FullTextOverlay: View {
                     }
                 }
             }
-        }
-    }
-}
-
-// MARK: - View Extension for Conditional Modifiers
-extension View {
-    @ViewBuilder
-    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform, elseTransform: (Self) -> Transform) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            elseTransform(self)
         }
     }
 }
