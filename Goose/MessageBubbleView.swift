@@ -727,8 +727,12 @@ struct TruncatableMessageContentView: View {
             MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
                 .lineSpacing(4)
                 .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: isUserMessage ? .trailing : .leading)
-                .fixedSize(horizontal: false, vertical: true)
+                .if(isUserMessage) { view in
+                    view.fixedSize(horizontal: false, vertical: true)
+                } else: { view in
+                    view.frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             
         case .toolRequest(_):
             // Hide tool requests - they'll be shown as consolidated pills
@@ -750,8 +754,12 @@ struct TruncatableMessageContentView: View {
             MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
                 .lineSpacing(4)
                 .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: isUserMessage ? .trailing : .leading)
-                .fixedSize(horizontal: false, vertical: true)
+                .if(isUserMessage) { view in
+                    view.fixedSize(horizontal: false, vertical: true)
+                } else: { view in
+                    view.frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
         }
     }
 }
@@ -888,6 +896,18 @@ struct FullTextOverlay: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// MARK: - View Extension for Conditional Modifiers
+extension View {
+    @ViewBuilder
+    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform, else elseTransform: (Self) -> Transform) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            elseTransform(self)
         }
     }
 }
