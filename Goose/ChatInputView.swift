@@ -59,14 +59,13 @@ struct ChatInputView: View {
             }
             
             VStack(spacing: 0) {
-                // Show transcribed text while in voice mode (if voice manager provided)
+                // Show listening indicator while in voice mode (if voice manager provided)
                 if let vm = voiceManager,
-                   vm.voiceMode != .normal && !vm.transcribedText.isEmpty {
+                   vm.voiceMode != .normal && vm.state == .listening {
                     HStack {
-                        Text("Listening: \"\(vm.transcribedText)\"")
+                        Text("Listening...")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                            .lineLimit(2)
                         Spacer()
                     }
                     .padding(.horizontal, 16)
