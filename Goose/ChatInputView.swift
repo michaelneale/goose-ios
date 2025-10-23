@@ -58,10 +58,10 @@ struct ChatInputView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             
-            VStack(spacing: 0) {
-                // Show listening indicator while in voice mode (if voice manager provided)
-                if let vm = voiceManager,
-                   vm.voiceMode != .normal && vm.state == .listening {
+            // Listening indicator banner (behind the input)
+            if let vm = voiceManager,
+               vm.voiceMode != .normal && vm.state == .listening {
+                VStack(spacing: 0) {
                     HStack(spacing: 12) {
                         Image(systemName: "waveform")
                             .font(.system(size: 20))
@@ -75,26 +75,36 @@ struct ChatInputView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(colorScheme == .dark ?
-                                  Color(red: 0.15, green: 0.15, blue: 0.18) :
-                                  Color(red: 0.96, green: 0.96, blue: 0.98))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(
-                                colorScheme == .dark ?
-                                Color(red: 0.25, green: 0.25, blue: 0.28) :
-                                Color(red: 0.88, green: 0.88, blue: 0.90),
-                                lineWidth: 1
-                            )
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
+                    
+                    // Spacer to extend behind input
+                    Spacer()
+                        .frame(height: 80)
                 }
-                
+                .frame(height: 140) // Fixed total height
+                .background(
+                    RoundedRectangle(cornerRadius: 32)
+                        .fill(colorScheme == .dark ?
+                              Color(red: 0.15, green: 0.15, blue: 0.18) :
+                              Color(red: 0.96, green: 0.96, blue: 0.98))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32)
+                        .strokeBorder(
+                            colorScheme == .dark ?
+                            Color(red: 0.25, green: 0.25, blue: 0.28) :
+                            Color(red: 0.88, green: 0.88, blue: 0.90),
+                            lineWidth: 1
+                        )
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+            
+            VStack(spacing: 0) {
+
                 VStack(alignment: .leading, spacing: 12) {
                     // Text field on top
                     TextField(placeholder, text: $text, axis: .vertical)
