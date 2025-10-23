@@ -62,15 +62,37 @@ struct ChatInputView: View {
                 // Show listening indicator while in voice mode (if voice manager provided)
                 if let vm = voiceManager,
                    vm.voiceMode != .normal && vm.state == .listening {
-                    HStack {
+                    HStack(spacing: 12) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 20))
+                            .foregroundColor(.blue)
+                            .symbolEffect(.variableColor.iterative.reversing)
+                        
                         Text("Listening...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                        
                         Spacer()
                     }
                     .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(colorScheme == .dark ?
+                                  Color(red: 0.15, green: 0.15, blue: 0.18) :
+                                  Color(red: 0.96, green: 0.96, blue: 0.98))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(
+                                colorScheme == .dark ?
+                                Color(red: 0.25, green: 0.25, blue: 0.28) :
+                                Color(red: 0.88, green: 0.88, blue: 0.90),
+                                lineWidth: 1
+                            )
+                    )
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 8)
-                    .background(Color(UIColor.systemBackground).opacity(0.95))
                 }
                 
                 VStack(alignment: .leading, spacing: 12) {
