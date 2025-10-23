@@ -43,6 +43,12 @@ struct MessageBubbleView: View {
                             ? Color.blue.opacity(0.15)
                             : Color.clear
                     )
+                    .overlay(
+                        message.role == .user 
+                            ? RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            : nil
+                    )
                     .cornerRadius(16)
                 }
                 
@@ -286,6 +292,7 @@ struct MarkdownText: View {
     var body: some View {
         Text(cachedAttributedText ?? AttributedString(text))
             .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
+            .multilineTextAlignment(isUserMessage ? .trailing : .leading)
             .textSelection(.enabled)
             .onAppear {
                 if cachedAttributedText == nil {
