@@ -78,9 +78,9 @@ struct ChatInputView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 12)
                     
-                    // Spacer to extend behind input - fixed height like trial banner
+                    // Spacer to extend behind input - grows with text field
                     Spacer()
-                        .frame(height: 80)
+                        .frame(minHeight: 80)
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 32)
