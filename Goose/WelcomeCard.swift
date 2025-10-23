@@ -51,7 +51,7 @@ struct WelcomeCard: View {
     // Calculate session density for the current day
     // Calculate session density for the current day
     private var sessionDensity: SessionDensity {
-        let calendar = Calendar.utc  // FIX: Use UTC calendar
+        let calendar = Calendar.current  // Use local timezone
         let targetDate = calendar.date(byAdding: .day, value: -daysOffset, to: Date()) ?? Date()
         
         let daySessions = sessions.filter { session in
@@ -78,7 +78,7 @@ struct WelcomeCard: View {
     
     // Computed property for day-aware greeting with density awareness
     private var greeting: String {
-        let calendar = Calendar.utc  // FIX: Use UTC calendar
+        let calendar = Calendar.current  // Use local timezone
         let targetDate = calendar.date(byAdding: .day, value: -daysOffset, to: Date()) ?? Date()
         
         if daysOffset == 0 {
