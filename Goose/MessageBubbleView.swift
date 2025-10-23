@@ -290,11 +290,19 @@ struct MarkdownText: View {
     @State private var cachedAttributedText: AttributedString?
     @State private var previousText = ""
     
-    var body: some View {
-        Text(cachedAttributedText ?? AttributedString(text))
-            .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
-            .multilineTextAlignment(isUserMessage ? .trailing : .leading)
-            .textSelection(isUserMessage ? .disabled : .enabled)
+var body: some View {
+        Group {
+            if isUserMessage {
+                Text(cachedAttributedText ?? AttributedString(text))
+                    .font(.system(size: 16, weight: .bold))
+                    .multilineTextAlignment(.trailing)
+            } else {
+                Text(cachedAttributedText ?? AttributedString(text))
+                    .font(.system(size: 16, weight: .regular))
+                    .multilineTextAlignment(.leading)
+                    .textSelection(.enabled)
+            }
+        }
             .onAppear {
                 if cachedAttributedText == nil {
                     cachedAttributedText = MarkdownParser.parse(text)
