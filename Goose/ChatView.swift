@@ -335,6 +335,11 @@ struct ChatView: View {
         let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty && !isLoading else { return }
 
+        // Stop voice input if active to prevent transcription after send
+        if voiceManager.isListening {
+            voiceManager.stopVoiceInput()
+        }
+
         // Check if we're in a demo session - if so, start fresh
         if let sessionId = currentSessionId, TrialMode.shared.isDemoSession(sessionId) {
             print("📺 Demo session detected - starting fresh session")

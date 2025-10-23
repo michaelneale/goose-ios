@@ -334,6 +334,11 @@ struct WelcomeView: View {
     private func handleSubmit() {
         let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
+
+        // Stop voice input if active to prevent transcription after send
+        if voiceManager.isListening {
+            voiceManager.stopVoiceInput()
+        }
         
         if let focusedSession = focusedNodeSession {
             // Route to existing session
