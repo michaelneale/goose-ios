@@ -11,7 +11,7 @@ struct MessageBubbleView: View {
     // Maximum height for truncation - about 70% of screen like PR #11
     private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7
     
-var body: some View {
+    var body: some View {
         HStack(alignment: .top, spacing: 0) {
             // Add spacer on left for user messages (push to right)
             if message.role == .user {
@@ -729,7 +729,7 @@ struct TruncatableMessageContentView: View {
                 .foregroundColor(.primary)
                 .if(isUserMessage) { view in
                     view.fixedSize(horizontal: false, vertical: true)
-                } else: { view in
+                } elseTransform: { view in
                     view.frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -756,7 +756,7 @@ struct TruncatableMessageContentView: View {
                 .foregroundColor(.primary)
                 .if(isUserMessage) { view in
                     view.fixedSize(horizontal: false, vertical: true)
-                } else: { view in
+                } elseTransform: { view in
                     view.frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -903,7 +903,7 @@ struct FullTextOverlay: View {
 // MARK: - View Extension for Conditional Modifiers
 extension View {
     @ViewBuilder
-    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform, else elseTransform: (Self) -> Transform) -> some View {
+    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform, elseTransform: (Self) -> Transform) -> some View {
         if condition {
             transform(self)
         } else {
