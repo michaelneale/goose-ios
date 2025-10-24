@@ -107,6 +107,7 @@ struct MarkdownParser {
                 }
                 result.append(childResult)
             }
+            result.append(AttributedString("\n"))
             
         default:
             if let blockElement = element as? BlockMarkup {
