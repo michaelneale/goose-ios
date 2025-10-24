@@ -189,56 +189,80 @@ struct FullTextOverlay: View {
 }
 
 // MARK: - Tool Call Progress View
+
 struct ToolCallProgressView: View {
     let toolCall: ToolCall
     
     var body: some View {
-        VStack(alignment: .center, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header with tool name and spinner
             HStack(spacing: 8) {
                 ProgressView()
                     .scaleEffect(0.7)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(toolCall.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    if let firstArgument = getFirstArgument() {
-                        Text(firstArgument)
-                            .font(.caption2)
-                            .monospaced()
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
+                Text(toolCall.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
                 
                 Spacer()
             }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                    )
-            )
             
+            // Arguments snippet
+            if !toolCall.arguments.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(getArgumentSnippets()), id: \.key) { item in
+                        HStack(alignment: .top, spacing: 4) {
+                            Text("\(item.key):")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                            
+                            Text(item.value)
+                                .font(.caption2)
+                                .monospaced()
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                            
+                            Spacer()
+                        }
+                    }
+                }
+                .padding(.leading, 24) // Align with text after spinner
+            }
+            
+            // Status text
             Text("executing...")
                 .font(.caption2)
                 .foregroundColor(.secondary)
+                .padding(.leading, 24)
         }
-        .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
     }
     
-    private func getFirstArgument() -> String? {
-        guard let firstKey = toolCall.arguments.keys.sorted().first,
-              let firstValue = toolCall.arguments[firstKey] else {
-            return nil
-        }
+    private func getArgumentSnippets() -> [(key: String, value: String)] {
+        let maxArgs = 3 // Show up to 3 arguments
+        let maxValueLength = 40 // Truncate values longer than this
         
-        let valueString = String(describing: firstValue.value)
-        return valueString.count > 50 ? String(valueString.prefix(50)) + "..." : valueString
+        return toolCall.arguments
+            .sorted { $0.key < $1.key }
+            .prefix(maxArgs)
+            .map { key, value in
+                let valueString = String(describing: value.value)
+                let truncated = valueString.count > maxValueLength 
+                    ? String(valueString.prefix(maxValueLength)) + "..." 
+                    : valueString
+                return (key: key, value: truncated)
+            }
     }
 }
+

@@ -74,7 +74,8 @@ struct AssistantMessageView: View {
         ).environmentObject(ThemeManager.shared)) {
             TaskPillContent(
                 icon: "checkmark.circle",
-                text: task.toolCall.name
+                text: task.toolCall.name,
+                arguments: task.toolCall.arguments  // Pass arguments!
             )
         }
         .buttonStyle(.plain)
@@ -106,28 +107,88 @@ struct AssistantMessageView: View {
 }
 
 /// Reusable pill content for task completion
+
+/// Enhanced pill content for task completion with argument snippets
 struct TaskPillContent: View {
     let icon: String
     let text: String
+    let arguments: [String: AnyCodable]?  // Optional arguments to display
+    
+    // Convenience initializer for backward compatibility
+    init(icon: String, text: String) {
+        self.icon = icon
+        self.text = text
+        self.arguments = nil
+    }
+    
+    // Full initializer with arguments
+    init(icon: String, text: String, arguments: [String: AnyCodable]?) {
+        self.icon = icon
+        self.text = text
+        self.arguments = arguments
+    }
     
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            // Header with icon and tool name
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                
+                Text(text)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
             
-            Text(text)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.secondary)
-            
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
+            // Arguments snippet (if available)
+            if let args = arguments, !args.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(getArgumentSnippets(args)), id: \.key) { item in
+                        HStack(alignment: .top, spacing: 4) {
+                            Text("\(item.key):")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.secondary.opacity(0.8))
+                            
+                            Text(item.value)
+                                .font(.system(size: 10))
+                                .monospaced()
+                                .foregroundColor(.secondary.opacity(0.8))
+                                .lineLimit(1)
+                            
+                            Spacer()
+                        }
+                    }
+                }
+                .padding(.leading, 20) // Align with text after icon
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Color(.systemGray6).opacity(0.85))
         .cornerRadius(16)
+    }
+    
+    private func getArgumentSnippets(_ args: [String: AnyCodable]) -> [(key: String, value: String)] {
+        let maxArgs = 2 // Show up to 2 arguments in pill (less than progress view)
+        let maxValueLength = 30 // Shorter for pill
+        
+        return args
+            .sorted { $0.key < $1.key }
+            .prefix(maxArgs)
+            .map { key, value in
+                let valueString = String(describing: value.value)
+                let truncated = valueString.count > maxValueLength 
+                    ? String(valueString.prefix(maxValueLength)) + "..." 
+                    : valueString
+                return (key: key, value: truncated)
+            }
     }
 }
 
