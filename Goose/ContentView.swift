@@ -83,8 +83,9 @@ struct ContentView: View {
     
     @EnvironmentObject var configurationHandler: ConfigurationHandler
     
-    // Shared voice manager across WelcomeView and ChatView
+    // Shared voice managers across WelcomeView and ChatView
     @StateObject private var sharedVoiceManager = EnhancedVoiceManager()
+    @StateObject private var sharedContinuousVoiceManager = ContinuousVoiceManager()
     
     // Dynamic sidebar width based on device
     private var sidebarWidth: CGFloat {
@@ -137,7 +138,8 @@ struct ContentView: View {
                                 onLoadMore: {  // Pass load more callback for NodeMatrix
                                     await loadMoreSessions()
                                 },
-                                voiceManager: sharedVoiceManager
+                                voiceManager: sharedVoiceManager,
+                                continuousVoiceManager: sharedContinuousVoiceManager
                             )
                             .navigationBarHidden(true)
                         } else {
@@ -145,6 +147,7 @@ struct ContentView: View {
                             ChatViewWithInitialMessage(
                                 showingSidebar: $showingSidebar,
                                 voiceManager: sharedVoiceManager,
+                                continuousVoiceManager: sharedContinuousVoiceManager,
                                 initialMessage: initialMessage,
                                 shouldSendMessage: shouldSendInitialMessage,
                                 selectedSessionId: selectedSessionId,
@@ -488,6 +491,7 @@ struct ConfigurationStatusView: View {
 struct ChatViewWithInitialMessage: View {
     @Binding var showingSidebar: Bool
     @ObservedObject var voiceManager: EnhancedVoiceManager
+    @ObservedObject var continuousVoiceManager: ContinuousVoiceManager
     let initialMessage: String
     let shouldSendMessage: Bool
     let selectedSessionId: String?
@@ -495,7 +499,7 @@ struct ChatViewWithInitialMessage: View {
     let onBackToWelcome: () -> Void
     
     var body: some View {
-        ChatView(showingSidebar: $showingSidebar, onBackToWelcome: onBackToWelcome, voiceManager: voiceManager)
+        ChatView(showingSidebar: $showingSidebar, onBackToWelcome: onBackToWelcome, voiceManager: voiceManager, continuousVoiceManager: continuousVoiceManager)
             .onAppear {
                 // Load session if one was selected
                 if let sessionId = selectedSessionId {

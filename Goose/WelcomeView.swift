@@ -12,6 +12,7 @@ struct WelcomeView: View {
     
     // Voice features - shared with ChatView
     @ObservedObject var voiceManager: EnhancedVoiceManager
+    @ObservedObject var continuousVoiceManager: ContinuousVoiceManager
     
     // States for welcome view
     @State private var recentSessions: [ChatSession] = []
@@ -152,6 +153,7 @@ struct WelcomeView: View {
                         text: $inputText,
                         isFocused: $isInputFocused,
                         voiceManager: voiceManager,
+                        continuousVoiceManager: continuousVoiceManager,
                         onSubmit: {
                             handleSubmit()
                         },
@@ -292,13 +294,30 @@ struct WelcomeView: View {
             }
         }
         .onAppear {
-            // Set up voice manager callback for auto-sending messages
+            // Transcribe mode (Enhanced)
             voiceManager.onSubmitMessage = { message in
                 inputText = message
-                // Auto-send the message
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     handleSubmit()
                 }
+            }
+            voiceManager.onTranscriptionUpdate = { transcribedText in
+                inputText = transcribedText
+            }
+            
+            // Continuous mode (live partials + auto-submit)
+            continuousVoiceManager.onTranscriptionUpdate = { partial in
+                inputText = partial
+            }
+            continuousVoiceManager.onSubmitMessage = { message in
+                inputText = message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    handleSubmit()
+                }
+            }
+            continuousVoiceManager.onCancelRequest = {
+                // Nothing to cancel here (handled in ChatView), but clear input to reflect interruption
+                inputText = ""
             }
             
             // Set up transcription update callback for continuous input (audio mode)
@@ -478,6 +497,7 @@ struct WelcomeSessionRowView: View {
         onSessionSelect: { sessionId in
             print("Selected session: \(sessionId)")
         },
-        voiceManager: EnhancedVoiceManager()
+        voiceManager: EnhancedVoiceManager(),
+        continuousVoiceManager: ContinuousVoiceManager()
     )
 }
