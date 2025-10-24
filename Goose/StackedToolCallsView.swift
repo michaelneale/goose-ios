@@ -186,7 +186,20 @@ struct ToolCallStackView: View {
     private let baseShadowRadius: CGFloat = 5
     
     var body: some View {
-        ZStack {
+        let _ = {
+            print("\n🎨 === TOOL CALL STACK DEBUG ===")
+            print("📊 Total tool calls: \(toolCalls.count)")
+            print("👁️  Visible cards: \(visibleToolCalls.count)")
+            print("📋 Tool calls:")
+            for (index, call) in toolCalls.enumerated() {
+                let name = call.toolCall.name
+                let status = call.isCompleted ? "✅" : "⏳"
+                print("   [\(index)] \(status) \(name) (id: \(call.id.prefix(8)))")
+            }
+            print("🎨 === END STACK DEBUG ===\n")
+        }()
+        
+        ZStack(alignment: .top) {
             // Show only the top 3 cards (or fewer if less than 3)
             ForEach(Array(visibleToolCalls.enumerated()), id: \.element.id) { index, call in
                 ToolCallCardView(toolCallState: call)
@@ -218,6 +231,8 @@ struct ToolCallStackView: View {
                     .offset(y: CGFloat(maxVisibleCards) * cardOffsetIncrement + 8)
             }
         }
+        .background(Color.blue.opacity(0.2)) // Light blue debug background
+        .padding(.bottom, 16)
         .contentShape(Rectangle()) // Make entire stack tappable
         .onTapGesture {
             onTap()

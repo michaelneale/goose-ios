@@ -41,6 +41,8 @@ struct AssistantMessageView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, Constants.horizontalMargin)
+        .padding(.bottom, 4)
+        .padding(.top, 8)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: filteredContent)
         }
