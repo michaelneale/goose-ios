@@ -304,8 +304,6 @@ struct ChatView: View {
                 .padding(.bottom, 24)
                 .background(
                     Color(UIColor.systemBackground)
-                        .opacity(0.95)
-                        .background(.regularMaterial)
                 )
             }
 
