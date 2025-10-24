@@ -60,19 +60,7 @@ struct StackedToolCallsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Group info header (only for grouped items)
-            if showGroupInfo && toolCalls.count > 1 {
-                GroupHeaderView(
-                    toolCalls: toolCalls,
-                    isExpanded: isExpanded,
-                    onCollapse: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            isExpanded = false
-                        }
-                    }
-                )
-            }
-            
+
             Group {
                 if toolCalls.count == 1 {
                     // Single tool call - show normal card (no stacking)
@@ -121,59 +109,6 @@ struct StackedToolCallsView: View {
     }
 }
 
-/// Header showing grouped tool call information
-struct GroupHeaderView: View {
-    let toolCalls: [ToolCallState]
-    let isExpanded: Bool
-    let onCollapse: (() -> Void)?
-    
-    init(toolCalls: [ToolCallState], isExpanded: Bool = false, onCollapse: (() -> Void)? = nil) {
-        self.toolCalls = toolCalls
-        self.isExpanded = isExpanded
-        self.onCollapse = onCollapse
-    }
-    
-    var body: some View {
-        HStack {
-            // Compact pill counter in top left
-            HStack(spacing: 4) {
-                Image(systemName: "square.stack.3d.up.fill")
-                    .font(.caption2)
-                
-                Text("\(toolCalls.count)")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-            }
-            .foregroundColor(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(Color(.systemGray5))
-            )
-            
-            Spacer()
-            
-            // Show collapse button when expanded
-            if isExpanded, let collapse = onCollapse {
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        collapse()
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.up")
-                            .font(.caption2)
-                        Text("Collapse")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(.secondary)
-                }
-            }
-        }
-        .padding(.horizontal, 4)
-    }
-}
 
 
 /// Stacked cards view (collapsed state)
@@ -342,7 +277,7 @@ struct ToolCallCarouselView: View {
     
     @State private var dragState: DragState = .inactive
     
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width * 0.85
+    private let cardWidth: CGFloat = UIScreen.main.bounds.width * 0.75
     private let cardSpacing: CGFloat = 16
     
     private enum DragState {
@@ -352,6 +287,28 @@ struct ToolCallCarouselView: View {
     
     var body: some View {
         VStack(spacing: 12) {
+            // Close button in top right
+            HStack {
+                Spacer()
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        onCollapse()
+                    }
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                        .background(
+                            Circle()
+                                .fill(Color(.systemBackground))
+                                .frame(width: 24, height: 24)
+                        )
+                }
+                .padding(.trailing, 16)
+                .padding(.top, 8)
+            }
+            .zIndex(1)
+
             // Horizontal scroll with peek preview and snap
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
