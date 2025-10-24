@@ -52,6 +52,14 @@ struct StackedToolCallsView: View {
     
     @State private var isExpanded = false
     @State private var selectedIndex = 0
+    @Namespace private var cardAnimation
+    
+    // Visual constants
+    private let maxVisibleCards = 3
+    private let cardOffsetIncrement: CGFloat = 12
+    private let cardScaleDecrement: CGFloat = 0.02
+    private let cardWidth: CGFloat = UIScreen.main.bounds.width * 0.75
+    private let cardSpacing: CGFloat = 16
     
     init(toolCalls: [ToolCallState], showGroupInfo: Bool = false) {
         self.toolCalls = toolCalls
@@ -60,37 +68,20 @@ struct StackedToolCallsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-
-            Group {
-                if toolCalls.count == 1 {
-                    // Single tool call - show normal card (no stacking)
-                    ToolCallCardView(toolCallState: toolCalls[0])
-                        .background(Color.green.opacity(0.2))
-                } else {
-                    // Multiple tool calls - show stack or carousel
-                    if isExpanded {
-                        // Expanded state - carousel view
-                        ToolCallCarouselView(
-                            toolCalls: toolCalls,
-                            selectedIndex: $selectedIndex,
-                            onCollapse: {
-                                isExpanded = false
-                            }
-                        )
+            if toolCalls.count == 1 {
+                // Single tool call - show normal card (no stacking)
+                ToolCallCardView(toolCallState: toolCalls[0])
+                    .background(Color.green.opacity(0.2))
+            } else {
+                // Multiple tool calls - unified view with matched geometry
+                ZStack {
+                    if !isExpanded {
+                        stackView
                     } else {
-                        // Collapsed state - stacked cards
-                        ToolCallStackView(
-                            toolCalls: toolCalls,
-                            onTap: {
-                                print("🎯 Stack tapped - expanding to carousel")
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    isExpanded = true
-                                }
-                            }
-                        )
-                        .background(Color.green.opacity(0.2))
+                        carouselView
                     }
                 }
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,54 +98,33 @@ struct StackedToolCallsView: View {
             }
         }
     }
-}
-
-
-
-/// Stacked cards view (collapsed state)
-/// Shows up to 3 cards with depth effect
-struct ToolCallStackView: View {
-    let toolCalls: [ToolCallState]
-    let onTap: () -> Void
     
-    // Visual constants
-    private let maxVisibleCards = 3
-    private let cardOffsetIncrement: CGFloat = 4
-    private let cardScaleDecrement: CGFloat = 0.02
-    private let baseShadowRadius: CGFloat = 5
+    // MARK: - Stack View (Collapsed State)
     
-    var body: some View {
-        let _ = {
-            print("\n🎨 === TOOL CALL STACK DEBUG ===")
-            print("📊 Total tool calls: \(toolCalls.count)")
-            print("👁️  Visible cards: \(visibleToolCalls.count)")
-            print("📋 Tool calls:")
-            for (index, call) in toolCalls.enumerated() {
-                let name = call.toolCall.name
-                let status = call.isCompleted ? "✅" : "⏳"
-                print("   [\(index)] \(status) \(name) (id: \(call.id.prefix(8)))")
-            }
-            print("🎨 === END STACK DEBUG ===\n")
-        }()
-        
-        ZStack(alignment: .top) {
-            // Show only the top 3 cards (or fewer if less than 3)
-            ForEach(Array(visibleToolCalls.enumerated()), id: \.element.id) { index, call in
-                ToolCallCardView(toolCallState: call)
-                    .offset(y: CGFloat(index) * cardOffsetIncrement)
+    private var stackView: some View {
+        ZStack(alignment: .leading) {
+            // Show only the top 3 cards
+            ForEach(Array(toolCalls.prefix(maxVisibleCards).enumerated()), id: \.element.id) { index, call in
+                ToolCallCardView(
+                    toolCallState: call,
+                    onTap: {
+                        print("🎯 Card tapped in stack - expanding to carousel")
+                        isExpanded = true
+                    }
+                )
+                    .matchedGeometryEffect(id: call.id, in: cardAnimation)
+                    .offset(x: CGFloat(index) * cardOffsetIncrement)
                     .scaleEffect(1.0 - CGFloat(index) * cardScaleDecrement)
                     .shadow(
                         color: .black.opacity(0.05),
-                        radius: baseShadowRadius - CGFloat(index),
-                        x: 0,
-                        y: CGFloat(index) * 2
+                        radius: 5 - CGFloat(index),
+                        x: CGFloat(index) * 2,
+                        y: 0
                     )
-                    .zIndex(Double(visibleToolCalls.count - index))
-                    // Only top card should be interactive in stack mode
-                    .allowsHitTesting(index == 0)
+                    .zIndex(Double(maxVisibleCards - index))
             }
             
-            // Show indicator if there are more than 3 cards
+            // Show "+X more" indicator if there are more than 3 cards
             if toolCalls.count > maxVisibleCards {
                 Text("+\(toolCalls.count - maxVisibleCards) more")
                     .font(.caption2)
@@ -166,29 +136,161 @@ struct ToolCallStackView: View {
                             .fill(Color(.systemBackground))
                             .shadow(color: .black.opacity(0.1), radius: 2)
                     )
-                    .offset(y: CGFloat(maxVisibleCards) * cardOffsetIncrement + 8)
+                    .offset(x: CGFloat(maxVisibleCards) * cardOffsetIncrement + 8)
             }
         }
-        .background(Color.blue.opacity(0.2)) // Light blue debug background
-        .padding(.bottom, 16)
-        .contentShape(Rectangle()) // Make entire stack tappable
-        .onTapGesture {
-            onTap()
-        }
+        .background(Color.green.opacity(0.2))
+        .padding(.trailing, 16)
+        .contentShape(Rectangle())
     }
     
-    /// Returns up to 3 tool calls for display
-    private var visibleToolCalls: [ToolCallState] {
-        Array(toolCalls.prefix(maxVisibleCards))
+    // MARK: - Carousel View (Expanded State)
+    
+    private var carouselView: some View {
+        VStack(spacing: 6) {
+            // Combined header with close button and navigation
+            HStack {
+                // Left navigation
+                Button(action: {
+                    if selectedIndex > 0 {
+                        withAnimation {
+                            selectedIndex -= 1
+                        }
+                    }
+                }) {
+                    Image(systemName: "chevron.left")
+                        .foregroundColor(selectedIndex > 0 ? .primary : .gray)
+                        .frame(width: 32, height: 32)
+                }
+                .disabled(selectedIndex == 0)
+                
+                Spacer()
+                
+                // Counter
+                Text("\(selectedIndex + 1) of \(toolCalls.count)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                // Right navigation
+                Button(action: {
+                    if selectedIndex < toolCalls.count - 1 {
+                        withAnimation {
+                            selectedIndex += 1
+                        }
+                    }
+                }) {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(selectedIndex < toolCalls.count - 1 ? .primary : .gray)
+                        .frame(width: 32, height: 32)
+                }
+                .disabled(selectedIndex == toolCalls.count - 1)
+                
+                // Close button
+                Button(action: {
+                    isExpanded = false
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.leading, 8)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .zIndex(1)
+            
+            // Horizontal scrollable cards with ScrollViewReader
+            GeometryReader { geometry in
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: cardSpacing) {
+                            ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, call in
+                                ToolCallCardView(
+                                    toolCallState: call,
+                                    onLongPress: selectedIndex == index ? nil : {
+                                        // Not centered - do nothing on long press
+                                    }
+                                )
+                                .matchedGeometryEffect(id: call.id, in: cardAnimation)
+                                .frame(width: cardWidth)
+                                .scaleEffect(selectedIndex == index ? 1.0 : 0.92)
+                                .opacity(selectedIndex == index ? 1.0 : 0.7)
+                                .id(index)
+                                .background(
+                                    GeometryReader { cardGeometry in
+                                        Color.clear.preference(
+                                            key: CardPositionPreferenceKey.self,
+                                            value: [
+                                                CardPosition(
+                                                    index: index,
+                                                    midX: cardGeometry.frame(in: .named("scroll")).midX
+                                                )
+                                            ]
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, (UIScreen.main.bounds.width - cardWidth) / 2)
+                    }
+                    .coordinateSpace(name: "scroll")
+                    .onPreferenceChange(CardPositionPreferenceKey.self) { positions in
+                        // Find the card closest to center
+                        let screenCenter = geometry.size.width / 2
+                        if let closestCard = positions.min(by: { abs($0.midX - screenCenter) < abs($1.midX - screenCenter) }) {
+                            if selectedIndex != closestCard.index {
+                                selectedIndex = closestCard.index
+                            }
+                        }
+                    }
+                    .frame(height: 160)
+                    .onChange(of: selectedIndex) { _, newIndex in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
+                    }
+                    .onAppear {
+                        // Scroll to selected card on appear
+                        proxy.scrollTo(selectedIndex, anchor: .center)
+                    }
+                }
+            }
+            .frame(height: 160)
+        }
+        .padding(.horizontal, -16)
+        .background(Color.green.opacity(0.2))
+    }
+
+}
+
+// MARK: - Preference Key for Card Positions
+
+struct CardPosition: Equatable {
+    let index: Int
+    let midX: CGFloat
+}
+
+struct CardPositionPreferenceKey: PreferenceKey {
+    static var defaultValue: [CardPosition] = []
+    
+    static func reduce(value: inout [CardPosition], nextValue: () -> [CardPosition]) {
+        value.append(contentsOf: nextValue())
     }
 }
+
+
 
 
 
 /// Card view that can display both active and completed tool calls
 struct ToolCallCardView: View {
     let toolCallState: ToolCallState
+    var onTap: (() -> Void)? = nil
+    var onLongPress: (() -> Void)? = nil
     
+    @State private var navigationActive = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header with tool name and status indicator
@@ -249,6 +351,30 @@ struct ToolCallCardView: View {
                 )
         )
         .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
+        .background(
+            NavigationLink(
+                destination: ToolCallDetailView(toolCallState: toolCallState)
+                    .environmentObject(ThemeManager.shared),
+                isActive: $navigationActive
+            ) {
+                EmptyView()
+            }
+            .opacity(0)
+        )
+        .onTapGesture {
+            if let onTap = onTap {
+                onTap()
+            }
+        }
+        .onLongPressGesture {
+            if let onLongPress = onLongPress {
+                onLongPress()
+            } else {
+                // No custom handler - trigger navigation
+                navigationActive = true
+            }
+        }
+
     }
     
     private func getArgumentSnippets() -> [(key: String, value: String)] {
@@ -268,151 +394,139 @@ struct ToolCallCardView: View {
     }
 }
 
-/// Carousel view (expanded state)
-/// Time Machine-style vertical carousel with navigation
-struct ToolCallCarouselView: View {
-    let toolCalls: [ToolCallState]
-    @Binding var selectedIndex: Int
-    let onCollapse: () -> Void
-    
-    @State private var dragState: DragState = .inactive
-    
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width * 0.75
-    private let cardSpacing: CGFloat = 16
-    
-    private enum DragState {
-        case inactive
-        case dragging
-    }
+
+
+// MARK: - Tool Call Detail View
+
+struct ToolCallDetailView: View {
+    let toolCallState: ToolCallState
+    @EnvironmentObject var themeManager: ThemeManager
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Close button in top right
-            HStack {
-                Spacer()
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        onCollapse()
-                    }
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                        .background(
-                            Circle()
-                                .fill(Color(.systemBackground))
-                                .frame(width: 24, height: 24)
-                        )
-                }
-                .padding(.trailing, 16)
-                .padding(.top, 8)
-            }
-            .zIndex(1)
-
-            // Horizontal scroll with peek preview and snap
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: cardSpacing) {
-                        ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, call in
-                            ToolCallCardView(toolCallState: call)
-                                .frame(width: cardWidth)
-                                .scaleEffect(selectedIndex == index ? 1.0 : 0.92)
-                                .opacity(selectedIndex == index ? 1.0 : 0.7)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedIndex)
-                                .id(index)
-                                .onTapGesture {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        selectedIndex = index
-                                    }
-                                }
-                        }
-                    }
-                    .padding(.horizontal, (UIScreen.main.bounds.width - cardWidth) / 2)
-                    .gesture(
-                        DragGesture()
-                            .onChanged { _ in
-                                dragState = .dragging
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                // Tool call details with padding for nav bar
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Header with tool name and status
+                        HStack {
+                            if toolCallState.isCompleted {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundColor(.green)
+                                    .font(.system(size: 16))
+                            } else {
+                                ProgressView()
+                                    .scaleEffect(0.8)
                             }
-                            .onEnded { value in
-                                dragState = .inactive
-                                // Calculate which card we're closest to based on drag
-                                let dragDistance = value.translation.width
-                                let cardPlusSpacing = cardWidth + cardSpacing
-                                let threshold = cardPlusSpacing / 3
+                            
+                            Text(toolCallState.toolCall.name)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(themeManager.primaryTextColor)
+                            
+                            Spacer()
+                            
+                            Text(toolCallState.isCompleted ? "completed" : "executing...")
+                                .font(.system(size: 12))
+                                .foregroundColor(toolCallState.isCompleted ? .green : themeManager.secondaryTextColor)
+                        }
+                        .padding(.bottom, 4)
+                        
+                        // Arguments
+                        if !toolCallState.toolCall.arguments.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Arguments")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(themeManager.primaryTextColor)
+                                    .padding(.bottom, 4)
                                 
-                                if dragDistance < -threshold && selectedIndex < toolCalls.count - 1 {
-                                    // Swiped left - go to next
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        selectedIndex += 1
-                                    }
-                                } else if dragDistance > threshold && selectedIndex > 0 {
-                                    // Swiped right - go to previous
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        selectedIndex -= 1
-                                    }
-                                } else {
-                                    // Snap back to current
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        proxy.scrollTo(selectedIndex, anchor: .center)
+                                ForEach(Array(toolCallState.toolCall.arguments.keys.sorted()), id: \.self) { key in
+                                    if let argValue = toolCallState.toolCall.arguments[key]?.value {
+                                        Text("\(key): \(String(describing: argValue))")
+                                            .font(.system(size: 12, design: .monospaced))
+                                            .foregroundColor(themeManager.secondaryTextColor)
                                     }
                                 }
                             }
-                    )
-                }
-                .onChange(of: selectedIndex) { _, newIndex in
-                    if dragState == .inactive {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            proxy.scrollTo(newIndex, anchor: .center)
+                            .padding(.bottom, 8)
+                        }
+                        
+                        // Tool Call ID
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Tool Call ID")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(themeManager.primaryTextColor)
+                                .padding(.bottom, 4)
+                            
+                            Text(toolCallState.id)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(themeManager.secondaryTextColor)
+                                .textSelection(.enabled)
                         }
                     }
-                }
-                .onAppear {
-                    proxy.scrollTo(selectedIndex, anchor: .center)
+                    .padding()
+                    .padding(.top, 80) // Padding for nav bar (56pt top + 24pt bottom = 80pt total height)
                 }
             }
-            .frame(height: 220)
+            .background(themeManager.backgroundColor)
             
-            // Counter and navigation
-            HStack(spacing: 20) {
-                Button(action: {
-                    if selectedIndex > 0 {
-                        withAnimation {
-                            selectedIndex -= 1
-                        }
+            // Custom navigation bar overlay with frosted glass
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    // Back button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .frame(width: 44, height: 44)
                     }
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(selectedIndex > 0 ? .primary : .gray)
-                }
-                .disabled(selectedIndex == 0)
-                
-                Spacer()
-                
-                Text("\(selectedIndex + 1) of \(toolCalls.count)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                Button(action: {
-                    if selectedIndex < toolCalls.count - 1 {
-                        withAnimation {
-                            selectedIndex += 1
-                        }
+                    .padding(.leading, 4)
+                    
+                    // Title (left-aligned to match main pattern)
+                    HStack(spacing: 4) {
+                        Text("Tool Call Details")
+                            .font(.system(size: 14))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .lineLimit(1)
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(themeManager.primaryTextColor)
+                        
+                        Text(toolCallState.toolCall.name)
+                            .font(.system(size: 14))
+                            .foregroundColor(themeManager.primaryTextColor)
+                            .lineLimit(1)
                     }
-                }) {
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(selectedIndex < toolCalls.count - 1 ? .primary : .gray)
+                    
+                    Spacer()
                 }
-                .disabled(selectedIndex == toolCalls.count - 1)
+                .padding(.horizontal, 0)
+                .padding(.top, 56)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
-            .background(Color.green.opacity(0.2))
+            .background(
+                ZStack {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                    Rectangle()
+                        .fill(themeManager.backgroundColor.opacity(0.95))
+                }
+                .ignoresSafeArea()
+            )
+            .frame(maxWidth: .infinity, alignment: .top)
+            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
         }
-        .padding(.horizontal, -16)  // Extend into ChatView gutter to show peek preview
+        .navigationBarHidden(true)
+        .ignoresSafeArea(edges: .top)
     }
 }
+
+
+
+
 
 // MARK: - Preview Provider
 
