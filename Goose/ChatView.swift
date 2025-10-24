@@ -38,6 +38,88 @@ struct ChatView: View {
     @State private var userIsScrolling = false  // Track manual scroll interactions
     @State private var lastContentHeight: CGFloat = 0  // Track content size changes
 
+    @ViewBuilder
+    private func renderMessage(_ index: Int, _ message: Message, _ toolOnlyGroups: [(startIndex: Int, messageIds: [String], indices: [Int])]) -> some View {
+        let groupForThisMessage = toolOnlyGroups.first { $0.startIndex == index }
+        
+        if let group = groupForThisMessage {
+            renderGroupedMessage(index, message, group)
+        } else {
+            renderRegularMessage(message)
+        }
+    }
+    
+    @ViewBuilder
+    private func renderGroupedMessage(_ index: Int, _ message: Message, _ group: (startIndex: Int, messageIds: [String], indices: [Int])) -> some View {
+        let groupedToolCalls = getToolCallsForGroup(messageIds: group.messageIds)
+        let hasTextContent = message.content.contains { content in
+            if case .text(let textContent) = content {
+                return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            return false
+        }
+        
+        if hasTextContent {
+            VStack(alignment: .leading, spacing: 8) {
+                AssistantMessageView(message: message, completedTasks: [], sessionName: currentSessionId ?? "Current Session")
+                if !groupedToolCalls.isEmpty {
+                    StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
+                }
+            }
+            .id("grouped-\(group.messageIds.joined(separator: "-"))")
+        } else if !groupedToolCalls.isEmpty {
+            StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
+                .id("grouped-tools-\(group.messageIds.joined(separator: "-"))")
+        }
+    }
+    
+    @ViewBuilder
+    private func renderRegularMessage(_ message: Message) -> some View {
+        if message.role == .user {
+            // Check if user message has actual text content
+            let hasTextContent = message.content.contains { content in
+                if case .text(let textContent) = content {
+                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+                return false
+            }
+            
+            // Only render if there's actual text content
+            if hasTextContent {
+                UserMessageView(message: message)
+                    .id(message.id)
+            }
+        } else {
+            let hasTextContent = message.content.contains { content in
+                if case .text(let textContent) = content {
+                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+                return false
+            }
+            
+            if hasTextContent {
+                AssistantMessageView(message: message, completedTasks: [], sessionName: currentSessionId ?? "Current Session")
+                    .id(message.id)
+            }
+        }
+        
+        let toolCallIds = getToolCallsForMessage(message.id)
+        let toolCallsForMessage = toolCallIds.compactMap { id -> ToolCallState? in
+            if let activeCall = activeToolCalls[id] {
+                return .active(id: id, timing: activeCall)
+            }
+            if let completedCall = completedToolCalls[id] {
+                return .completed(id: id, completed: completedCall)
+            }
+            return nil
+        }
+        
+        if !toolCallsForMessage.isEmpty {
+            StackedToolCallsView(toolCalls: toolCallsForMessage)
+                .id("tools-\(message.id)")
+        }
+    }
+    
     var body: some View {
         ZStack(alignment: .top) {
             // Background color
@@ -46,48 +128,46 @@ struct ChatView: View {
 
             // Main content that stops before input area
             VStack(spacing: 0) {
+                SafeAreaExtension(useSystemBackground: true)
                 // Messages scroll view with proper constraints
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(messages) { message in
-                                MessageBubbleView(
-                                    message: message,
-                                    completedTasks: getCompletedTasksForMessage(message.id),
-                                    sessionName: currentSessionId ?? "Current Session"
-                                )
-                                .id(message.id)
 
-                                // Show ONLY active/in-progress tool calls (completed ones are in the pill)
-                                ForEach(getToolCallsForMessage(message.id), id: \.self) {
-                                    toolCallId in
-                                    if let activeCall = activeToolCalls[toolCallId] {
-                                        ToolCallProgressView(toolCall: activeCall.toolCall)
-                                            .id("tool-\(toolCallId)")
-                                    }
-                                }
+                        // Group consecutive tool-only messages
+                        // Group consecutive tool-only messages
+                        let toolOnlyGroups = groupConsecutiveToolOnlyMessages(messages)
+
+                        // Filter messages to only those that should be rendered (removes spacing for grouped messages)
+                        let messagesToRender: [(offset: Int, element: Message)] = messages.enumerated().filter { index, _ in
+                            !isPartOfGroup(messageIndex: index, groups: toolOnlyGroups)
+                        }
+                        
+                        LazyVStack(spacing: 0) {
+                            ForEach(messagesToRender, id: \.element.id) { item in
+                                let index = item.offset
+                                let message = item.element
+                                renderMessage(index, message, toolOnlyGroups)
                             }
-
                             // Show "thinking" indicator if no active tool calls
                             if isLoading && activeToolCalls.isEmpty {
                                 HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                    Text("goose is thinking...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("goose is thinking...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
                                 }
                                 .padding(.horizontal)
                                 .id("thinking-indicator")
                             } else if isPollingForUpdates {
                                 HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                    Text("🔍 Checking for new messages...")
-                                        .font(.caption)
-                                        .foregroundColor(.orange)
-                                    Spacer()
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("🔍 Checking for new messages...")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                Spacer()
                                 }
                                 .padding(.horizontal)
                                 .id("polling-indicator")
@@ -109,9 +189,9 @@ struct ChatView: View {
                             .onChanged { _ in
                                 // User is manually scrolling
                                 if isLoading {
-                                    userIsScrolling = true
-                                    shouldAutoScroll = false
-                                    print("📜 User started scrolling - auto-scroll disabled")
+                                userIsScrolling = true
+                                shouldAutoScroll = false
+                                print("📜 User started scrolling - auto-scroll disabled")
                                 }
                             }
                             .onEnded { _ in
@@ -204,8 +284,9 @@ struct ChatView: View {
                             showingSidebar.toggle()
                         }
                     }) {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 22))
+                        Image("SideMenuIcon")
+                            .resizable()
+                            .renderingMode(.template)
                             .foregroundColor(.primary)
                             .frame(width: 24, height: 22)
                     }
@@ -224,8 +305,6 @@ struct ChatView: View {
                 .padding(.bottom, 24)
                 .background(
                     Color(UIColor.systemBackground)
-                        .opacity(0.95)
-                        .background(.regularMaterial)
                 )
             }
 
@@ -768,7 +847,7 @@ struct ChatView: View {
                     }
                 } catch {
                     // Check if it's a 404 - session might have been deleted
-                    if case APIError.httpError(let code, let message) = error, code == 404 {
+                    if case APIError.httpError(let code, let _) = error, code == 404 {
                         print(
                             "⚠️ Polling got 404 for session \(sessionId) - session no longer exists, stopping polling"
                         )
@@ -915,6 +994,23 @@ struct ChatView: View {
         print(
             "🔧 Rebuilt: \(newActiveToolCalls.count) active, \(newCompletedToolCalls.count) completed"
         )
+        print("🔧 Tool call message map has \(newToolCallMessageMap.count) entries")
+        
+        // Show sample of what was built
+        if !newCompletedToolCalls.isEmpty {
+            print("🔧 Sample completed tool calls:")
+            for (id, completed) in newCompletedToolCalls.prefix(3) {
+                let msgId = newToolCallMessageMap[id] ?? "NO MESSAGE"
+                print("   🟢 \(id.prefix(8)): \(completed.toolCall.name) → Message \(msgId.prefix(8))")
+            }
+        }
+        
+        if !newToolCallMessageMap.isEmpty {
+            print("🔧 Sample message mappings:")
+            for (toolId, msgId) in newToolCallMessageMap.prefix(3) {
+                print("   🔗 Tool \(toolId.prefix(8)) → Message \(msgId.prefix(8))")
+            }
+        }
     }
 
     /// Stop polling for updates
@@ -936,6 +1032,165 @@ struct ChatView: View {
     private func getCompletedTasksForMessage(_ messageId: String) -> [CompletedToolCall] {
         let toolCallIds = getToolCallsForMessage(messageId)
         return toolCallIds.compactMap { completedToolCalls[$0] }
+    }
+
+    /// Groups consecutive assistant messages that have only tool calls (no meaningful text)
+    private func groupConsecutiveToolOnlyMessages(_ messages: [Message]) -> [(startIndex: Int, messageIds: [String], indices: [Int])] {
+        var groups: [(startIndex: Int, messageIds: [String], indices: [Int])] = []
+        var currentGroup: [String] = []
+        var currentGroupIndices: [Int] = []
+        var groupStartIndex: Int? = nil
+        
+        print("\n🔎 === GROUPING ANALYSIS (Thread-Aware) ===")
+        print("📊 Analyzing \(messages.count) messages for grouping")
+        
+        for (index, message) in messages.enumerated() {
+            // Track user messages with actual text (not empty)
+            if message.role == .user {
+                let userText = message.content.compactMap { content -> String? in
+                    if case .text(let textContent) = content {
+                        return textContent.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    return nil
+                }.joined()
+                
+                if !userText.isEmpty {
+                    // Real user message - this breaks the group (new conversation turn)
+                    print("📋 [\(index)] USER (with text): '\(userText.prefix(40))...' - BREAKS GROUP (new turn)")
+                    
+                    // Finalize current group before breaking
+                    if currentGroup.count > 1, let startIdx = groupStartIndex {
+                        print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+                        print("        Indices: \(currentGroupIndices)")
+                        groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+                    } else if currentGroup.count == 1 {
+                        print("     ⚠️ Only 1 message in group - not grouping")
+                    }
+                    
+                    currentGroup = []
+                    currentGroupIndices = []
+                    groupStartIndex = nil
+                } else {
+                    // Empty user message - skip but don't break group
+                    print("📋 [\(index)] USER (empty) - skipping")
+                }
+                continue
+            }
+            
+            let hasTextContent = message.content.contains { content in
+                if case .text(let textContent) = content {
+                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+                return false
+            }
+            
+            let hasToolCalls = !getToolCallsForMessage(message.id).isEmpty
+            
+            if message.role == .assistant {
+                if hasToolCalls {
+                    print("📋 [\(index)] ASSISTANT \(message.id.prefix(8)): hasText=\(hasTextContent), hasTools=\(hasToolCalls)")
+                } else {
+                    print("📋 [\(index)] ASSISTANT (no tools) - breaks grouping")
+                    if !currentGroup.isEmpty {
+                        print("     ⚠️ Breaking current group of \(currentGroup.count) messages")
+                    }
+                }
+            }
+            
+            if message.role == .assistant && hasToolCalls {
+                // Assistant message with tool calls - can start or continue a group
+                if hasTextContent {
+                    // Text + tool calls - this can START a new group
+                    print("     ✅ TEXT+TOOLS - can start group")
+                    if currentGroup.isEmpty {
+                        // Start new group with this message
+                        groupStartIndex = index
+                        currentGroup.append(message.id)
+                        currentGroupIndices.append(index)
+                    } else {
+                        // Already in a group - finalize previous and start new
+                        if currentGroup.count > 1, let startIdx = groupStartIndex {
+                            print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+                            print("        Indices: \(currentGroupIndices)")
+                            groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+                        }
+                        // Start new group
+                        groupStartIndex = index
+                        currentGroup = [message.id]
+                        currentGroupIndices = [index]
+                    }
+                } else {
+                    // No text, just tool calls - CONTINUE existing group or start new
+                    print("     ✅ TOOL-ONLY - adding to group")
+                    if currentGroup.isEmpty {
+                        groupStartIndex = index
+                    }
+                    currentGroup.append(message.id)
+                    currentGroupIndices.append(index)
+                }
+            } else {
+                // Non-tool-call assistant message breaks the group
+                if currentGroup.count > 1, let startIdx = groupStartIndex {
+                    print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+                    print("        Indices: \(currentGroupIndices)")
+                    groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+                } else if currentGroup.count == 1 {
+                    print("     ⚠️ Only 1 message in group - not grouping")
+                }
+                currentGroup = []
+                currentGroupIndices = []
+                groupStartIndex = nil
+            }
+        }
+        
+        if currentGroup.count > 1, let startIdx = groupStartIndex {
+            print("     🎯 FINALIZING LAST GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+            print("        Indices: \(currentGroupIndices)")
+            groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+        } else if currentGroup.count == 1 {
+            print("     ⚠️ Last group only has 1 message - not grouping")
+        }
+        
+        print("🔎 Total groups found: \(groups.count)")
+        for (idx, group) in groups.enumerated() {
+            print("   Group \(idx + 1): \(group.messageIds.count) messages starting at index \(group.startIndex)")
+            print("      Indices: \(group.indices)")
+        }
+        print("🔎 === END GROUPING ANALYSIS ===\n")
+        
+        return groups
+    }
+    
+    /// Check if a message index is part of a grouped set (but not the first one)
+    private func isPartOfGroup(messageIndex: Int, groups: [(startIndex: Int, messageIds: [String], indices: [Int])]) -> Bool {
+        for group in groups {
+            // Check if this index is in the group's indices array
+            if group.indices.contains(messageIndex) && messageIndex != group.startIndex {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Get all tool calls for a group of messages
+    private func getToolCallsForGroup(messageIds: [String]) -> [ToolCallState] {
+        var allToolCalls: [ToolCallState] = []
+        
+        for messageId in messageIds {
+            let toolCallIds = getToolCallsForMessage(messageId)
+            let toolCalls = toolCallIds.compactMap { id -> ToolCallState? in
+                if let activeCall = activeToolCalls[id] {
+                    return .active(id: id, timing: activeCall)
+                }
+                if let completedCall = completedToolCalls[id] {
+                    return .completed(id: id, completed: completedCall)
+                }
+                return nil
+            }
+            allToolCalls.append(contentsOf: toolCalls)
+        }
+        
+        return allToolCalls
     }
 
     private func limitMessages() {
