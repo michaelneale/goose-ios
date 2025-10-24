@@ -84,6 +84,7 @@ struct StackedToolCallsView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
             }
         }
+        .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: toolCalls.count) { oldValue, newValue in
             // Auto-collapse if only 1 tool call remains
