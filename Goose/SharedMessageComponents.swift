@@ -100,9 +100,13 @@ struct MarkdownParser {
         case let listItem as ListItem:
             result.append(AttributedString("• "))
             for child in listItem.children {
-                result.append(processElement(child))
+                var childResult = processElement(child)
+                // Strip trailing newlines from list item content
+                while childResult.characters.last == "\n" {
+                    childResult = AttributedString(childResult.characters.dropLast())
+                }
+                result.append(childResult)
             }
-            result.append(AttributedString("\n"))
             
         default:
             if let blockElement = element as? BlockMarkup {
