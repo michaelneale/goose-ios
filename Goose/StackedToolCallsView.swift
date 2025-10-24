@@ -62,7 +62,15 @@ struct StackedToolCallsView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Group info header (only for grouped items)
             if showGroupInfo && toolCalls.count > 1 {
-                GroupHeaderView(toolCalls: toolCalls)
+                GroupHeaderView(
+                    toolCalls: toolCalls,
+                    isExpanded: isExpanded,
+                    onCollapse: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isExpanded = false
+                        }
+                    }
+                )
             }
             
             Group {
@@ -113,43 +121,54 @@ struct StackedToolCallsView: View {
 /// Header showing grouped tool call information
 struct GroupHeaderView: View {
     let toolCalls: [ToolCallState]
+    let isExpanded: Bool
+    let onCollapse: (() -> Void)?
+    
+    init(toolCalls: [ToolCallState], isExpanded: Bool = false, onCollapse: (() -> Void)? = nil) {
+        self.toolCalls = toolCalls
+        self.isExpanded = isExpanded
+        self.onCollapse = onCollapse
+    }
     
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "square.stack.3d.up.fill")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            
-            Text("Grouped: \(toolCalls.count) tool calls")
-                .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
+        HStack {
+            // Compact pill counter in top left
+            HStack(spacing: 4) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.caption2)
+                
+                Text("\(toolCalls.count)")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(Color(.systemGray5))
+            )
             
             Spacer()
             
-            // Show unique tool names
-            if !uniqueToolNames.isEmpty {
-                Text(uniqueToolNames.joined(separator: ", "))
-                    .font(.caption2)
+            // Show collapse button when expanded
+            if isExpanded, let collapse = onCollapse {
+                Button(action: {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        collapse()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.up")
+                            .font(.caption2)
+                        Text("Collapse")
+                            .font(.caption2)
+                    }
                     .foregroundColor(.secondary)
-                    .lineLimit(1)
+                }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemGray6))
-        )
         .padding(.horizontal, 4)
-    }
-    
-    private var uniqueToolNames: [String] {
-        let names = Set(toolCalls.map { $0.toolCall.name })
-        return Array(names).sorted().map { name in
-            // Shorten common prefixes
-            name.replacingOccurrences(of: "computercontroller__", with: "")
-        }
     }
 }
 
@@ -174,7 +193,7 @@ struct ToolCallStackView: View {
                     .offset(y: CGFloat(index) * cardOffsetIncrement)
                     .scaleEffect(1.0 - CGFloat(index) * cardScaleDecrement)
                     .shadow(
-                        color: .black.opacity(0.15),
+                        color: .black.opacity(0.05),
                         radius: baseShadowRadius - CGFloat(index),
                         x: 0,
                         y: CGFloat(index) * 2
@@ -186,20 +205,17 @@ struct ToolCallStackView: View {
             
             // Show indicator if there are more than 3 cards
             if toolCalls.count > maxVisibleCards {
-                VStack {
-                    Spacer()
-                    Text("+\(toolCalls.count - maxVisibleCards) more")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color(.systemBackground))
-                                .shadow(color: .black.opacity(0.1), radius: 2)
-                        )
-                        .offset(y: CGFloat(maxVisibleCards) * cardOffsetIncrement + 8)
-                }
+                Text("+\(toolCalls.count - maxVisibleCards) more")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.1), radius: 2)
+                    )
+                    .offset(y: CGFloat(maxVisibleCards) * cardOffsetIncrement + 8)
             }
         }
         .contentShape(Rectangle()) // Make entire stack tappable
@@ -276,7 +292,7 @@ struct ToolCallCardView: View {
                 .fill(Color(.systemGray6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(toolCallState.isCompleted ? Color.green.opacity(0.3) : Color.blue.opacity(0.3), lineWidth: 1)
+                        .stroke(Color(.systemGray4), lineWidth: 0.5)
                 )
         )
         .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
@@ -307,70 +323,26 @@ struct ToolCallCarouselView: View {
     let onCollapse: () -> Void
     
     var body: some View {
-        ZStack {
-            // Semi-transparent background overlay
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        onCollapse()
-                    }
+        VStack(spacing: 12) {
+            // Inline carousel with TabView
+            TabView(selection: $selectedIndex) {
+                ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, call in
+                    ToolCallCardView(toolCallState: call)
+                        .tag(index)
                 }
-            
-            VStack(spacing: 0) {
-                // Close button
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            onCollapse()
-                        }
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                            .background(
-                                Circle()
-                                    .fill(Color(.systemBackground))
-                                    .frame(width: 32, height: 32)
-                            )
-                    }
-                    .padding()
-                }
-                
-                // Carousel with TabView
-                TabView(selection: $selectedIndex) {
-                    ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, call in
-                        ToolCallCardView(toolCallState: call)
-                            .padding(.horizontal, 20)
-                            .scaleEffect(selectedIndex == index ? 1.0 : 0.85)
-                            .rotation3DEffect(
-                                .degrees(selectedIndex == index ? 0 : 15),
-                                axis: (x: 1, y: 0, z: 0),
-                                perspective: 0.5
-                            )
-                            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: selectedIndex)
-                            .tag(index)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .always))
-                .frame(height: 350)
-                
-                // Navigation counter
-                HStack {
-                    Text("\(selectedIndex + 1) of \(toolCalls.count)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color(.systemBackground))
-                                .shadow(color: .black.opacity(0.1), radius: 2)
-                        )
-                }
-                .padding(.bottom, 20)
             }
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            .frame(height: 200)
+            
+            // Counter below the card
+            HStack {
+                Spacer()
+                Text("\(selectedIndex + 1) of \(toolCalls.count)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
         }
     }
 }
