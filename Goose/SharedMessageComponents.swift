@@ -12,14 +12,14 @@ struct MarkdownText: View {
         Group {
             if isUserMessage {
                 Text(cachedAttributedText ?? AttributedString(text))
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundColor(.white)
                     .lineLimit(nil)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(cachedAttributedText ?? AttributedString(text))
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .multilineTextAlignment(.leading)
                     .textSelection(.enabled)
             }
@@ -59,6 +59,11 @@ struct MarkdownParser {
             attributedString.append(processElement(child))
         }
         
+        // Trim trailing newlines for cleaner output
+        while attributedString.characters.last == "\n" {
+            attributedString = AttributedString(attributedString.characters.dropLast())
+        }
+        
         return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
     }
     
@@ -72,7 +77,7 @@ struct MarkdownParser {
                     result.append(processInline(inlineChild))
                 }
             }
-            result.append(AttributedString("\n"))
+            result.append(AttributedString("\n\n"))
             
         case let heading as Heading:
             var headingText = AttributedString()
@@ -81,16 +86,16 @@ struct MarkdownParser {
                     headingText.append(processInline(inlineChild))
                 }
             }
-            headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
+            headingText.font = .system(size: max(18 - CGFloat(heading.level) * 2, 14), weight: .bold)
             result.append(headingText)
-            result.append(AttributedString("\n"))
+            result.append(AttributedString("\n\n"))
             
         case let codeBlock as CodeBlock:
             var codeText = AttributedString(codeBlock.code)
-            codeText.font = .monospaced(.body)()
+            codeText.font = .system(size: 14, design: .monospaced)
             codeText.backgroundColor = .secondary.opacity(0.1)
             result.append(codeText)
-            result.append(AttributedString("\n"))
+            result.append(AttributedString("\n\n"))
             
         case let listItem as ListItem:
             result.append(AttributedString("• "))
@@ -121,7 +126,7 @@ struct MarkdownParser {
                     strongText.append(processInline(inlineChild))
                 }
             }
-            strongText.font = .body.bold()
+            strongText.font = .system(size: 14, weight: .bold)
             return strongText
             
         case let emphasis as Emphasis:
@@ -131,12 +136,12 @@ struct MarkdownParser {
                     emphasisText.append(processInline(inlineChild))
                 }
             }
-            emphasisText.font = .body.italic()
+            emphasisText.font = .system(size: 14).italic()
             return emphasisText
             
         case let inlineCode as InlineCode:
             var codeText = AttributedString(inlineCode.code)
-            codeText.font = .monospaced(.body)()
+            codeText.font = .system(size: 14, design: .monospaced)
             codeText.backgroundColor = .secondary.opacity(0.1)
             return codeText
             

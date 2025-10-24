@@ -77,9 +77,20 @@ struct ChatView: View {
     @ViewBuilder
     private func renderRegularMessage(_ message: Message) -> some View {
         if message.role == .user {
-            UserMessageView(message: message)
-                .background(Color.purple.opacity(0.15))
-                .id(message.id)
+            // Check if user message has actual text content
+            let hasTextContent = message.content.contains { content in
+                if case .text(let textContent) = content {
+                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+                return false
+            }
+            
+            // Only render if there's actual text content
+            if hasTextContent {
+                UserMessageView(message: message)
+                    .background(Color.purple.opacity(0.15))
+                    .id(message.id)
+            }
         } else {
             let hasTextContent = message.content.contains { content in
                 if case .text(let textContent) = content {
