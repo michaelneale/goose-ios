@@ -62,7 +62,6 @@ struct ChatView: View {
         if hasTextContent {
             VStack(alignment: .leading, spacing: 8) {
                 AssistantMessageView(message: message, completedTasks: [], sessionName: currentSessionId ?? "Current Session")
-                    .background(Color.orange.opacity(0.15))
                 if !groupedToolCalls.isEmpty {
                     StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
                 }
