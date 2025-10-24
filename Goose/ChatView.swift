@@ -49,31 +49,93 @@ struct ChatView: View {
                 // Messages scroll view with proper constraints
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(messages) { message in
-                                // Use dedicated components based on message role
-                                if message.role == .user {
-                                    UserMessageView(message: message)
-                                        .id(message.id)
-                                } else {
-                                    AssistantMessageView(
-                                        message: message,
-                                        completedTasks: getCompletedTasksForMessage(message.id),
-                                        sessionName: currentSessionId ?? "Current Session"
-                                    )
-                                    .id(message.id)
-                                }
-
-                                // Show ONLY active/in-progress tool calls (completed ones are in the pill)
-                                ForEach(getToolCallsForMessage(message.id), id: \.self) {
-                                    toolCallId in
-                                    if let activeCall = activeToolCalls[toolCallId] {
-                                        ToolCallProgressView(toolCall: activeCall.toolCall)
-                                            .id("tool-\(toolCallId)")
-                                    }
+                        let _ = {
+                            print("\n📊 === TOOL CALL STATE SNAPSHOT ===")
+                            print("📊 Active: \(activeToolCalls.count), Completed: \(completedToolCalls.count)")
+                            print("📊 Tool call message map: \(toolCallMessageMap.count) entries")
+                            if toolCallMessageMap.count > 0 {
+                                print("📊 Sample mappings:")
+                                for (toolId, msgId) in toolCallMessageMap.prefix(3) {
+                                    print("   🔗 Tool \(toolId.prefix(8)) → Message \(msgId.prefix(8))")
                                 }
                             }
+                            print("📊 === END SNAPSHOT ===\n")
+                        }()
+                        
+                        // Group consecutive tool-only messages
+                        // Group consecutive tool-only messages
+                        let toolOnlyGroups = groupConsecutiveToolOnlyMessages(messages)
+                        let _ = {
+                            if !toolOnlyGroups.isEmpty {
+                                print("🎯 Found \(toolOnlyGroups.count) groups in ForEach:")
+                                for (idx, group) in toolOnlyGroups.enumerated() {
+                                    print("   Group \(idx + 1): \(group.messageIds.count) messages at index \(group.startIndex)")
+                                }
+                            } else {
+                                print("⚠️ No groups found")
+                            }
+                        }()
+                        LazyVStack(spacing: 12) {
+                            ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                                // Skip if this message is part of a group (but not the first one)
+                                if !isPartOfGroup(messageIndex: index, groups: toolOnlyGroups) {
+                                    // Check if this is the start of a group
+                                    let groupForThisMessage = toolOnlyGroups.first { $0.startIndex == index }
+                                    
+                                    if let group = groupForThisMessage {
+                                        // This is the first message in a group - render grouped tool calls
+                                        let _ = print("🎨 Rendering GROUP at index \(index): \(group.messageIds.count) messages")
+                                        let groupedToolCalls = getToolCallsForGroup(messageIds: group.messageIds)
+                                        let _ = print("   📦 Group has \(groupedToolCalls.count) tool calls")
+                                        if !groupedToolCalls.isEmpty {
+                                            StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
+                                                .id("grouped-tools-\(group.messageIds.joined(separator: "-"))")
+                                        }
+                                    } else {
+                                        // Regular message rendering
+                                        if message.role == .user {
+                                            UserMessageView(message: message)
+                                                .id(message.id)
+                                        } else {
+                                            // Only show AssistantMessageView if there's meaningful text content
+                                            let hasTextContent = message.content.contains { content in
+                                                if case .text(let textContent) = content {
+                                                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                                }
+                                                return false
+                                            }
+                                            
+                                            if hasTextContent {
+                                                AssistantMessageView(
+                                                    message: message,
+                                                    completedTasks: [],
+                                                    sessionName: currentSessionId ?? "Current Session"
+                                                )
+                                                .id(message.id)
+                                            }
+                                        }
 
+                                        // Show tool calls for non-grouped messages
+                                        let toolCallIds = getToolCallsForMessage(message.id)
+                                        let toolCallsForMessage = toolCallIds.compactMap { id -> ToolCallState? in
+                                            if let activeCall = activeToolCalls[id] {
+                                                return .active(id: id, timing: activeCall)
+                                            }
+                                            if let completedCall = completedToolCalls[id] {
+                                                return .completed(id: id, completed: completedCall)
+                                            }
+                                            return nil
+                                        }
+                                        
+                                        if !toolCallsForMessage.isEmpty {
+                                            StackedToolCallsView(toolCalls: toolCallsForMessage)
+                                                .id("tools-\(message.id)")
+                                        }
+                                    }
+                                } else {
+                                    let _ = print("⏭️  Skipping message \(message.id.prefix(8)) at index \(index) - part of group")
+                                }
+                            }
                             // Show "thinking" indicator if no active tool calls
                             if isLoading && activeToolCalls.isEmpty {
                                 HStack {
@@ -921,6 +983,23 @@ struct ChatView: View {
         print(
             "🔧 Rebuilt: \(newActiveToolCalls.count) active, \(newCompletedToolCalls.count) completed"
         )
+        print("🔧 Tool call message map has \(newToolCallMessageMap.count) entries")
+        
+        // Show sample of what was built
+        if !newCompletedToolCalls.isEmpty {
+            print("🔧 Sample completed tool calls:")
+            for (id, completed) in newCompletedToolCalls.prefix(3) {
+                let msgId = newToolCallMessageMap[id] ?? "NO MESSAGE"
+                print("   🟢 \(id.prefix(8)): \(completed.toolCall.name) → Message \(msgId.prefix(8))")
+            }
+        }
+        
+        if !newToolCallMessageMap.isEmpty {
+            print("🔧 Sample message mappings:")
+            for (toolId, msgId) in newToolCallMessageMap.prefix(3) {
+                print("   🔗 Tool \(toolId.prefix(8)) → Message \(msgId.prefix(8))")
+            }
+        }
     }
 
     /// Stop polling for updates
@@ -942,6 +1021,141 @@ struct ChatView: View {
     private func getCompletedTasksForMessage(_ messageId: String) -> [CompletedToolCall] {
         let toolCallIds = getToolCallsForMessage(messageId)
         return toolCallIds.compactMap { completedToolCalls[$0] }
+    }
+
+    /// Groups consecutive assistant messages that have only tool calls (no meaningful text)
+    private func groupConsecutiveToolOnlyMessages(_ messages: [Message]) -> [(startIndex: Int, messageIds: [String], indices: [Int])] {
+        var groups: [(startIndex: Int, messageIds: [String], indices: [Int])] = []
+        var currentGroup: [String] = []
+        var currentGroupIndices: [Int] = []
+        var groupStartIndex: Int? = nil
+        
+        print("\n🔎 === GROUPING ANALYSIS (Thread-Aware) ===")
+        print("📊 Analyzing \(messages.count) messages for grouping")
+        
+        for (index, message) in messages.enumerated() {
+            // Track user messages with actual text (not empty)
+            if message.role == .user {
+                let userText = message.content.compactMap { content -> String? in
+                    if case .text(let textContent) = content {
+                        return textContent.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    return nil
+                }.joined()
+                
+                if !userText.isEmpty {
+                    // Real user message - this breaks the group (new conversation turn)
+                    print("📋 [\(index)] USER (with text): '\(userText.prefix(40))...' - BREAKS GROUP (new turn)")
+                    
+                    // Finalize current group before breaking
+                    if currentGroup.count > 1, let startIdx = groupStartIndex {
+                        print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+                        print("        Indices: \(currentGroupIndices)")
+                        groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+                    } else if currentGroup.count == 1 {
+                        print("     ⚠️ Only 1 message in group - not grouping")
+                    }
+                    
+                    currentGroup = []
+                    currentGroupIndices = []
+                    groupStartIndex = nil
+                } else {
+                    // Empty user message - skip but don't break group
+                    print("📋 [\(index)] USER (empty) - skipping")
+                }
+                continue
+            }
+            
+            let hasTextContent = message.content.contains { content in
+                if case .text(let textContent) = content {
+                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+                return false
+            }
+            
+            let hasToolCalls = !getToolCallsForMessage(message.id).isEmpty
+            
+            if message.role == .assistant {
+                if hasToolCalls {
+                    print("📋 [\(index)] ASSISTANT \(message.id.prefix(8)): hasText=\(hasTextContent), hasTools=\(hasToolCalls)")
+                } else {
+                    print("📋 [\(index)] ASSISTANT (no tools) - breaks grouping")
+                    if !currentGroup.isEmpty {
+                        print("     ⚠️ Breaking current group of \(currentGroup.count) messages")
+                    }
+                }
+            }
+            
+            if message.role == .assistant && !hasTextContent && hasToolCalls {
+                print("     ✅ TOOL-ONLY - adding to group")
+                if currentGroup.isEmpty {
+                    groupStartIndex = index
+                }
+                currentGroup.append(message.id)
+                currentGroupIndices.append(index)
+            } else {
+                // Non-tool-only assistant message breaks the group
+                if currentGroup.count > 1, let startIdx = groupStartIndex {
+                    print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+                    print("        Indices: \(currentGroupIndices)")
+                    groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+                } else if currentGroup.count == 1 {
+                    print("     ⚠️ Only 1 message in group - not grouping")
+                }
+                currentGroup = []
+                currentGroupIndices = []
+                groupStartIndex = nil
+            }
+        }
+        
+        if currentGroup.count > 1, let startIdx = groupStartIndex {
+            print("     🎯 FINALIZING LAST GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+            print("        Indices: \(currentGroupIndices)")
+            groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+        } else if currentGroup.count == 1 {
+            print("     ⚠️ Last group only has 1 message - not grouping")
+        }
+        
+        print("🔎 Total groups found: \(groups.count)")
+        for (idx, group) in groups.enumerated() {
+            print("   Group \(idx + 1): \(group.messageIds.count) messages starting at index \(group.startIndex)")
+            print("      Indices: \(group.indices)")
+        }
+        print("🔎 === END GROUPING ANALYSIS ===\n")
+        
+        return groups
+    }
+    
+    /// Check if a message index is part of a grouped set (but not the first one)
+    private func isPartOfGroup(messageIndex: Int, groups: [(startIndex: Int, messageIds: [String], indices: [Int])]) -> Bool {
+        for group in groups {
+            // Check if this index is in the group's indices array
+            if group.indices.contains(messageIndex) && messageIndex != group.startIndex {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Get all tool calls for a group of messages
+    private func getToolCallsForGroup(messageIds: [String]) -> [ToolCallState] {
+        var allToolCalls: [ToolCallState] = []
+        
+        for messageId in messageIds {
+            let toolCallIds = getToolCallsForMessage(messageId)
+            let toolCalls = toolCallIds.compactMap { id -> ToolCallState? in
+                if let activeCall = activeToolCalls[id] {
+                    return .active(id: id, timing: activeCall)
+                }
+                if let completedCall = completedToolCalls[id] {
+                    return .completed(id: id, completed: completedCall)
+                }
+                return nil
+            }
+            allToolCalls.append(contentsOf: toolCalls)
+        }
+        
+        return allToolCalls
     }
 
     private func limitMessages() {

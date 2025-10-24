@@ -32,6 +32,7 @@
 		A1234567890ABCDEF020 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = A1234567890ABCDEF019 /* Markdown */; };
 		C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */; };
 		D32A017F2EAA7D6600AF9DD0 /* AssistantMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32A017E2EAA7D6600AF9DD0 /* AssistantMessageView.swift */; };
+		BBDDB97B3661CB27DAED17A1 /* StackedToolCallsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A3D767C87B30740AC05D2 /* StackedToolCallsView.swift */; };
 		D32A01812EAA7D7300AF9DD0 /* UserMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32A01802EAA7D7300AF9DD0 /* UserMessageView.swift */; };
 		D32A01832EAA7D8100AF9DD0 /* SharedMessageComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32A01822EAA7D8100AF9DD0 /* SharedMessageComponents.swift */; };
 		D32A01852EAA7D8F00AF9DD0 /* ToolViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32A01842EAA7D8F00AF9DD0 /* ToolViews.swift */; };
@@ -70,6 +71,7 @@
 		A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOutputManager.swift; sourceTree = "<group>"; };
 		AE15643668F34C98B329A6FA /* CalendarExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarExtensions.swift; sourceTree = "<group>"; };
 		D32A017E2EAA7D6600AF9DD0 /* AssistantMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantMessageView.swift; sourceTree = "<group>"; };
+		FE1A3D767C87B30740AC05D2 /* StackedToolCallsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackedToolCallsView.swift; sourceTree = "<group>"; };
 		D32A01802EAA7D7300AF9DD0 /* UserMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserMessageView.swift; sourceTree = "<group>"; };
 		D32A01822EAA7D8100AF9DD0 /* SharedMessageComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedMessageComponents.swift; sourceTree = "<group>"; };
 		D32A01842EAA7D8F00AF9DD0 /* ToolViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolViews.swift; sourceTree = "<group>"; };
@@ -137,6 +139,7 @@
 				A19A6DF268C759B62CA875DB /* VoiceOutputManager.swift */,
 				834A2CB82E98D93B00D15D6A /* EnhancedVoiceManager.swift */,
 				D32A017E2EAA7D6600AF9DD0 /* AssistantMessageView.swift */,
+				FE1A3D767C87B30740AC05D2 /* StackedToolCallsView.swift */,
 				D32A01802EAA7D7300AF9DD0 /* UserMessageView.swift */,
 				D32A01822EAA7D8100AF9DD0 /* SharedMessageComponents.swift */,
 				D32A01842EAA7D8F00AF9DD0 /* ToolViews.swift */,
@@ -245,6 +248,7 @@
 				838F2DEB2E9E1CF700E2FC48 /* ThemeManager.swift in Sources */,
 				D3BC33FE2EA16CF30057E748 /* TrialModeBanner.swift in Sources */,
 				D32A017F2EAA7D6600AF9DD0 /* AssistantMessageView.swift in Sources */,
+				BBDDB97B3661CB27DAED17A1 /* StackedToolCallsView.swift in Sources */,
 				838F2DEC2E9E1CF700E2FC48 /* TaskDetailView.swift in Sources */,
 				C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */,
 				D32A01832EAA7D8100AF9DD0 /* SharedMessageComponents.swift in Sources */,
