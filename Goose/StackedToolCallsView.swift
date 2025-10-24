@@ -103,6 +103,7 @@ struct StackedToolCallsView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: toolCalls.count) { oldValue, newValue in
             // Auto-collapse if only 1 tool call remains
             if newValue <= 1 && isExpanded {
