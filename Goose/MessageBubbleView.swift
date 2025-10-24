@@ -12,14 +12,19 @@ struct MessageBubbleView: View {
     private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.7
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Message content - filter out tool responses AND tool requests (we'll show them as pills)
-            let filteredContent = message.content.filter { 
-                !isToolResponse($0) && !isToolRequest($0)
+        HStack(alignment: .top, spacing: 0) {
+            // Content
+            if message.role == .user {
+                Spacer()
             }
             
-            if !filteredContent.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: message.role == .user ? 0 : 8) {
+                // Message content - filter out tool responses AND tool requests (we'll show them as pills)
+                let filteredContent = message.content.filter { 
+                    !isToolResponse($0) && !isToolRequest($0)
+                }
+                
+if !filteredContent.isEmpty {
                     ForEach(Array(filteredContent.enumerated()), id: \.offset) { index, content in
                         TruncatableMessageContentView(
                             content: content,
@@ -29,60 +34,83 @@ struct MessageBubbleView: View {
                             isUserMessage: message.role == .user
                         )
                     }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(message.role == .user ? EdgeInsets(top: 6, leading: 8, bottom: 0, trailing: 8) : EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                    .background(
+                        message.role == .user 
+                            ? Color.blue.opacity(0.15)
+                            : Color.clear
+                    )
+                    .overlay(
+                        message.role == .user 
+                            ? RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            : nil
+                    )
+                    .cornerRadius(16)
                 }
+                
+                // Show consolidated task completion pill if there are completed tasks
+                if !completedTasks.isEmpty {
+                    // For single task, go directly to output; for multiple, show combined view
+                    if completedTasks.count == 1 {
+                        // Single task - go directly to output
+                        NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(ThemeManager.shared)) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Text(completedTasks[0].toolCall.name)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6).opacity(0.85))
+                            .cornerRadius(16)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        // Multiple tasks - show all outputs in one view
+                        NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(ThemeManager.shared)) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Text("\(completedTasks.count) Tasks completed")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6).opacity(0.85))
+                            .cornerRadius(16)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            
+            if message.role != .user {
+                Spacer()
             }
             
-            // Show consolidated task completion pill if there are completed tasks
-            if !completedTasks.isEmpty {
-                // For single task, go directly to output; for multiple, show combined view
-                if completedTasks.count == 1 {
-                    // Single task - go directly to output
-                    NavigationLink(destination: TaskOutputDetailView(task: completedTasks[0], taskNumber: 1, sessionName: sessionName, messageTimestamp: message.created).environmentObject(ThemeManager.shared)) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Text(completedTasks[0].toolCall.name)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemGray6).opacity(0.85))
-                        .cornerRadius(16)
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    // Multiple tasks - show all outputs in one view
-                    NavigationLink(destination: TaskDetailView(message: message, completedTasks: completedTasks, sessionName: sessionName).environmentObject(ThemeManager.shared)) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Text("\(completedTasks.count) Tasks completed")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemGray6).opacity(0.85))
-                        .cornerRadius(16)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
+        .padding(.trailing, message.role == .user ? 12 : 0)
+        .padding(.leading, message.role == .user ? 0 : 12)
         .sheet(isPresented: $showFullText) {
             FullTextOverlay(content: message.content.filter { !isToolResponse($0) })
         }
@@ -260,17 +288,31 @@ struct MarkdownText: View {
     @State private var cachedAttributedText: AttributedString?
     @State private var previousText = ""
     
-    var body: some View {
-        Text(cachedAttributedText ?? AttributedString(text))
-            .font(.system(size: 16, weight: isUserMessage ? .bold : .regular))
-            .textSelection(.enabled)
+var body: some View {
+        Group {
+if isUserMessage {
+                Text(cachedAttributedText ?? AttributedString(text))
+                    .font(.system(size: 16, weight: .bold))
+                    .lineLimit(nil)
+                    .minimumScaleFactor(1.0)
+                    .multilineTextAlignment(.trailing)
+                    .baselineOffset(0)
+                    .background(Color.green.opacity(0.3))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(cachedAttributedText ?? AttributedString(text))
+                    .font(.system(size: 16, weight: .regular))
+                    .multilineTextAlignment(.leading)
+                    .textSelection(.enabled)
+            }
+        }
             .onAppear {
                 if cachedAttributedText == nil {
                     cachedAttributedText = MarkdownParser.parse(text)
                     previousText = text
                 }
             }
-            .onChange(of: text) { newText in
+            .onChange(of: text) { _, newText in
                 // Only reparse if text changed significantly
                 if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
                     // Full reparse for significant changes
@@ -702,11 +744,19 @@ struct TruncatableMessageContentView: View {
     var body: some View {
         switch content {
         case .text(let textContent):
-            // Use MarkdownText for proper markdown rendering  
-            MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
-                .lineSpacing(8)
-                .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Use MarkdownText for proper markdown rendering
+            if isUserMessage {
+                MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(height: nil)
+            } else {
+                MarkdownText(text: textContent.text, isUserMessage: isUserMessage)
+                    .lineSpacing(4)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             
         case .toolRequest(_):
             // Hide tool requests - they'll be shown as consolidated pills
@@ -724,11 +774,18 @@ struct TruncatableMessageContentView: View {
             EmptyView()
             
         case .conversationCompacted(let content):
-            // Show compacted conversation message  
-            MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
-                .lineSpacing(8)
-                .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Show compacted conversation message
+            if isUserMessage {
+                MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                MarkdownText(text: "📝 \(content.msg)", isUserMessage: isUserMessage)
+                    .lineSpacing(4)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
