@@ -128,6 +128,7 @@ struct ChatView: View {
 
             // Main content that stops before input area
             VStack(spacing: 0) {
+                SafeAreaExtension(useSystemBackground: true)
                 // Messages scroll view with proper constraints
                 ScrollViewReader { proxy in
                     ScrollView {
