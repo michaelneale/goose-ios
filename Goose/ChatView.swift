@@ -62,16 +62,14 @@ struct ChatView: View {
         if hasTextContent {
             VStack(alignment: .leading, spacing: 8) {
                 AssistantMessageView(message: message, completedTasks: [], sessionName: currentSessionId ?? "Current Session")
+                    .background(Color.orange.opacity(0.15))
                 if !groupedToolCalls.isEmpty {
                     StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
-                        .background(Color.green.opacity(0.2))
                 }
             }
             .id("grouped-\(group.messageIds.joined(separator: "-"))")
-            .background(Color.orange.opacity(0.15))
         } else if !groupedToolCalls.isEmpty {
             StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
-                .background(Color.green.opacity(0.2))
                 .id("grouped-tools-\(group.messageIds.joined(separator: "-"))")
         }
     }
@@ -110,7 +108,6 @@ struct ChatView: View {
         
         if !toolCallsForMessage.isEmpty {
             StackedToolCallsView(toolCalls: toolCallsForMessage)
-                .background(Color.green.opacity(0.2))
                 .id("tools-\(message.id)")
         }
     }

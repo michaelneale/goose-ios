@@ -77,6 +77,7 @@ struct StackedToolCallsView: View {
                 if toolCalls.count == 1 {
                     // Single tool call - show normal card (no stacking)
                     ToolCallCardView(toolCallState: toolCalls[0])
+                        .background(Color.green.opacity(0.2))
                 } else {
                     // Multiple tool calls - show stack or carousel
                     if isExpanded {
@@ -99,6 +100,7 @@ struct StackedToolCallsView: View {
                                 }
                             }
                         )
+                        .background(Color.green.opacity(0.2))
                     }
                 }
             }
@@ -338,28 +340,120 @@ struct ToolCallCarouselView: View {
     @Binding var selectedIndex: Int
     let onCollapse: () -> Void
     
+    @State private var dragState: DragState = .inactive
+    
+    private let cardWidth: CGFloat = UIScreen.main.bounds.width * 0.85
+    private let cardSpacing: CGFloat = 16
+    
+    private enum DragState {
+        case inactive
+        case dragging
+    }
+    
     var body: some View {
         VStack(spacing: 12) {
-            // Inline carousel with TabView
-            TabView(selection: $selectedIndex) {
-                ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, call in
-                    ToolCallCardView(toolCallState: call)
-                        .tag(index)
+            // Horizontal scroll with peek preview and snap
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: cardSpacing) {
+                        ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, call in
+                            ToolCallCardView(toolCallState: call)
+                                .frame(width: cardWidth)
+                                .scaleEffect(selectedIndex == index ? 1.0 : 0.92)
+                                .opacity(selectedIndex == index ? 1.0 : 0.7)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedIndex)
+                                .id(index)
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedIndex = index
+                                    }
+                                }
+                        }
+                    }
+                    .padding(.horizontal, (UIScreen.main.bounds.width - cardWidth) / 2)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { _ in
+                                dragState = .dragging
+                            }
+                            .onEnded { value in
+                                dragState = .inactive
+                                // Calculate which card we're closest to based on drag
+                                let dragDistance = value.translation.width
+                                let cardPlusSpacing = cardWidth + cardSpacing
+                                let threshold = cardPlusSpacing / 3
+                                
+                                if dragDistance < -threshold && selectedIndex < toolCalls.count - 1 {
+                                    // Swiped left - go to next
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedIndex += 1
+                                    }
+                                } else if dragDistance > threshold && selectedIndex > 0 {
+                                    // Swiped right - go to previous
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedIndex -= 1
+                                    }
+                                } else {
+                                    // Snap back to current
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        proxy.scrollTo(selectedIndex, anchor: .center)
+                                    }
+                                }
+                            }
+                    )
+                }
+                .onChange(of: selectedIndex) { _, newIndex in
+                    if dragState == .inactive {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
+                    }
+                }
+                .onAppear {
+                    proxy.scrollTo(selectedIndex, anchor: .center)
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            .frame(height: 200)
+            .frame(height: 220)
             
-            // Counter below the card
-            HStack {
+            // Counter and navigation
+            HStack(spacing: 20) {
+                Button(action: {
+                    if selectedIndex > 0 {
+                        withAnimation {
+                            selectedIndex -= 1
+                        }
+                    }
+                }) {
+                    Image(systemName: "chevron.left")
+                        .foregroundColor(selectedIndex > 0 ? .primary : .gray)
+                }
+                .disabled(selectedIndex == 0)
+                
                 Spacer()
+                
                 Text("\(selectedIndex + 1) of \(toolCalls.count)")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                
                 Spacer()
+                
+                Button(action: {
+                    if selectedIndex < toolCalls.count - 1 {
+                        withAnimation {
+                            selectedIndex += 1
+                        }
+                    }
+                }) {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(selectedIndex < toolCalls.count - 1 ? .primary : .gray)
+                }
+                .disabled(selectedIndex == toolCalls.count - 1)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+            .background(Color.green.opacity(0.2))
         }
+        .padding(.horizontal, -16)  // Extend into ChatView gutter to show peek preview
     }
 }
 
