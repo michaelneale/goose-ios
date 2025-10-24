@@ -169,7 +169,7 @@ struct ToolCallStackView: View {
     var body: some View {
         ZStack {
             // Show only the top 3 cards (or fewer if less than 3)
-            ForEach(Array(visibleToolCalls.enumerated()), id: \.element.toolCall.name) { index, call in
+            ForEach(Array(visibleToolCalls.enumerated()), id: \.element.id) { index, call in
                 ToolCallCardView(toolCallState: call)
                     .offset(y: CGFloat(index) * cardOffsetIncrement)
                     .scaleEffect(1.0 - CGFloat(index) * cardScaleDecrement)
@@ -340,7 +340,7 @@ struct ToolCallCarouselView: View {
                 
                 // Carousel with TabView
                 TabView(selection: $selectedIndex) {
-                    ForEach(Array(toolCalls.enumerated()), id: \.offset) { index, call in
+                    ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, call in
                         ToolCallCardView(toolCallState: call)
                             .padding(.horizontal, 20)
                             .scaleEffect(selectedIndex == index ? 1.0 : 0.85)

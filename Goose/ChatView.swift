@@ -87,9 +87,35 @@ struct ChatView: View {
                                         let _ = print("🎨 Rendering GROUP at index \(index): \(group.messageIds.count) messages")
                                         let groupedToolCalls = getToolCallsForGroup(messageIds: group.messageIds)
                                         let _ = print("   📦 Group has \(groupedToolCalls.count) tool calls")
-                                        if !groupedToolCalls.isEmpty {
-                                            StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
-                                                .id("grouped-tools-\(group.messageIds.joined(separator: "-"))")
+                                        
+                                        // Check if the first message has text content
+                                        let hasTextContent = message.content.contains { content in
+                                            if case .text(let textContent) = content {
+                                                return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                            }
+                                            return false
+                                        }
+                                        
+                                        if hasTextContent {
+                                            // First message has text - show text + grouped tools together
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                AssistantMessageView(
+                                                    message: message,
+                                                    completedTasks: [],
+                                                    sessionName: currentSessionId ?? "Current Session"
+                                                )
+                                                
+                                                if !groupedToolCalls.isEmpty {
+                                                    StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
+                                                }
+                                            }
+                                            .id("grouped-\(group.messageIds.joined(separator: "-"))")
+                                        } else {
+                                            // No text in first message - just show grouped tools
+                                            if !groupedToolCalls.isEmpty {
+                                                StackedToolCallsView(toolCalls: groupedToolCalls, showGroupInfo: true)
+                                                    .id("grouped-tools-\(group.messageIds.joined(separator: "-"))")
+                                            }
                                         }
                                     } else {
                                         // Regular message rendering
@@ -1086,15 +1112,39 @@ struct ChatView: View {
                 }
             }
             
-            if message.role == .assistant && !hasTextContent && hasToolCalls {
-                print("     ✅ TOOL-ONLY - adding to group")
-                if currentGroup.isEmpty {
-                    groupStartIndex = index
+            if message.role == .assistant && hasToolCalls {
+                // Assistant message with tool calls - can start or continue a group
+                if hasTextContent {
+                    // Text + tool calls - this can START a new group
+                    print("     ✅ TEXT+TOOLS - can start group")
+                    if currentGroup.isEmpty {
+                        // Start new group with this message
+                        groupStartIndex = index
+                        currentGroup.append(message.id)
+                        currentGroupIndices.append(index)
+                    } else {
+                        // Already in a group - finalize previous and start new
+                        if currentGroup.count > 1, let startIdx = groupStartIndex {
+                            print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
+                            print("        Indices: \(currentGroupIndices)")
+                            groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
+                        }
+                        // Start new group
+                        groupStartIndex = index
+                        currentGroup = [message.id]
+                        currentGroupIndices = [index]
+                    }
+                } else {
+                    // No text, just tool calls - CONTINUE existing group or start new
+                    print("     ✅ TOOL-ONLY - adding to group")
+                    if currentGroup.isEmpty {
+                        groupStartIndex = index
+                    }
+                    currentGroup.append(message.id)
+                    currentGroupIndices.append(index)
                 }
-                currentGroup.append(message.id)
-                currentGroupIndices.append(index)
             } else {
-                // Non-tool-only assistant message breaks the group
+                // Non-tool-call assistant message breaks the group
                 if currentGroup.count > 1, let startIdx = groupStartIndex {
                     print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
                     print("        Indices: \(currentGroupIndices)")
