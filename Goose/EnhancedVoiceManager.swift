@@ -28,7 +28,7 @@ enum VoiceMode: String, CaseIterable {
     var description: String {
         switch self {
         case .normal: return "Type messages"
-        case .audio: return "Listen only, no speech"
+        case .audio: return "Continuous transcription"
         case .fullAudio: return "Listen and speak back"
         }
     }
@@ -92,13 +92,17 @@ class EnhancedVoiceManager: ObservableObject {
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var speechCoordinator: SpeechCoordinator?
     
-    // Silence detection
+    // Silence detection - modified for continuous input
     private var silenceTimer: Timer?
     private var lastSpeechTime = Date()
     private var hasDetectedSpeech = false
-    private let silenceThreshold: TimeInterval = 1.5
+    private let silenceThreshold: TimeInterval = 2.0  // Increased for continuous mode
+    private var isManuallyStopping = false  // Track manual stops to prevent auto-submit
     
-    // Callback for sending messages
+    // Callback for updating text field (instead of auto-submitting)
+    var onTranscriptionUpdate: ((String) -> Void)?
+    
+    // Callback for sending messages (only used in fullAudio mode)
     var onSubmitMessage: ((String) -> Void)?
     
     // MARK: - Initialization
@@ -117,9 +121,26 @@ class EnhancedVoiceManager: ObservableObject {
     private func handleModeChange(from oldMode: VoiceMode, to newMode: VoiceMode) {
         print("🔄 Voice mode changed from \(oldMode) to \(newMode)")
         
+        // Set flag to prevent auto-submit when manually stopping
+        if oldMode == .audio && newMode == .normal && !transcribedText.isEmpty {
+            print("📝 Preserving text without auto-submit: \(transcribedText)")
+            // Update the input field one last time before stopping
+            onTranscriptionUpdate?(transcribedText)
+            transcribedText = ""  // Clear to prevent any auto-submit
+        }
+        
+        // Mark that we're manually stopping
+        isManuallyStopping = true
+        
         // Stop any ongoing operations
         stopListening()
         stopSpeaking()
+        
+        // Reset the flag after a short delay
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            isManuallyStopping = false
+        }
         
         // Handle the new mode
         switch newMode {
@@ -143,12 +164,11 @@ class EnhancedVoiceManager: ObservableObject {
     }
     
     func cycleVoiceMode() {
+        // Toggle between normal and audio (transcribe) only
         switch voiceMode {
         case .normal:
             setMode(.audio)
-        case .audio:
-            setMode(.fullAudio)
-        case .fullAudio:
+        case .audio, .fullAudio:
             setMode(.normal)
         }
     }
@@ -289,9 +309,15 @@ class EnhancedVoiceManager: ObservableObject {
                     if !hasDetectedSpeech {
                         hasDetectedSpeech = true
                     }
+                    
+                    // Update the text field in real-time (for audio mode)
+                    if voiceMode == .audio {
+                        onTranscriptionUpdate?(newText)
+                    }
                 }
                 
-                if result.isFinal {
+                // In fullAudio mode, auto-submit on final result
+                if result.isFinal && voiceMode == .fullAudio {
                     submitTranscription()
                 }
             }
@@ -321,14 +347,43 @@ class EnhancedVoiceManager: ObservableObject {
     
     private func checkForSilence() {
         guard voiceMode != .normal, state == .listening, hasDetectedSpeech else { return }
+        guard !isManuallyStopping else { return }  // Don't auto-submit during manual stop
         
         let timeSinceLastSpeech = Date().timeIntervalSince(lastSpeechTime)
         
+        // In audio mode (continuous), we finalize text on silence but keep listening
+        // In fullAudio mode, we submit on silence
         if timeSinceLastSpeech > silenceThreshold && !transcribedText.isEmpty {
-            submitTranscription()
+            if voiceMode == .audio {
+                finalizeCurrentTranscription()
+            } else if voiceMode == .fullAudio {
+                submitTranscription()
+            }
         }
     }
     
+    // NEW: Finalize transcription without submitting (for audio mode)
+    private func finalizeCurrentTranscription() {
+        guard !transcribedText.isEmpty else { return }
+        
+        print("📝 Finalizing transcription (continuous mode): \(transcribedText)")
+        
+        // Update the text field with finalized text
+        onTranscriptionUpdate?(transcribedText)
+        
+        // Play a subtle sound to indicate text was captured
+        playSound(.submit)
+        
+        // Reset for next phrase but keep listening
+        transcribedText = ""
+        hasDetectedSpeech = false
+        lastSpeechTime = Date()
+        
+        // Stay in listening state - don't restart, just continue
+        print("🎤 Continuing to listen...")
+    }
+    
+    // MODIFIED: Only used in fullAudio mode now
     private func submitTranscription() {
         guard !transcribedText.isEmpty else { return }
         
@@ -340,18 +395,9 @@ class EnhancedVoiceManager: ObservableObject {
         state = .processing
         playSound(.submit)
         
-        // Send the message via callback
+        // Send the message via callback (only in fullAudio mode)
         onSubmitMessage?(message)
         
-        // In audio mode, immediately go back to listening
-        if voiceMode == .audio {
-            Task {
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
-                if voiceMode == .audio {
-                    startListening()
-                }
-            }
-        }
         // In full audio mode, we'll wait for the response to be spoken before listening again
     }
     

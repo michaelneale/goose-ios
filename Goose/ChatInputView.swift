@@ -24,6 +24,9 @@ struct ChatInputView: View {
     var showTrialBanner: Bool = false
     var onTrialBannerTap: (() -> Void)? = nil
     
+    // Track input field height
+    @State private var inputHeight: CGFloat = 80
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             // Trial mode banner (behind the input)
@@ -58,22 +61,53 @@ struct ChatInputView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             
-            VStack(spacing: 0) {
-                // Show transcribed text while in voice mode (if voice manager provided)
-                if let vm = voiceManager,
-                   vm.voiceMode != .normal && !vm.transcribedText.isEmpty {
-                    HStack {
-                        Text("Transcribing: \"\(vm.transcribedText)\"")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
+            // Listening indicator banner (behind the input) - GROWS WITH INPUT
+            if let vm = voiceManager,
+               vm.voiceMode != .normal && vm.state == .listening {
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 20))
+                            .foregroundColor(.blue)
+                            .symbolEffect(.variableColor.iterative.reversing)
+                        
+                        Text("Listening...")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                        
                         Spacer()
                     }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                    .background(Color(UIColor.systemBackground).opacity(0.95))
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
+                    
+                    // Spacer that matches the input field height
+                    Spacer()
+                        .frame(height: inputHeight)
                 }
-                
+                .background(
+                    RoundedRectangle(cornerRadius: 32)
+                        .fill(colorScheme == .dark ?
+                              Color(red: 0.15, green: 0.15, blue: 0.18) :
+                              Color(red: 0.96, green: 0.96, blue: 0.98))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32)
+                        .strokeBorder(
+                            colorScheme == .dark ?
+                            Color(red: 0.25, green: 0.25, blue: 0.28) :
+                            Color(red: 0.88, green: 0.88, blue: 0.90),
+                            lineWidth: 1
+                        )
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .animation(.easeInOut(duration: 0.2), value: inputHeight)
+            }
+            
+            VStack(spacing: 0) {
+
                 VStack(alignment: .leading, spacing: 12) {
                     // Text field on top
                     TextField(placeholder, text: $text, axis: .vertical)
@@ -82,7 +116,6 @@ struct ChatInputView: View {
                         .lineLimit(1...4)
                         .padding(.vertical, 8)
                         .focused($isFocused)
-                        .disabled(voiceManager?.voiceMode != .normal && voiceManager != nil)
                         .onSubmit {
                             onSubmit()
                         }
@@ -112,7 +145,7 @@ struct ChatInputView: View {
                         HStack(spacing: 10) {
                             // Voice mode indicator text (if voice manager provided)
                             if let vm = voiceManager, vm.voiceMode != .normal {
-                                Text(vm.voiceMode == .audio ? "Transcribe" : "Full Audio")
+                                Text("Transcribe")
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundColor(.blue)
@@ -174,7 +207,17 @@ struct ChatInputView: View {
                 .padding(.leading, 14)
                 .padding(.trailing, 10)
                 .frame(maxWidth: .infinity)
-                .background(Color(UIColor.secondarySystemBackground))
+                .background(
+                    GeometryReader { geometry in
+                        Color(UIColor.secondarySystemBackground)
+                            .onAppear {
+                                inputHeight = geometry.size.height
+                            }
+                            .onChange(of: geometry.size.height) { newHeight in
+                                inputHeight = newHeight
+                            }
+                    }
+                )
                 .cornerRadius(32)
                 .overlay(
                     RoundedRectangle(cornerRadius: 32)
