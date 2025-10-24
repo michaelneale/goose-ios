@@ -23,6 +23,7 @@ struct ChatView: View {
 
     // Voice features - shared with WelcomeView
     @ObservedObject var voiceManager: EnhancedVoiceManager
+    @ObservedObject var continuousVoiceManager: ContinuousVoiceManager
 
     // Memory management
     private let maxMessages = 50  // Limit messages to prevent memory issues
@@ -172,6 +173,7 @@ struct ChatView: View {
                     showPlusButton: true,
                     isLoading: isLoading,
                     voiceManager: voiceManager,
+                    continuousVoiceManager: continuousVoiceManager,
                     onSubmit: {
                         sendMessage()
                     },
@@ -235,17 +237,28 @@ struct ChatView: View {
         }
 
         .onAppear {
-            // Set up voice manager callback
+            // Set up voice manager callback (Transcribe mode)
             voiceManager.onSubmitMessage = { transcribedText in
-                // Create the message and send it
                 inputText = transcribedText
                 sendMessage()
             }
             
-            // Set up transcription update callback for continuous input (audio mode)
+            // Live transcription updates (Transcribe mode)
             voiceManager.onTranscriptionUpdate = { transcribedText in
-                // Update the input text field without sending
                 inputText = transcribedText
+            }
+            
+            // Set up continuous voice mode callbacks (live partials + finalize)
+            continuousVoiceManager.onTranscriptionUpdate = { partial in
+                // Mirror the transcribed partials into the input field live
+                inputText = partial
+            }
+            continuousVoiceManager.onSubmitMessage = { transcribedText in
+                inputText = transcribedText
+                sendMessage()
+            }
+            continuousVoiceManager.onCancelRequest = {
+                stopStreaming()
             }
 
             Task {
@@ -592,17 +605,29 @@ struct ChatView: View {
                 }
             }
 
-            // Handle voice mode response - only speak if in full audio mode
-            if voiceManager.voiceMode == .fullAudio,
-                let lastMessage = messages.last,
-                lastMessage.role == .assistant,
-                let textContent = lastMessage.content.first(where: {
-                    if case .text = $0 { return true } else { return false }
-                }),
-                case .text(let content) = textContent
-            {
-                print("🎤 Speaking response in full audio mode")
-                voiceManager.speakResponse(content.text)
+            // Handle voice output on finish
+            if let lastMessage = messages.last,
+               lastMessage.role == .assistant,
+               let textContent = lastMessage.content.first(where: { if case .text = $0 { return true } else { return false } }),
+               case .text(let content) = textContent {
+                if voiceManager.voiceMode == .fullAudio {
+                    print("🎤 Speaking response in full audio mode")
+                    voiceManager.speakResponse(content.text)
+                } else if continuousVoiceManager.isVoiceMode {
+                    print("🎤 Speaking response in continuous mode")
+                    continuousVoiceManager.speakResponse(content.text)
+                }
+            } else {
+                // If no assistant text, ensure continuous returns to listening
+                if continuousVoiceManager.isVoiceMode {
+                    print("ℹ️ No assistant text found; ensuring continuous returns to listening")
+                    // Kick listening if stuck in processing with no TTS
+                    Task { @MainActor in
+                        if continuousVoiceManager.state == .processing {
+                            continuousVoiceManager.handleUserInteraction() // this stops any speech and resumes listening
+                        }
+                    }
+                }
             }
 
         case .modelChange(let modelEvent):
@@ -1174,5 +1199,5 @@ struct CompletedToolCall {
 
 #Preview {
     ChatView(
-        showingSidebar: .constant(false), onBackToWelcome: {}, voiceManager: EnhancedVoiceManager())
+        showingSidebar: .constant(false), onBackToWelcome: {}, voiceManager: EnhancedVoiceManager(), continuousVoiceManager: ContinuousVoiceManager())
 }

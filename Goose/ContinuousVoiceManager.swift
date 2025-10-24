@@ -10,6 +10,7 @@ class ContinuousVoiceManager: ObservableObject {
     @Published var state: VoiceState = .idle
     @Published var transcribedText = ""
     @Published var errorMessage: String?
+    @Published var currentVolume: Float = 0.0  // RMS volume level 0.0-1.0 for UI feedback
     
     // MARK: - State Enum
     enum VoiceState: String {
@@ -48,16 +49,23 @@ class ContinuousVoiceManager: ObservableObject {
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var speechCoordinator: SpeechCoordinator?  // Keep strong reference
     
-    // Silence detection
+    // RMS-based silence detection
     private var silenceTimer: Timer?
     private var lastSpeechTime = Date()
     private var hasDetectedSpeech = false
-    private let silenceThreshold: TimeInterval = 1.5
+    private let silenceThreshold: TimeInterval = 0.8  // Reduced for faster response
+    private var volumeHistory: [Float] = []
+    private let volumeHistorySize = 10  // ~0.5 second of history
+    private let silenceVolumeThreshold: Float = 0.03  // Volume level that counts as speech
     
-    // Audio feedback
+    // Stop word detection
+    private let stopWords = ["goose", "hey goose", "stop", "cancel"]
+    private var lastStopWordCheck = Date()
     
-    // Callback for sending messages
-    var onSubmitMessage: ((String) -> Void)?
+    // Callbacks
+    var onTranscriptionUpdate: ((String) -> Void)?  // Live partials for UI
+    var onSubmitMessage: ((String) -> Void)?        // Finalized phrase submission
+    var onCancelRequest: (() -> Void)?              // For cancelling API requests
     
     // MARK: - Initialization
     init() {
@@ -114,20 +122,17 @@ class ContinuousVoiceManager: ObservableObject {
         }
         
         print("🎤 Speaking response: \(text.prefix(50))...")
+        
+        // Keep listening running so we can detect "stop" commands during speech
+        // The .playAndRecord audio session with .voiceChat mode provides echo cancellation
         state = .speaking
         playSound(.responseReady)
         
         // Clean the text for speech
         let cleanedText = cleanTextForSpeech(text)
         
-        // Configure audio session
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .spokenAudio, options: .duckOthers)
-            try audioSession.setActive(true)
-        } catch {
-            print("Failed to configure audio for playback: \(error)")
-        }
+        // Don't change audio session - keep it in .playAndRecord mode so we can still hear "stop" commands
+        // The audio session was already configured in startListening() with echo cancellation
         
         let utterance = AVSpeechUtterance(string: cleanedText)
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
@@ -152,22 +157,25 @@ class ContinuousVoiceManager: ObservableObject {
                 transcribedText = ""
                 hasDetectedSpeech = false
                 lastSpeechTime = Date()
+                volumeHistory.removeAll()
                 state = .listening
                 
                 playSound(.startListening)
                 
-                // Configure audio session
+                // Configure audio session with better settings for continuous mode
                 let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+                // Use playAndRecord with voiceChat mode for echo cancellation
+                try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothA2DP])
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
                 
-                // Create recognition request
+                // Create recognition request with on-device recognition
                 recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
                 guard let recognitionRequest = recognitionRequest else {
                     throw VoiceError.recognitionRequestFailed
                 }
                 
                 recognitionRequest.shouldReportPartialResults = true
+                recognitionRequest.requiresOnDeviceRecognition = true  // Privacy + speed
                 
                 // Setup audio engine
                 audioEngine = AVAudioEngine()
@@ -178,9 +186,14 @@ class ContinuousVoiceManager: ObservableObject {
                 let inputNode = audioEngine.inputNode
                 let recordingFormat = inputNode.outputFormat(forBus: 0)
                 
-                // Install tap
-                inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+                // Install tap with RMS calculation
+                inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
                     recognitionRequest.append(buffer)
+                    
+                    // Calculate RMS volume level
+                    Task { @MainActor in
+                        self?.calculateAndUpdateRMS(buffer: buffer)
+                    }
                 }
                 
                 audioEngine.prepare()
@@ -232,6 +245,12 @@ class ContinuousVoiceManager: ObservableObject {
                     if !hasDetectedSpeech {
                         hasDetectedSpeech = true
                     }
+                    
+                    // Mirror partials to UI
+                    onTranscriptionUpdate?(newText)
+                    
+                    // Check for stop words (interrupt commands)
+                    checkForStopWords(in: newText)
                 }
                 
                 // Check if recognition has finalized
@@ -283,7 +302,7 @@ class ContinuousVoiceManager: ObservableObject {
         transcribedText = ""
         hasDetectedSpeech = false
         
-        stopListening()
+        // Do NOT stop listening in continuous mode; keep the mic hot for stop-words
         state = .processing
         playSound(.submit)
         
@@ -379,6 +398,105 @@ class ContinuousVoiceManager: ObservableObject {
         cleaned = cleaned.replacingOccurrences(of: "[❌✅🚨📝🔧⚠️🛑→]", with: "", options: .regularExpression)
         
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - RMS Volume Calculation
+    private func calculateAndUpdateRMS(buffer: AVAudioPCMBuffer) {
+        guard let channelData = buffer.floatChannelData?[0] else { return }
+        let frameLength = Int(buffer.frameLength)
+        
+        // Calculate RMS (Root Mean Square)
+        var sum: Float = 0.0
+        for i in 0..<frameLength {
+            let sample = channelData[i]
+            sum += sample * sample
+        }
+        let rms = sqrtf(sum / Float(frameLength))
+        
+        // Normalize and smooth
+        let normalizedRMS = min(rms * 10.0, 1.0)  // Scale up and cap at 1.0
+        currentVolume = normalizedRMS * 0.7 + currentVolume * 0.3  // Smoothing
+        
+        // Track volume history for silence detection
+        volumeHistory.append(normalizedRMS)
+        if volumeHistory.count > volumeHistorySize {
+            volumeHistory.removeFirst()
+        }
+    }
+    
+    private func isVolumeSilent() -> Bool {
+        guard volumeHistory.count >= volumeHistorySize / 2 else { return false }
+        let recentVolumes = volumeHistory.suffix(volumeHistorySize / 2)
+        let avgVolume = recentVolumes.reduce(0.0, +) / Float(recentVolumes.count)
+        return avgVolume < silenceVolumeThreshold
+    }
+    
+    // MARK: - Stop Word Detection
+    private func checkForStopWords(in text: String) {
+        // Throttle checks to avoid too frequent processing
+        let now = Date()
+        guard now.timeIntervalSince(lastStopWordCheck) > 0.3 else { return }
+        lastStopWordCheck = now
+        
+        let lowercased = text.lowercased()
+        let words = lowercased.split(separator: " ")
+        let lastFewWords = words.suffix(3).joined(separator: " ")
+        
+        for stopWord in stopWords {
+            if lastFewWords.contains(stopWord) {
+                print("🛑 Stop word detected: '\(stopWord)' in '\(lastFewWords)'")
+                handleStopCommand(context: state)
+                return
+            }
+        }
+    }
+    
+    private func handleStopCommand(context: VoiceState) {
+        print("🛑 Handling stop command in state: \(context)")
+        playSound(.error)  // Audio feedback
+        
+        switch context {
+        case .listening:
+            // Clear current transcription and restart
+            print("🛑 Clearing transcription")
+            transcribedText = ""
+            hasDetectedSpeech = false
+            lastSpeechTime = Date()
+            volumeHistory.removeAll()
+            
+        case .processing:
+            // Cancel the pending API request
+            print("🛑 Cancelling API request")
+            onCancelRequest?()
+            transcribedText = ""
+            hasDetectedSpeech = false
+            volumeHistory.removeAll()
+            // Return to listening
+            if isVoiceMode {
+                state = .listening
+            }
+            
+        case .speaking:
+            // Stop speaking and return to listening
+            print("🛑 Stopping speech playback")
+            stopSpeaking()
+            transcribedText = ""
+            hasDetectedSpeech = false
+            volumeHistory.removeAll()
+            if isVoiceMode {
+                // Small delay before resuming listening
+                Task {
+                    try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second
+                    if isVoiceMode {
+                        startListening()
+                    }
+                }
+            }
+            
+        case .idle, .error:
+            // Nothing to do
+            break
+        }
     }
     
     // Called when speech finishes

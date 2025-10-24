@@ -17,6 +17,7 @@ struct ChatInputView: View {
     var showPlusButton: Bool = false
     var isLoading: Bool = false
     var voiceManager: EnhancedVoiceManager? = nil
+    var continuousVoiceManager: ContinuousVoiceManager? = nil
     var onSubmit: () -> Void
     var onStop: (() -> Void)? = nil
     
@@ -62,6 +63,7 @@ struct ChatInputView: View {
             }
             
             // Listening indicator banner (behind the input) - GROWS WITH INPUT
+            // For transcribe mode (EnhancedVoiceManager)
             if let vm = voiceManager,
                vm.voiceMode != .normal && vm.state == .listening {
                 VStack(spacing: 0) {
@@ -106,6 +108,60 @@ struct ChatInputView: View {
                 .animation(.easeInOut(duration: 0.2), value: inputHeight)
             }
             
+            // Continuous voice mode banner (ContinuousVoiceManager)
+            if let cvm = continuousVoiceManager, cvm.isVoiceMode {
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
+                        Image(systemName: cvm.state.icon)
+                            .font(.system(size: 20))
+                            .foregroundColor(cvm.state.color)
+                            .symbolEffect(.variableColor.iterative.reversing, isActive: cvm.state == .listening)
+                        
+                        Text(cvm.state.rawValue)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        // Volume indicator
+                        if cvm.state == .listening && cvm.currentVolume > 0.01 {
+                            HStack(spacing: 2) {
+                                ForEach(0..<5) { i in
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(cvm.currentVolume > Float(i) * 0.2 ? Color.green : Color.gray.opacity(0.3))
+                                        .frame(width: 3, height: CGFloat(4 + i * 2))
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
+                    
+                    // Spacer that matches the input field height
+                    Spacer()
+                        .frame(height: inputHeight)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 32)
+                        .fill(colorScheme == .dark ?
+                              Color(red: 0.15, green: 0.15, blue: 0.18) :
+                              Color(red: 0.96, green: 0.96, blue: 0.98))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32)
+                        .strokeBorder(
+                            cvm.state.color.opacity(0.3),
+                            lineWidth: 1
+                        )
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .animation(.easeInOut(duration: 0.2), value: inputHeight)
+            }
+            
+
             VStack(spacing: 0) {
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -157,19 +213,52 @@ struct ChatInputView: View {
                                     )
                             }
                             
-                            // Voice button (if voice manager provided)
+                            // Continuous voice mode indicator
+                            if let cvm = continuousVoiceManager, cvm.isVoiceMode {
+                                Text("Continuous")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.green)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color.green.opacity(0.1))
+                                    )
+                            }
+                            
+                            // Transcribe button (if voice manager provided)
                             if let vm = voiceManager {
                                 Button(action: {
+                                    // Toggle transcribe mode
                                     vm.cycleVoiceMode()
                                 }) {
-                                    Image(systemName: vm.voiceMode == .normal ? "waveform" : "waveform.circle.fill")
+                                    Image(systemName: vm.voiceMode == .normal ? "waveform" : "keyboard")
                                         .font(.system(size: 14, weight: .medium))
                                         .foregroundColor(vm.voiceMode == .normal ? .primary : .blue)
                                         .frame(width: 32, height: 32)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 16)
                                                 .inset(by: 0.5)
-                                                .stroke(Color(UIColor.separator), lineWidth: 0.5)
+                                                .stroke(vm.voiceMode == .normal ? Color(UIColor.separator) : Color.blue.opacity(0.5), lineWidth: 0.5)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            
+                            // Continuous conversation button (if continuous voice manager provided)
+                            if let cvm = continuousVoiceManager {
+                                Button(action: {
+                                    cvm.toggleVoiceMode()
+                                }) {
+                                    Image(systemName: cvm.isVoiceMode ? "mic.and.signal.meter.fill" : "mic.and.signal.meter")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(cvm.isVoiceMode ? .green : .primary)
+                                        .frame(width: 32, height: 32)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .inset(by: 0.5)
+                                                .stroke(cvm.isVoiceMode ? Color.green.opacity(0.5) : Color(UIColor.separator), lineWidth: 0.5)
                                         )
                                 }
                                 .buttonStyle(.plain)
