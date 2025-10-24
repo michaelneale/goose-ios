@@ -88,7 +88,6 @@ struct ChatView: View {
             // Only render if there's actual text content
             if hasTextContent {
                 UserMessageView(message: message)
-                    .background(Color.purple.opacity(0.15))
                     .id(message.id)
             }
         } else {
@@ -102,7 +101,6 @@ struct ChatView: View {
             if hasTextContent {
                 AssistantMessageView(message: message, completedTasks: [], sessionName: currentSessionId ?? "Current Session")
                     .id(message.id)
-                    .background(Color.yellow.opacity(0.15))
             }
         }
         
