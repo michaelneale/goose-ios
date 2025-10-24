@@ -97,6 +97,18 @@ struct MarkdownParser {
             result.append(codeText)
             result.append(AttributedString("\n\n"))
             
+        case let list as UnorderedList:
+            for child in list.children {
+                result.append(processElement(child))
+            }
+            result.append(AttributedString("\n\n"))  // Paragraph break after list
+            
+        case let list as OrderedList:
+            for child in list.children {
+                result.append(processElement(child))
+            }
+            result.append(AttributedString("\n\n"))  // Paragraph break after list
+            
         case let listItem as ListItem:
             result.append(AttributedString("• "))
             for child in listItem.children {
