@@ -320,6 +320,12 @@ struct WelcomeView: View {
                 inputText = ""
             }
             
+            // Set up transcription update callback for continuous input (audio mode)
+            voiceManager.onTranscriptionUpdate = { transcribedText in
+                // Update the input text field without sending
+                inputText = transcribedText
+            }
+            
             // Load recent sessions
             Task {
                 await loadRecentSessions()
