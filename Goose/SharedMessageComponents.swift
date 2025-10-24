@@ -107,8 +107,10 @@ struct MarkdownParser {
                 }
                 result.append(childResult)
             }
-            result.append(AttributedString("\n"))
-            
+            // Add a smaller line break for tighter spacing
+            var smallBreak = AttributedString("\n")
+            smallBreak.font = .system(size: 7)  // Half the normal 14pt font
+            result.append(smallBreak)
         default:
             if let blockElement = element as? BlockMarkup {
                 for child in blockElement.children {
