@@ -51,12 +51,18 @@ struct ChatView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(messages) { message in
-                                MessageBubbleView(
-                                    message: message,
-                                    completedTasks: getCompletedTasksForMessage(message.id),
-                                    sessionName: currentSessionId ?? "Current Session"
-                                )
-                                .id(message.id)
+                                // Use dedicated components based on message role
+                                if message.role == .user {
+                                    UserMessageView(message: message)
+                                        .id(message.id)
+                                } else {
+                                    AssistantMessageView(
+                                        message: message,
+                                        completedTasks: getCompletedTasksForMessage(message.id),
+                                        sessionName: currentSessionId ?? "Current Session"
+                                    )
+                                    .id(message.id)
+                                }
 
                                 // Show ONLY active/in-progress tool calls (completed ones are in the pill)
                                 ForEach(getToolCallsForMessage(message.id), id: \.self) {
