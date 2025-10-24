@@ -71,7 +71,7 @@ struct StackedToolCallsView: View {
             if toolCalls.count == 1 {
                 // Single tool call - show normal card (no stacking)
                 ToolCallCardView(toolCallState: toolCalls[0])
-                    .background(Color.green.opacity(0.2))
+                    
             } else {
                 // Multiple tool calls - unified view with matched geometry
                 ZStack {
@@ -139,7 +139,7 @@ struct StackedToolCallsView: View {
                     .offset(x: CGFloat(maxVisibleCards) * cardOffsetIncrement + 8)
             }
         }
-        .background(Color.green.opacity(0.2))
+        
         .padding(.trailing, 16)
         .contentShape(Rectangle())
     }
@@ -260,7 +260,7 @@ struct StackedToolCallsView: View {
             .frame(height: 160)
         }
         .padding(.horizontal, -16)
-        .background(Color.green.opacity(0.2))
+        
     }
 
 }
