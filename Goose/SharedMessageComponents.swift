@@ -102,6 +102,7 @@ struct MarkdownParser {
             for child in listItem.children {
                 result.append(processElement(child))
             }
+            result.append(AttributedString("\n"))
             
         default:
             if let blockElement = element as? BlockMarkup {
