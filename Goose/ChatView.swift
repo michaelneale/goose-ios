@@ -284,8 +284,9 @@ struct ChatView: View {
                             showingSidebar.toggle()
                         }
                     }) {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 22))
+                        Image("SideMenuIcon")
+                            .resizable()
+                            .renderingMode(.template)
                             .foregroundColor(.primary)
                             .frame(width: 24, height: 22)
                     }
