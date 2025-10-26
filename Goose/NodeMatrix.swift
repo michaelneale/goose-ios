@@ -511,23 +511,31 @@ struct NodeMatrix: View {
         let random2 = cos(Double(seed) * 1.5)
         let random3 = sin(Double(seed) * 2.3)
         
+        // X-axis: Time-based clustering (horizontal)
         let clusterCount: CGFloat = 4
         let clusterIndex = floor(timeProgress * clusterCount)
         
         let clusterCenterX = (clusterIndex + 0.5) / clusterCount
-        let clusterCenterY: CGFloat = 0.5
-        
         let clusterSpreadX: CGFloat = 0.15
-        let clusterSpreadY: CGFloat = 0.25
-        
         let offsetX = (random1 * 0.5 + 0.5) * clusterSpreadX - (clusterSpreadX / 2)
-        let offsetY = (random2 * 0.5 + 0.5) * clusterSpreadY - (clusterSpreadY / 2)
-        
         let microOffsetX = (random3 * 0.5 + 0.5) * 0.03 - 0.015
+        let xProgress = clusterCenterX + offsetX + microOffsetX
+        
+        // Y-axis: Project/directory-based lanes (vertical)
+        let uniqueProjects = Array(Set(allSessions.map { $0.groupingPath })).sorted()
+        let projectCount = max(1, uniqueProjects.count)
+        let projectIndex = uniqueProjects.firstIndex(of: session.groupingPath) ?? 0
+        
+        // Assign lane based on project
+        let laneHeight = 1.0 / CGFloat(projectCount)
+        let laneCenterY = (CGFloat(projectIndex) + 0.5) * laneHeight
+        
+        // Add some spread within the lane (less than full lane height to show clustering)
+        let laneSpread: CGFloat = min(0.20, laneHeight * 0.7) // Stay within lane boundaries
+        let offsetY = (random2 * 0.5 + 0.5) * laneSpread - (laneSpread / 2)
         let microOffsetY = (sin(random3 * 3) * 0.5 + 0.5) * 0.03 - 0.015
         
-        let xProgress = clusterCenterX + offsetX + microOffsetX
-        let yProgress = clusterCenterY + offsetY + microOffsetY
+        let yProgress = laneCenterY + offsetY + microOffsetY
         
         let x = paddingX + (availableWidth * min(max(xProgress, 0), 1))
         let y = paddingY + (availableHeight * min(max(yProgress, 0), 1))
