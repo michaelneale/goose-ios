@@ -20,6 +20,9 @@ struct ChatView: View {
     // Session polling for live updates
     @State private var isPollingForUpdates = false
     @State private var pollingTask: Task<Void, Never>?
+    
+    // Session loading state
+    @State private var isLoadingSession = false
 
     // Voice features - shared with WelcomeView
     @ObservedObject var voiceManager: EnhancedVoiceManager
@@ -121,11 +124,25 @@ struct ChatView: View {
                         }
                         
                         LazyVStack(spacing: 4) {
-                            ForEach(messagesToRender, id: \.element.id) { item in
-                                let index = item.offset
-                                let message = item.element
-                                renderMessage(index, message, toolOnlyGroups)
+                            // Show loading indicator when fetching session
+                            if isLoadingSession {
+                                VStack(spacing: 12) {
+                                    ProgressView()
+                                        .scaleEffect(1.2)
+                                    Text("Loading session...")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .padding()
+                            } else {
+                                ForEach(messagesToRender, id: \.element.id) { item in
+                                    let index = item.offset
+                                    let message = item.element
+                                    renderMessage(index, message, toolOnlyGroups)
+                                }
                             }
+                            
                             // Show "thinking" indicator if no active tool calls
                             if isLoading && activeToolCalls.isEmpty {
                                 HStack {
@@ -1214,6 +1231,12 @@ struct ChatView: View {
         }
 
         Task {
+            // Show loading indicator
+            await MainActor.run {
+                isLoadingSession = true
+                messages.removeAll()  // Clear messages while loading
+            }
+            
             do {
                 // Check if this is a demo session in trial mode
                 let isDemoSession = apiService.isTrialMode && TrialMode.shared.isDemoSession(sessionId)
@@ -1234,8 +1257,8 @@ struct ChatView: View {
                         currentSessionId = sessionId
                         
                         // Load demo messages
-                        messages.removeAll()
                         messages = demoMessages
+                        isLoadingSession = false
                         
                         print("📺 Loaded \(demoMessages.count) demo messages")
                         
@@ -1321,10 +1344,14 @@ struct ChatView: View {
                         print("🔄 Session appears to be waiting for response, starting polling...")
                         startPollingForUpdates(sessionId: resumedSessionId)
                     }
+                    
+                    // Clear loading state
+                    isLoadingSession = false
                 }
             } catch {
                 print("🚨 Failed to load session: \(error)")
                 await MainActor.run {
+                    isLoadingSession = false
                     let errorMessage = Message(
                         role: .assistant,
                         text: "❌ Failed to load session: \(error.localizedDescription)"
