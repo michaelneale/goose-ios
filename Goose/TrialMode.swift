@@ -39,7 +39,8 @@ class TrialMode {
                 description: description,
                 messageCount: messageCount,
                 createdAt: createdAt,
-                updatedAt: updatedAt
+                updatedAt: updatedAt,
+                workingDir: nil
             )
         }
     }
@@ -576,7 +577,8 @@ class TrialMode {
                     description: "Current Session",
                     messageCount: 0,  // Will be updated when loaded
                     createdAt: formatter.string(from: now),
-                    updatedAt: formatter.string(from: now)
+                    updatedAt: formatter.string(from: now),
+                    workingDir: nil
                 ))
         }
 

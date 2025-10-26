@@ -67,7 +67,8 @@ struct NodeFocus: View {
                 description: "Working on iOS app features",
                 messageCount: 12,
                 createdAt: "2024-01-15T10:30:00Z",
-                updatedAt: "2024-01-15T14:45:00Z"
+                updatedAt: "2024-01-15T14:45:00Z",
+                workingDir: "/Users/test/project"
             ),
             onDismiss: {
                 print("Dismiss tapped")

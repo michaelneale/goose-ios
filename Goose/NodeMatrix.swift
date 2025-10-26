@@ -861,12 +861,12 @@ struct DayContentView: View {
                 NodeMatrix(
                     sessions: [
                         // Today
-                        ChatSession(id: "1", description: "Small Session", messageCount: 3, createdAt: dateString(daysAgo: 0, hoursAgo: 8), updatedAt: dateString(daysAgo: 0, hoursAgo: 8)),
-                        ChatSession(id: "2", description: "Medium Session", messageCount: 15, createdAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30), updatedAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30)),
-                        ChatSession(id: "3", description: "Large Session", messageCount: 45, createdAt: dateString(daysAgo: 0, hoursAgo: 7), updatedAt: dateString(daysAgo: 0, hoursAgo: 7)),
+                        ChatSession(id: "1", description: "Small Session", messageCount: 3, createdAt: dateString(daysAgo: 0, hoursAgo: 8), updatedAt: dateString(daysAgo: 0, hoursAgo: 8), workingDir: nil),
+                        ChatSession(id: "2", description: "Medium Session", messageCount: 15, createdAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30), updatedAt: dateString(daysAgo: 0, hoursAgo: 7, minutesOffset: 30), workingDir: nil),
+                        ChatSession(id: "3", description: "Large Session", messageCount: 45, createdAt: dateString(daysAgo: 0, hoursAgo: 7), updatedAt: dateString(daysAgo: 0, hoursAgo: 7), workingDir: nil),
                         // Yesterday
-                        ChatSession(id: "4", description: "Yesterday 1", messageCount: 10, createdAt: dateString(daysAgo: 1, hoursAgo: 5), updatedAt: dateString(daysAgo: 1, hoursAgo: 5)),
-                        ChatSession(id: "5", description: "Yesterday 2", messageCount: 25, createdAt: dateString(daysAgo: 1, hoursAgo: 3), updatedAt: dateString(daysAgo: 1, hoursAgo: 3)),
+                        ChatSession(id: "4", description: "Yesterday 1", messageCount: 10, createdAt: dateString(daysAgo: 1, hoursAgo: 5), updatedAt: dateString(daysAgo: 1, hoursAgo: 5), workingDir: nil),
+                        ChatSession(id: "5", description: "Yesterday 2", messageCount: 25, createdAt: dateString(daysAgo: 1, hoursAgo: 3), updatedAt: dateString(daysAgo: 1, hoursAgo: 3), workingDir: nil),
                     ],
                     selectedSessionId: "2",
                     onNodeTap: { session, position in

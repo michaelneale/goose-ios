@@ -1412,6 +1412,7 @@ struct ChatSession: Identifiable, Codable, Equatable {
     let messageCount: Int
     let createdAt: String
     let updatedAt: String
+    let workingDir: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -1419,13 +1420,15 @@ struct ChatSession: Identifiable, Codable, Equatable {
         case messageCount = "message_count"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case workingDir = "working_dir"
     }
     
     static func == (lhs: ChatSession, rhs: ChatSession) -> Bool {
         lhs.id == rhs.id &&
         lhs.description == rhs.description &&
         lhs.messageCount == rhs.messageCount &&
-        lhs.updatedAt == rhs.updatedAt
+        lhs.updatedAt == rhs.updatedAt &&
+        lhs.workingDir == rhs.workingDir
     }
 
     // Computed properties for UI display
@@ -1441,6 +1444,18 @@ struct ChatSession: Identifiable, Codable, Equatable {
         // Parse the ISO 8601 date string
         let formatter = ISO8601DateFormatter()
         return formatter.date(from: updatedAt) ?? Date()
+    }
+    
+    // Extract just the directory name from the full path
+    var directoryName: String {
+        guard let workingDir = workingDir else { return "Unknown" }
+        let components = workingDir.split(separator: "/")
+        return String(components.last ?? "Unknown")
+    }
+    
+    // Get the full path for grouping (fallback to "Unknown" if nil)
+    var groupingPath: String {
+        return workingDir ?? "Unknown"
     }
 }
 

@@ -18,6 +18,9 @@ struct SidebarView: View {
     let isLoadingMore: Bool
     let hasMoreSessions: Bool
     
+    // Grouping mode state
+    @State private var groupByDirectory: Bool = false
+    
     // Dynamic sidebar width based on device
     private var sidebarWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
@@ -83,6 +86,54 @@ struct SidebarView: View {
             formatter.dateFormat = "EEEE, MMM d"
             return formatter.string(from: date).uppercased()
         }
+    }
+    
+    // Group sessions by working directory
+    private var groupedSessionsByDirectory: [(String, [ChatSession])] {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        // Group sessions by working directory
+        var groups: [String: [ChatSession]] = [:]
+        
+        for session in cachedSessions {
+            let path = session.groupingPath
+            
+            if groups[path] == nil {
+                groups[path] = []
+            }
+            groups[path]?.append(session)
+        }
+        
+        // Sort groups alphabetically, but put "Unknown" last
+        let sortedGroups = groups.sorted { group1, group2 in
+            if group1.key == "Unknown" { return false }
+            if group2.key == "Unknown" { return true }
+            return group1.key < group2.key
+        }
+        
+        // Return groups with formatted labels and sorted sessions
+        return sortedGroups.map { path, sessions in
+            // Extract just the directory name for the label
+            let components = path.split(separator: "/")
+            let label = String(components.last ?? "Unknown").uppercased()
+            
+            // Sort sessions within each group by updated time (newest first)
+            let sortedSessions = sessions.sorted { s1, s2 in
+                guard let date1 = formatter.date(from: s1.updatedAt),
+                      let date2 = formatter.date(from: s2.updatedAt) else {
+                    return false
+                }
+                return date1 > date2
+            }
+            
+            return (label, sortedSessions)
+        }
+    }
+    
+    // Get the appropriate grouping based on mode
+    private var currentGrouping: [(String, [ChatSession])] {
+        return groupByDirectory ? groupedSessionsByDirectory : groupedSessions
     }
 
     var body: some View {
@@ -170,9 +221,54 @@ struct SidebarView: View {
                             Color.clear
                                 .frame(height: 48)
                             
+                            // Group by toggle
+                            HStack(spacing: 8) {
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        groupByDirectory = false
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "calendar")
+                                            .font(.system(size: 12))
+                                        Text("Date")
+                                            .font(.system(size: 13, weight: groupByDirectory ? .regular : .semibold))
+                                    }
+                                    .foregroundColor(groupByDirectory ? .secondary : .primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(groupByDirectory ? Color.clear : Color(.systemGray5))
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                                
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        groupByDirectory = true
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "folder")
+                                            .font(.system(size: 12))
+                                        Text("Project")
+                                            .font(.system(size: 13, weight: groupByDirectory ? .semibold : .regular))
+                                    }
+                                    .foregroundColor(groupByDirectory ? .primary : .secondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(groupByDirectory ? Color(.systemGray5) : Color.clear)
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            
                             // Spacer to push sessions further down
                             Color.clear
-                                .frame(height: 48)
+                                .frame(height: 24)
                             
                             // Push sessions to bottom if fewer than 5
                             if cachedSessions.count < 5 {
@@ -180,14 +276,14 @@ struct SidebarView: View {
                                     .frame(height: scrollGeometry.size.height * 0.3)
                             }
 
-                            // Grouped sessions with date headers
-                            ForEach(groupedSessions, id: \.0) { dateLabel, sessions in
+                            // Grouped sessions with headers (date or directory)
+                            ForEach(currentGrouping, id: \.0) { dateLabel, sessions in
                                 // Date section header
                                 DateSectionHeader(label: dateLabel)
                                 
-                                // Sessions for this date
+                                // Sessions for this date/directory
                                 ForEach(sessions) { session in
-                                    SessionRowView(session: session)
+                                    SessionRowView(session: session, showDirectory: !groupByDirectory)
                                         .onTapGesture {
                                             onSessionSelect(session.id)
                                             withAnimation(.easeInOut(duration: 0.3)) {
@@ -304,33 +400,50 @@ struct DateSectionHeader: View {
 // MARK: - Session Row View
 struct SessionRowView: View {
     let session: ChatSession
+    var showDirectory: Bool = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Session name
-            Text(session.title)
-                .font(.system(size: 15, weight: .medium))
-                .lineLimit(1)
-                .foregroundColor(.primary)
-            
-            Spacer()
-            
-            // Time ago
-            Text(formatTime(session.updatedAt))
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-            
-            // Message count with icon
-            HStack(spacing: 4) {
-                Image("MessageIcon")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 12, height: 12)
-                    .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                // Session name
+                Text(session.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
                 
-                Text("\(session.messageCount)")
+                Spacer()
+                
+                // Time ago
+                Text(formatTime(session.updatedAt))
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
+                
+                // Message count with icon
+                HStack(spacing: 4) {
+                    Image("MessageIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 12, height: 12)
+                        .foregroundColor(.secondary)
+                    
+                    Text("\(session.messageCount)")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // Show directory path when in date mode
+            if showDirectory, let workingDir = session.workingDir {
+                HStack(spacing: 4) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                    Text(workingDir)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
         }
         .padding(.horizontal, 16)

@@ -187,7 +187,8 @@ struct SessionsCard: View {
                     description: "Building a SwiftUI app with node visualization",
                     messageCount: 42,
                     createdAt: formatter.string(from: twoHoursAgo),
-                    updatedAt: formatter.string(from: twoHoursAgo)
+                    updatedAt: formatter.string(from: twoHoursAgo),
+                    workingDir: nil
                 ),
                 onClose: {
                     print("Close tapped")
