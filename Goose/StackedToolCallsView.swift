@@ -9,8 +9,6 @@
 import SwiftUI
 
 /// Represents a tool call that can be either active or completed
-/// Represents a tool call that can be either active or completed
-/// Represents a tool call that can be either active or completed
 enum ToolCallState: Identifiable {
     case active(id: String, timing: ToolCallWithTiming)
     case completed(id: String, completed: CompletedToolCall)
@@ -42,8 +40,6 @@ enum ToolCallState: Identifiable {
     }
 }
 
-/// Main container for tool call stacking
-/// Handles single card vs stacked cards vs expanded carousel
 /// Main container for tool call stacking
 /// Handles single card vs stacked cards vs expanded carousel
 struct StackedToolCallsView: View {
