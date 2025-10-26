@@ -52,12 +52,7 @@ struct ChatView: View {
     @ViewBuilder
     private func renderGroupedMessage(_ index: Int, _ message: Message, _ group: (startIndex: Int, messageIds: [String], indices: [Int])) -> some View {
         let groupedToolCalls = getToolCallsForGroup(messageIds: group.messageIds)
-        let hasTextContent = message.content.contains { content in
-            if case .text(let textContent) = content {
-                return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            }
-            return false
-        }
+        let hasTextContent = message.hasNonEmptyTextContent  // Cache this check
         
         if hasTextContent {
             VStack(alignment: .leading, spacing: 8) {
@@ -76,28 +71,13 @@ struct ChatView: View {
     @ViewBuilder
     private func renderRegularMessage(_ message: Message) -> some View {
         if message.role == .user {
-            // Check if user message has actual text content
-            let hasTextContent = message.content.contains { content in
-                if case .text(let textContent) = content {
-                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                }
-                return false
-            }
-            
             // Only render if there's actual text content
-            if hasTextContent {
+            if message.hasNonEmptyTextContent {
                 UserMessageView(message: message)
                     .id(message.id)
             }
         } else {
-            let hasTextContent = message.content.contains { content in
-                if case .text(let textContent) = content {
-                    return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                }
-                return false
-            }
-            
-            if hasTextContent {
+            if message.hasNonEmptyTextContent {
                 AssistantMessageView(message: message, completedTasks: [], sessionName: currentSessionId ?? "Current Session")
                     .id(message.id)
             }
@@ -140,7 +120,7 @@ struct ChatView: View {
                             !isPartOfGroup(messageIndex: index, groups: toolOnlyGroups)
                         }
                         
-                        LazyVStack(spacing: 0) {
+                        LazyVStack(spacing: 4) {
                             ForEach(messagesToRender, id: \.element.id) { item in
                                 let index = item.offset
                                 let message = item.element

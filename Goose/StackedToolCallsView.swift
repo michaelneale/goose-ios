@@ -106,7 +106,6 @@ struct StackedToolCallsView: View {
                 ToolCallCardView(
                     toolCallState: call,
                     onTap: {
-                        print("🎯 Card tapped in stack - expanding to carousel")
                         isExpanded = true
                     }
                 )
@@ -137,7 +136,7 @@ struct StackedToolCallsView: View {
                     .offset(x: CGFloat(maxVisibleCards) * cardOffsetIncrement + 8)
             }
         }
-        
+        .drawingGroup() // Composite stacked cards as single layer for better performance
         .padding(.trailing, 16)
         .contentShape(Rectangle())
     }

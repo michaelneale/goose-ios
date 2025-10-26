@@ -31,14 +31,23 @@ struct MarkdownText: View {
             }
         }
         .onChange(of: text) { _, newText in
-            // Only reparse if text changed significantly
-            if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
+            // Improved streaming: only reparse if text structure changed
+            if !newText.hasPrefix(previousText) {
+                // Text was modified (not appended) - full reparse needed
                 cachedAttributedText = MarkdownParser.parse(newText)
             } else if newText != previousText {
-                // For streaming: append efficiently
+                // Text was appended - efficient delta parsing
+                let delta = String(newText.dropFirst(previousText.count))
                 if let cached = cachedAttributedText {
-                    let newPart = String(newText.dropFirst(previousText.count))
-                    cachedAttributedText = cached + AttributedString(newPart)
+                    // Simple append for streaming - only reparse if delta contains markdown syntax
+                    if delta.contains("**") || delta.contains("*") || delta.contains("`") || 
+                       delta.contains("[") || delta.contains("#") || delta.contains("\n\n") {
+                        // Markdown syntax detected - reparse to maintain formatting
+                        cachedAttributedText = MarkdownParser.parse(newText)
+                    } else {
+                        // Plain text - just append efficiently
+                        cachedAttributedText = cached + AttributedString(delta)
+                    }
                 } else {
                     cachedAttributedText = MarkdownParser.parse(newText)
                 }
