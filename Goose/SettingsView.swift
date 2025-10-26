@@ -4,11 +4,14 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var apiService = GooseAPIService.shared
     @EnvironmentObject var configurationHandler: ConfigurationHandler
+    @StateObject private var serverStorage = ServerStorage.shared
 
     @State private var baseURL: String = ""
     @State private var secretKey: String = ""
     @State private var isTestingConnection = false
     @State private var showResetConfirmation = false
+    @State private var showSaveServerDialog = false
+    @State private var serverName = ""
 
     var body: some View {
         NavigationView {
@@ -67,6 +70,25 @@ struct SettingsView: View {
                             Text("Testing connection...")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    // Save Server button (only show when connected)
+                    if apiService.isConnected {
+                        Button(action: {
+                            // Pre-populate with existing name if this server is already saved
+                            if let existing = serverStorage.getServerFromCurrentDefaults() {
+                                serverName = existing.name ?? ""
+                            } else {
+                                serverName = ""
+                            }
+                            showSaveServerDialog = true
+                        }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.down")
+                                Text("Save Server")
+                            }
+                            .foregroundColor(.blue)
                         }
                     }
                 }
@@ -134,6 +156,18 @@ struct SettingsView: View {
                 loadSettings()
             }
         }
+        .alert("Save Server", isPresented: $showSaveServerDialog) {
+            TextField("Server Name (optional)", text: $serverName)
+            Button("Cancel", role: .cancel) {
+                serverName = ""
+            }
+            Button("Save") {
+                configurationHandler.saveCurrentConfigurationAsServer(withName: serverName.isEmpty ? nil : serverName)
+                serverName = ""
+            }
+        } message: {
+            Text("Give this server a name to easily identify it later")
+        }
     }
 
     private func loadSettings() {
@@ -144,6 +178,9 @@ struct SettingsView: View {
     private func saveSettings() {
         UserDefaults.standard.set(baseURL, forKey: "goose_base_url")
         UserDefaults.standard.set(secretKey, forKey: "goose_secret_key")
+        
+        // Ensure the configuration is added to the server list
+        ServerStorage.shared.ensureCurrentServerInList()
         
         // Post notification to refresh sessions when URL changes
         NotificationCenter.default.post(name: Notification.Name("RefreshSessions"), object: nil)
