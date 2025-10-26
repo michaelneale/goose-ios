@@ -7,7 +7,7 @@ struct UserMessageView: View {
     private enum Constants {
         static let cornerRadius: CGFloat = 16
         static let fontSize: CGFloat = 16
-        static let padding = EdgeInsets(top: 8, leading: 12, bottom: -8, trailing: 12)
+        static let padding = EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
         static let horizontalMargin: CGFloat = 12
     }
     

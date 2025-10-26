@@ -12,14 +12,14 @@ struct MarkdownText: View {
         Group {
             if isUserMessage {
                 Text(cachedAttributedText ?? AttributedString(text))
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundColor(.white)
                     .lineLimit(nil)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(cachedAttributedText ?? AttributedString(text))
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .multilineTextAlignment(.leading)
                     .textSelection(.enabled)
             }
@@ -31,14 +31,23 @@ struct MarkdownText: View {
             }
         }
         .onChange(of: text) { _, newText in
-            // Only reparse if text changed significantly
-            if !newText.hasPrefix(previousText) || newText.count - previousText.count > 50 {
+            // Improved streaming: only reparse if text structure changed
+            if !newText.hasPrefix(previousText) {
+                // Text was modified (not appended) - full reparse needed
                 cachedAttributedText = MarkdownParser.parse(newText)
             } else if newText != previousText {
-                // For streaming: append efficiently
+                // Text was appended - efficient delta parsing
+                let delta = String(newText.dropFirst(previousText.count))
                 if let cached = cachedAttributedText {
-                    let newPart = String(newText.dropFirst(previousText.count))
-                    cachedAttributedText = cached + AttributedString(newPart)
+                    // Simple append for streaming - only reparse if delta contains markdown syntax
+                    if delta.contains("**") || delta.contains("*") || delta.contains("`") || 
+                       delta.contains("[") || delta.contains("#") || delta.contains("\n\n") {
+                        // Markdown syntax detected - reparse to maintain formatting
+                        cachedAttributedText = MarkdownParser.parse(newText)
+                    } else {
+                        // Plain text - just append efficiently
+                        cachedAttributedText = cached + AttributedString(delta)
+                    }
                 } else {
                     cachedAttributedText = MarkdownParser.parse(newText)
                 }
@@ -59,6 +68,11 @@ struct MarkdownParser {
             attributedString.append(processElement(child))
         }
         
+        // Trim trailing newlines for cleaner output
+        while attributedString.characters.last == "\n" {
+            attributedString = AttributedString(attributedString.characters.dropLast())
+        }
+        
         return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
     }
     
@@ -72,7 +86,7 @@ struct MarkdownParser {
                     result.append(processInline(inlineChild))
                 }
             }
-            result.append(AttributedString("\n"))
+            result.append(AttributedString("\n\n"))
             
         case let heading as Heading:
             var headingText = AttributedString()
@@ -81,23 +95,43 @@ struct MarkdownParser {
                     headingText.append(processInline(inlineChild))
                 }
             }
-            headingText.font = .system(size: max(20 - CGFloat(heading.level) * 2, 14), weight: .bold)
+            headingText.font = .system(size: max(18 - CGFloat(heading.level) * 2, 14), weight: .bold)
             result.append(headingText)
-            result.append(AttributedString("\n"))
+            result.append(AttributedString("\n\n"))
             
         case let codeBlock as CodeBlock:
             var codeText = AttributedString(codeBlock.code)
-            codeText.font = .monospaced(.body)()
+            codeText.font = .system(size: 14, design: .monospaced)
             codeText.backgroundColor = .secondary.opacity(0.1)
             result.append(codeText)
-            result.append(AttributedString("\n"))
+            result.append(AttributedString("\n\n"))
+            
+        case let list as UnorderedList:
+            for child in list.children {
+                result.append(processElement(child))
+            }
+            result.append(AttributedString("\n\n"))  // Paragraph break after list
+            
+        case let list as OrderedList:
+            for child in list.children {
+                result.append(processElement(child))
+            }
+            result.append(AttributedString("\n\n"))  // Paragraph break after list
             
         case let listItem as ListItem:
             result.append(AttributedString("• "))
             for child in listItem.children {
-                result.append(processElement(child))
+                var childResult = processElement(child)
+                // Strip trailing newlines from list item content
+                while childResult.characters.last == "\n" {
+                    childResult = AttributedString(childResult.characters.dropLast())
+                }
+                result.append(childResult)
             }
-            
+            // Add a smaller line break for tighter spacing
+            var smallBreak = AttributedString("\n")
+            smallBreak.font = .system(size: 7)  // Half the normal 14pt font
+            result.append(smallBreak)
         default:
             if let blockElement = element as? BlockMarkup {
                 for child in blockElement.children {
@@ -121,7 +155,7 @@ struct MarkdownParser {
                     strongText.append(processInline(inlineChild))
                 }
             }
-            strongText.font = .body.bold()
+            strongText.font = .system(size: 14, weight: .bold)
             return strongText
             
         case let emphasis as Emphasis:
@@ -131,12 +165,12 @@ struct MarkdownParser {
                     emphasisText.append(processInline(inlineChild))
                 }
             }
-            emphasisText.font = .body.italic()
+            emphasisText.font = .system(size: 14).italic()
             return emphasisText
             
         case let inlineCode as InlineCode:
             var codeText = AttributedString(inlineCode.code)
-            codeText.font = .monospaced(.body)()
+            codeText.font = .system(size: 14, design: .monospaced)
             codeText.backgroundColor = .secondary.opacity(0.1)
             return codeText
             
@@ -189,56 +223,80 @@ struct FullTextOverlay: View {
 }
 
 // MARK: - Tool Call Progress View
+
 struct ToolCallProgressView: View {
     let toolCall: ToolCall
     
     var body: some View {
-        VStack(alignment: .center, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header with tool name and spinner
             HStack(spacing: 8) {
                 ProgressView()
                     .scaleEffect(0.7)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(toolCall.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    if let firstArgument = getFirstArgument() {
-                        Text(firstArgument)
-                            .font(.caption2)
-                            .monospaced()
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
+                Text(toolCall.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
                 
                 Spacer()
             }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                    )
-            )
             
+            // Arguments snippet
+            if !toolCall.arguments.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(getArgumentSnippets()), id: \.key) { item in
+                        HStack(alignment: .top, spacing: 4) {
+                            Text("\(item.key):")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                            
+                            Text(item.value)
+                                .font(.caption2)
+                                .monospaced()
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                            
+                            Spacer()
+                        }
+                    }
+                }
+                .padding(.leading, 24) // Align with text after spinner
+            }
+            
+            // Status text
             Text("executing...")
                 .font(.caption2)
                 .foregroundColor(.secondary)
+                .padding(.leading, 24)
         }
-        .frame(maxWidth: UIScreen.main.bounds.width * 0.6)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
     }
     
-    private func getFirstArgument() -> String? {
-        guard let firstKey = toolCall.arguments.keys.sorted().first,
-              let firstValue = toolCall.arguments[firstKey] else {
-            return nil
-        }
+    private func getArgumentSnippets() -> [(key: String, value: String)] {
+        let maxArgs = 3 // Show up to 3 arguments
+        let maxValueLength = 40 // Truncate values longer than this
         
-        let valueString = String(describing: firstValue.value)
-        return valueString.count > 50 ? String(valueString.prefix(50)) + "..." : valueString
+        return toolCall.arguments
+            .sorted { $0.key < $1.key }
+            .prefix(maxArgs)
+            .map { key, value in
+                let valueString = String(describing: value.value)
+                let truncated = valueString.count > maxValueLength 
+                    ? String(valueString.prefix(maxValueLength)) + "..." 
+                    : valueString
+                return (key: key, value: truncated)
+            }
     }
 }
+

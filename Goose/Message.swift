@@ -83,6 +83,16 @@ struct Message: Identifiable, Codable {
         self.display = true
         self.sendToLLM = true
     }
+    
+    /// Cached check for non-empty text content to avoid repeated computation in view body
+    var hasNonEmptyTextContent: Bool {
+        content.contains { content in
+            if case .text(let textContent) = content {
+                return !textContent.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            return false
+        }
+    }
 }
 
 enum MessageRole: String, Codable {
