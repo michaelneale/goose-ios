@@ -132,8 +132,6 @@ struct ChatView: View {
                 // Messages scroll view with proper constraints
                 ScrollViewReader { proxy in
                     ScrollView {
-
-                        // Group consecutive tool-only messages
                         // Group consecutive tool-only messages
                         let toolOnlyGroups = groupConsecutiveToolOnlyMessages(messages)
 
