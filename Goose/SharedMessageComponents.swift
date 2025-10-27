@@ -970,15 +970,13 @@ struct CodeBlockView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header with language badge and copy button
             HStack {
-                if let language = codeBlock.language, !language.isEmpty {
-                    Text(language.uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(languageColor)
-                        .cornerRadius(4)
-                }
+                Text((codeBlock.language?.isEmpty == false ? codeBlock.language! : "text").uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(languageColor)
+                    .cornerRadius(4)
                 
                 Spacer()
                 
@@ -1050,7 +1048,7 @@ struct CodeBlockView: View {
             return Color(red: 0.2, green: 0.5, blue: 0.9)
         case "sql":
             return Color.indigo
-        case "markdown", "md":
+        case "text", "markdown", "md":
             return Color.gray
         default:
             return Color.gray
@@ -1075,3 +1073,4 @@ struct CodeBlockView: View {
 }
 
 
+}
