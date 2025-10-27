@@ -271,6 +271,8 @@ struct MarkdownParser {
                 alignments.append(.center)
             case .right:
                 alignments.append(.trailing)
+            default:
+                alignments.append(.leading)
             }
         }
         
