@@ -2,12 +2,13 @@ import SwiftUI
 import Markdown
 
 
-// MARK: - Markdown Text View with Table Support
+// MARK: - Markdown Text View with Table and Code Block Support
 struct MarkdownText: View {
     let text: String
     var isUserMessage: Bool = false
     @State private var cachedAttributedText: AttributedString?
     @State private var tables: [TableData] = []
+    @State private var codeBlocks: [CodeBlockData] = []
     @State private var previousText = ""
     
     var body: some View {
@@ -31,6 +32,11 @@ struct MarkdownText: View {
                 }
             }
             
+            // Render code blocks
+            ForEach(codeBlocks) { codeBlock in
+                CodeBlockView(codeBlock: codeBlock)
+            }
+            
             // Render tables - they handle their own positioning and scrolling
             ForEach(tables) { table in
                 MarkdownTableView(tableData: table)
@@ -47,9 +53,11 @@ struct MarkdownText: View {
             // For streaming, check if we need to reparse
             let hasTable = newText.contains("|") && newText.contains("---")
             let hadTable = previousText.contains("|") && previousText.contains("---")
+            let hasCodeBlock = newText.contains("```")
+            let hadCodeBlock = previousText.contains("```")
             
-            if !newText.hasPrefix(previousText) || (hasTable && !hadTable) {
-                // Text changed significantly or table detected - reparse
+            if !newText.hasPrefix(previousText) || (hasTable && !hadTable) || (hasCodeBlock && !hadCodeBlock) {
+                // Text changed significantly or special content detected - reparse
                 withAnimation(.easeOut(duration: 0.15)) {
                     parseContent()
                 }
@@ -78,11 +86,12 @@ struct MarkdownText: View {
     }
     
     private func parseContent() {
-        // Extract tables first
+        // Extract tables and code blocks first
         tables = MarkdownParser.extractTables(text)
+        codeBlocks = MarkdownParser.extractCodeBlocks(text)
         
-        // Parse the rest as attributed string (tables will be skipped)
-        cachedAttributedText = MarkdownParser.parseWithoutTables(text)
+        // Parse the rest as attributed string (tables and code blocks will be skipped)
+        cachedAttributedText = MarkdownParser.parseWithoutTablesAndCodeBlocks(text)
         previousText = text
     }
 }
@@ -321,6 +330,54 @@ struct MarkdownParser {
         
         return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
     }
+    
+    // MARK: - Code Block Support
+    
+    /// Extract all code blocks from markdown text
+    static func extractCodeBlocks(_ text: String) -> [CodeBlockData] {
+        let document = Document(parsing: text)
+        var codeBlocks: [CodeBlockData] = []
+        
+        func findCodeBlocks(in element: Markup) {
+            if let codeBlock = element as? CodeBlock {
+                let language = codeBlock.language
+                codeBlocks.append(CodeBlockData(code: codeBlock.code, language: language))
+            }
+            
+            // Recursively search children
+            for child in element.children {
+                findCodeBlocks(in: child)
+            }
+        }
+        
+        for child in document.children {
+            findCodeBlocks(in: child)
+        }
+        
+        return codeBlocks
+    }
+    
+    /// Parse markdown without rendering code blocks (they'll be rendered separately)
+    static func parseWithoutTablesAndCodeBlocks(_ text: String) -> AttributedString {
+        let trimmedText = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let document = Document(parsing: trimmedText)
+        
+        var attributedString = AttributedString()
+        for child in document.children {
+            // Skip tables and code blocks - they'll be rendered as SwiftUI views
+            if child is Markdown.Table || child is CodeBlock {
+                continue
+            }
+            attributedString.append(processElement(child))
+        }
+        
+        // Trim trailing newlines
+        while attributedString.characters.last == "\n" {
+            attributedString = AttributedString(attributedString.characters.dropLast())
+        }
+        
+        return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
+    }
 }
 // MARK: - Full Text Overlay
 struct FullTextOverlay: View {
@@ -428,3 +485,66 @@ struct ToolCallProgressView: View {
     }
 }
 
+
+// MARK: - Code Block Data Model
+
+struct CodeBlockData: Hashable, Identifiable {
+    let id = UUID()
+    let code: String
+    let language: String?
+    
+    init(code: String, language: String? = nil) {
+        self.code = code
+        self.language = language
+    }
+}
+
+// MARK: - Code Block View Component
+
+struct CodeBlockView: View {
+    let codeBlock: CodeBlockData
+    @Environment(\.colorScheme) var colorScheme
+    
+    private let fontSize: CGFloat = 13
+    private let padding: CGFloat = 12
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 0) {
+                // Language label if available
+                if let language = codeBlock.language, !language.isEmpty {
+                    Text(language)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, padding)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                }
+                
+                // Code content
+                Text(codeBlock.code)
+                    .font(.system(size: fontSize, design: .monospaced))
+                    .foregroundColor(.primary)
+                    .padding(padding)
+                    .textSelection(.enabled)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(backgroundColor)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+    
+    private var backgroundColor: Color {
+        colorScheme == .dark 
+            ? Color(.systemGray6) 
+            : Color(.systemGray6).opacity(0.5)
+    }
+    
+    private var borderColor: Color {
+        Color(.systemGray4).opacity(0.5)
+    }
+}
