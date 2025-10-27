@@ -18,10 +18,10 @@ struct SidebarView: View {
     let isLoadingMore: Bool
     let hasMoreSessions: Bool
     
-    @StateObject private var serverStorage = ServerStorage.shared
+    @StateObject private var agentStorage = AgentStorage.shared
     @State private var showingRenameDialog = false
-    @State private var serverToRename: ServerConfiguration?
-    @State private var newServerName = ""
+    @State private var agentToRename: AgentConfiguration?
+    @State private var newAgentName = ""
     
     // Dynamic sidebar width based on device
     private var sidebarWidth: CGFloat {
@@ -142,7 +142,7 @@ struct SidebarView: View {
                     GeometryReader { scrollGeometry in
                         ScrollView {
                             LazyVStack(spacing: 0) {
-                            // Server section header
+                            // Agent section header
                             HStack(spacing: 12) {
                                 Image("ServerIcon")
                                     .resizable()
@@ -150,7 +150,7 @@ struct SidebarView: View {
                                     .frame(width: 13, height: 13)
                                     .foregroundColor(.primary)
                                 
-                                Text("Servers")
+                                Text("Agents")
                                     .font(.system(size: 15, weight: .medium))
                                     .foregroundColor(.primary)
                                 
@@ -161,14 +161,14 @@ struct SidebarView: View {
                             .frame(maxWidth: .infinity)
                             .background(Color(.systemBackground))
                             
-                            // Server list
-                            if serverStorage.savedServers.isEmpty {
+                            // Agent list
+                            if agentStorage.savedAgents.isEmpty {
                                 // Empty state
                                 VStack(spacing: 8) {
-                                    Text("No saved servers")
+                                    Text("No saved agents")
                                         .font(.system(size: 14))
                                         .foregroundColor(.secondary)
-                                    Text("Configure a server in Settings to save it")
+                                    Text("Configure an agent in Settings to save it")
                                         .font(.system(size: 12))
                                         .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
@@ -177,23 +177,23 @@ struct SidebarView: View {
                                 .padding(.vertical, 24)
                                 .padding(.horizontal, 16)
                             } else {
-                                ForEach(serverStorage.savedServers) { server in
-                                    ServerRowView(
-                                        server: server,
-                                        isCurrent: serverStorage.currentServerId == server.id,
+                                ForEach(agentStorage.savedAgents) { agent in
+                                    AgentRowView(
+                                        agent: agent,
+                                        isCurrent: agentStorage.currentAgentId == agent.id,
                                         onTap: {
-                                            ConfigurationHandler.shared.switchToServer(server)
+                                            ConfigurationHandler.shared.switchToAgent(agent)
                                             withAnimation(.easeInOut(duration: 0.3)) {
                                                 isShowing = false
                                             }
                                         },
                                         onRename: {
-                                            serverToRename = server
-                                            newServerName = server.name ?? ""
+                                            agentToRename = agent
+                                            newAgentName = agent.name ?? ""
                                             showingRenameDialog = true
                                         },
                                         onDelete: {
-                                            serverStorage.deleteServer(server)
+                                            agentStorage.deleteAgent(agent)
                                         }
                                     )
                                     Divider()
@@ -202,7 +202,7 @@ struct SidebarView: View {
                                 }
                             }
                             
-                            // Spacer below server list
+                            // Spacer below agent list
                             Color.clear
                                 .frame(height: 24)
                             
@@ -310,23 +310,23 @@ struct SidebarView: View {
                 }
             }
         }
-        .alert("Rename Server", isPresented: $showingRenameDialog) {
-            TextField("Server Name", text: $newServerName)
+        .alert("Rename Agent", isPresented: $showingRenameDialog) {
+            TextField("Agent Name", text: $newAgentName)
             Button("Cancel", role: .cancel) {
-                serverToRename = nil
-                newServerName = ""
+                agentToRename = nil
+                newAgentName = ""
             }
             Button("Save") {
-                if let server = serverToRename {
-                    var updated = server
-                    updated.name = newServerName.isEmpty ? nil : newServerName
-                    serverStorage.saveServer(updated)
+                if let agent = agentToRename {
+                    var updated = agent
+                    updated.name = newAgentName.isEmpty ? nil : newAgentName
+                    agentStorage.saveAgent(updated)
                 }
-                serverToRename = nil
-                newServerName = ""
+                agentToRename = nil
+                newAgentName = ""
             }
         } message: {
-            Text("Enter a name for this server")
+            Text("Enter a name for this agent")
         }
     }
 }
@@ -403,9 +403,9 @@ struct SessionRowView: View {
     }
 }
 
-// MARK: - Server Row View
-struct ServerRowView: View {
-    let server: ServerConfiguration
+// MARK: - Agent Row View
+struct AgentRowView: View {
+    let agent: AgentConfiguration
     let isCurrent: Bool
     let onTap: () -> Void
     let onRename: () -> Void
@@ -422,12 +422,12 @@ struct ServerRowView: View {
                     .frame(width: 8, height: 8)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(server.displayName)
+                    Text(agent.displayName)
                         .font(.system(size: 15, weight: isCurrent ? .semibold : .medium))
                         .lineLimit(1)
                         .foregroundColor(.primary)
                     
-                    if let subtitle = server.subtitle {
+                    if let subtitle = agent.subtitle {
                         Text(subtitle)
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
@@ -453,7 +453,7 @@ struct ServerRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .confirmationDialog("Server Options", isPresented: $showingOptions, titleVisibility: .visible) {
+        .confirmationDialog("Agent Options", isPresented: $showingOptions, titleVisibility: .visible) {
             Button("Rename") {
                 onRename()
             }

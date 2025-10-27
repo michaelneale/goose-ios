@@ -4,14 +4,14 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var apiService = GooseAPIService.shared
     @EnvironmentObject var configurationHandler: ConfigurationHandler
-    @StateObject private var serverStorage = ServerStorage.shared
+    @StateObject private var agentStorage = AgentStorage.shared
 
     @State private var baseURL: String = ""
     @State private var secretKey: String = ""
     @State private var isTestingConnection = false
     @State private var showResetConfirmation = false
-    @State private var showSaveServerDialog = false
-    @State private var serverName = ""
+    @State private var showSaveAgentDialog = false
+    @State private var agentName = ""
 
     var body: some View {
         NavigationView {
@@ -73,20 +73,20 @@ struct SettingsView: View {
                         }
                     }
                     
-                    // Save Server button (only show when connected)
+                    // Save Agent button (only show when connected)
                     if apiService.isConnected {
                         Button(action: {
-                            // Pre-populate with existing name if this server is already saved
-                            if let existing = serverStorage.getServerFromCurrentDefaults() {
-                                serverName = existing.name ?? ""
+                            // Pre-populate with existing name if this agent is already saved
+                            if let existing = agentStorage.getAgentFromCurrentDefaults() {
+                                agentName = existing.name ?? ""
                             } else {
-                                serverName = ""
+                                agentName = ""
                             }
-                            showSaveServerDialog = true
+                            showSaveAgentDialog = true
                         }) {
                             HStack {
                                 Image(systemName: "square.and.arrow.down")
-                                Text("Save Server")
+                                Text("Save Agent")
                             }
                             .foregroundColor(.blue)
                         }
@@ -156,17 +156,17 @@ struct SettingsView: View {
                 loadSettings()
             }
         }
-        .alert("Save Server", isPresented: $showSaveServerDialog) {
-            TextField("Server Name (optional)", text: $serverName)
+        .alert("Save Agent", isPresented: $showSaveAgentDialog) {
+            TextField("Agent Name (optional)", text: $agentName)
             Button("Cancel", role: .cancel) {
-                serverName = ""
+                agentName = ""
             }
             Button("Save") {
-                configurationHandler.saveCurrentConfigurationAsServer(withName: serverName.isEmpty ? nil : serverName)
-                serverName = ""
+                configurationHandler.saveCurrentConfigurationAsAgent(withName: agentName.isEmpty ? nil : agentName)
+                agentName = ""
             }
         } message: {
-            Text("Give this server a name to easily identify it later")
+            Text("Give this agent a name to easily identify it later")
         }
     }
 
@@ -179,8 +179,8 @@ struct SettingsView: View {
         UserDefaults.standard.set(baseURL, forKey: "goose_base_url")
         UserDefaults.standard.set(secretKey, forKey: "goose_secret_key")
         
-        // Ensure the configuration is added to the server list
-        ServerStorage.shared.ensureCurrentServerInList()
+        // Ensure the configuration is added to the agent list
+        AgentStorage.shared.ensureCurrentAgentInList()
         
         // Post notification to refresh sessions when URL changes
         NotificationCenter.default.post(name: Notification.Name("RefreshSessions"), object: nil)
