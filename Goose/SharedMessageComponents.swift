@@ -170,7 +170,7 @@ struct MarkdownParser {
                     result.append(processInline(inlineChild))
                 }
             }
-            result.append(AttributedString("\n\n"))
+            result.append(AttributedString("\n"))
             
         case let heading as Heading:
             var headingText = AttributedString()
@@ -181,7 +181,7 @@ struct MarkdownParser {
             }
             headingText.font = .system(size: max(18 - CGFloat(heading.level) * 2, 14), weight: .bold)
             result.append(headingText)
-            result.append(AttributedString("\n\n"))
+            result.append(AttributedString("\n"))
             
         case let codeBlock as CodeBlock:
             var codeText = AttributedString(codeBlock.code)
