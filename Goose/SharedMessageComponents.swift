@@ -31,9 +31,12 @@ struct MarkdownText: View {
                 }
             }
             
-            // Render tables
+            // Render tables with full-bleed (break out of container padding)
             ForEach(tables) { table in
                 MarkdownTableView(tableData: table)
+                    .padding(.leading, -12)  // Offset the container's leading padding
+                    .padding(.trailing, -12) // Offset any trailing padding
+                    .frame(maxWidth: .infinity)
             }
         }
         .onAppear {
@@ -84,6 +87,7 @@ struct MarkdownText: View {
         previousText = text
     }
 }
+
 
 struct MarkdownParser {
     static func parse(_ text: String) -> AttributedString {
