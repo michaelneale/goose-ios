@@ -662,7 +662,7 @@ struct ChatView: View {
                     // Throttle to avoid excessive scrolling during rapid updates
                     if self.shouldAutoScroll {
                         let now = Date()
-                        if now.timeIntervalSince(self.lastScrollUpdate) > 0.1 {  // Throttle to 10 updates per second
+                        if now.timeIntervalSince(self.lastScrollUpdate) > 0.05 {  // Throttle to 20 updates per second for smoother scrolling
                             self.lastScrollUpdate = now
                             self.scrollRefreshTrigger = UUID()
                         }
