@@ -31,11 +31,11 @@ struct MarkdownText: View {
                 }
             }
             
-            // Render tables - aligned left with text, but extend to right edge
+            // Render tables - they handle their own positioning and scrolling
             ForEach(tables) { table in
                 MarkdownTableView(tableData: table)
-                    .padding(.trailing, -28) // Break out to right edge (12pt + 16pt)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, -28)  // Break out of container padding
+                    .padding(.trailing, -28) // Break out to allow full-width scrolling
             }
         }
         .onAppear {

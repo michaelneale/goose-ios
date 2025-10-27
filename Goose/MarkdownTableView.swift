@@ -34,6 +34,7 @@ struct MarkdownTableView: View {
     private let minCellWidth: CGFloat = 80
     private let headerFontSize: CGFloat = 14
     private let cellFontSize: CGFloat = 14
+    private let initialLeftPadding: CGFloat = 28 // Match text alignment (12pt + 16pt)
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
@@ -56,12 +57,14 @@ struct MarkdownTableView: View {
                 }
             }
             .background(backgroundColor)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(borderColor, lineWidth: 1)
+            )
+            .padding(.leading, initialLeftPadding) // Initial position aligned with text
+            .padding(.trailing, 16) // Some padding on the right
         }
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(borderColor, lineWidth: 1)
-        )
         .onAppear {
             calculateColumnWidths()
         }
