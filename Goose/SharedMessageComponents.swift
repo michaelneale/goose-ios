@@ -248,16 +248,17 @@ struct MarkdownParser {
     }
     
     /// Extract table data from a Table markup element
+
+    /// Extract table data from a Table markup element
     private static func extractTableData(from table: Markdown.Table) -> TableData? {
         var headers: [String] = []
         var rows: [[String]] = []
         var alignments: [TextAlignment] = []
         
-        // Extract headers
-        if let head = table.head {
-            for cell in head.cells {
-                headers.append(cell.plainText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
-            }
+        // Extract headers from table head
+        let head = table.head
+        for cell in head.cells {
+            headers.append(cell.plainText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
         }
         
         // Extract column alignments
@@ -270,24 +271,21 @@ struct MarkdownParser {
                 alignments.append(.center)
             case .right:
                 alignments.append(.trailing)
-            @unknown default:
-                alignments.append(.leading)
             }
         }
         
-        // Extract data rows
-        if let body = table.body {
-            for row in body.rows {
-                var rowData: [String] = []
-                for cell in row.cells {
-                    rowData.append(cell.plainText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
-                }
-                // Ensure row has same number of columns as headers
-                while rowData.count < headers.count {
-                    rowData.append("")
-                }
-                rows.append(rowData)
+        // Extract data rows from table body
+        let body = table.body
+        for row in body.rows {
+            var rowData: [String] = []
+            for cell in row.cells {
+                rowData.append(cell.plainText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
             }
+            // Ensure row has same number of columns as headers
+            while rowData.count < headers.count {
+                rowData.append("")
+            }
+            rows.append(rowData)
         }
         
         // Only return if we have headers and at least one row
@@ -295,8 +293,7 @@ struct MarkdownParser {
         
         return TableData(headers: headers, rows: rows, columnAlignments: alignments)
     }
-    
-    /// Parse markdown without rendering tables (they'll be rendered separately)
+
     static func parseWithoutTables(_ text: String) -> AttributedString {
         let trimmedText = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         let document = Document(parsing: trimmedText)
