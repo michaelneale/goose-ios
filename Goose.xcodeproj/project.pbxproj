@@ -35,6 +35,8 @@
 		BBDDB97B3661CB27DAED17A1 /* StackedToolCallsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A3D767C87B30740AC05D2 /* StackedToolCallsView.swift */; };
 		D32A01812EAA7D7300AF9DD0 /* UserMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32A01802EAA7D7300AF9DD0 /* UserMessageView.swift */; };
 		D32A01832EAA7D8100AF9DD0 /* SharedMessageComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32A01822EAA7D8100AF9DD0 /* SharedMessageComponents.swift */; };
+		EA377AE97CC0C621896375E7 /* MarkdownTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTableView.swift; sourceTree = "<group>"; };
+		8C4210473D62873842C1D790 /* MarkdownTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA377AE97CC0C621896375E7 /* MarkdownTableView.swift */; };
 		D32A01852EAA7D8F00AF9DD0 /* ToolViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32A01842EAA7D8F00AF9DD0 /* ToolViews.swift */; };
 		D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33F92EA1597B0057E748 /* WelcomeCard.swift */; };
 		D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FB2EA161BA0057E748 /* SafeAreaExtension.swift */; };
@@ -142,6 +144,7 @@
 				FE1A3D767C87B30740AC05D2 /* StackedToolCallsView.swift */,
 				D32A01802EAA7D7300AF9DD0 /* UserMessageView.swift */,
 				D32A01822EAA7D8100AF9DD0 /* SharedMessageComponents.swift */,
+				EA377AE97CC0C621896375E7 /* MarkdownTableView.swift */,
 				D32A01842EAA7D8F00AF9DD0 /* ToolViews.swift */,
 				A1234567890ABCDEF017 /* SettingsView.swift */,
 				A1234567890ABCDEF011 /* Message.swift */,
@@ -252,6 +255,7 @@
 				838F2DEC2E9E1CF700E2FC48 /* TaskDetailView.swift in Sources */,
 				C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */,
 				D32A01832EAA7D8100AF9DD0 /* SharedMessageComponents.swift in Sources */,
+				8C4210473D62873842C1D790 /* MarkdownTableView.swift in Sources */,
 				D32A01852EAA7D8F00AF9DD0 /* ToolViews.swift in Sources */,
 				D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */,
 				A1234567890ABCDEF012 /* Message.swift in Sources */,

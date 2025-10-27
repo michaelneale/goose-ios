@@ -1,6 +1,7 @@
 import SwiftUI
 import Markdown
 
+
 // MARK: - Markdown Text View with Table Support
 struct MarkdownText: View {
     let text: String
@@ -84,6 +85,7 @@ struct MarkdownText: View {
     }
 }
 
+struct MarkdownParser {
     static func parse(_ text: String) -> AttributedString {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let document = Document(parsing: trimmedText)
@@ -316,7 +318,6 @@ struct MarkdownText: View {
         return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
     }
 }
-
 // MARK: - Full Text Overlay
 struct FullTextOverlay: View {
     let content: [MessageContent]
