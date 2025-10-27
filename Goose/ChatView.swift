@@ -463,6 +463,8 @@ struct ChatView: View {
                 // Create session if we don't have one
                 if currentSessionId == nil {
                     // Always create a new session when starting from welcome screen
+                    let sessionStartTime = Date()
+                    print("⏱️ [SESSION_START] Beginning session creation")
                     print("🆕 Creating new session (trial mode: \(apiService.isTrialMode))")
                     let (sessionId, initialMessages) = try await apiService.startAgent()
                     
@@ -481,10 +483,13 @@ struct ChatView: View {
                         }
                     }
 
-                    // Read provider and model from config
-                    print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
-                    guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
-                        let model = await apiService.readConfigValue(key: "GOOSE_MODEL")
+                    // Read provider and model from config (in parallel)
+                    print("🔧 READING PROVIDER AND MODEL FROM CONFIG (parallel)")
+                    async let providerResult = apiService.readConfigValue(key: "GOOSE_PROVIDER")
+                    async let modelResult = apiService.readConfigValue(key: "GOOSE_MODEL")
+                    
+                    guard let provider = await providerResult,
+                        let model = await modelResult
                     else {
                         throw APIError.noData
                     }
@@ -494,14 +499,12 @@ struct ChatView: View {
                         sessionId: sessionId, provider: provider, model: model)
                     print("✅ PROVIDER UPDATED FOR SESSION: \(sessionId)")
 
-                    // Apply server-side prompts (desktop_prompt.md + recipe if present)
-                    print("🔧 UPDATING AGENT FROM SESSION: \(sessionId)")
-                    try await apiService.updateFromSession(sessionId: sessionId)
-                    print("✅ AGENT UPDATED FROM SESSION: \(sessionId)")
-
-                    // Load enabled extensions just like desktop does
-                    print("🔧 LOADING ENABLED EXTENSIONS FOR SESSION: \(sessionId)")
-                    try await apiService.loadEnabledExtensions(sessionId: sessionId)
+                    // Apply server-side prompts and load extensions in parallel
+                    print("🔧 STARTING AGENT UPDATE AND EXTENSION LOAD (parallel) for session: \(sessionId)")
+                    async let updateFromSessionTask: Void = apiService.updateFromSession(sessionId: sessionId)
+                    async let loadExtensionsTask: Void = apiService.loadEnabledExtensions(sessionId: sessionId)
+                    try await (updateFromSessionTask, loadExtensionsTask)
+                    print("✅ AGENT UPDATED AND EXTENSIONS LOADED for session: \(sessionId)")
 
                     currentSessionId = sessionId
                     
@@ -509,6 +512,10 @@ struct ChatView: View {
                     await MainActor.run {
                         isSessionActivated = true
                     }
+                    
+                    // Log total session creation time
+                    let totalElapsed = Date().timeIntervalSince(sessionStartTime)
+                    print("⏱️ [SESSION_START] Session ready in \(String(format: "%.2f", totalElapsed))s")
                 } else {
                     // Resuming an existing session - activate it if needed
                     if !isSessionActivated {
