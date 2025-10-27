@@ -23,6 +23,7 @@ struct ChatView: View {
     
     // Session loading state
     @State private var isLoadingSession = false
+    @State private var isSessionActivated = false  // Track if model/extensions are loaded
 
     // Voice features - shared with WelcomeView
     @ObservedObject var voiceManager: EnhancedVoiceManager
@@ -462,6 +463,8 @@ struct ChatView: View {
                 // Create session if we don't have one
                 if currentSessionId == nil {
                     // Always create a new session when starting from welcome screen
+                    let sessionStartTime = Date()
+                    print("⏱️ [SESSION_START] Beginning session creation")
                     print("🆕 Creating new session (trial mode: \(apiService.isTrialMode))")
                     let (sessionId, initialMessages) = try await apiService.startAgent()
                     
@@ -480,10 +483,13 @@ struct ChatView: View {
                         }
                     }
 
-                    // Read provider and model from config
-                    print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
-                    guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
-                        let model = await apiService.readConfigValue(key: "GOOSE_MODEL")
+                    // Read provider and model from config (in parallel)
+                    print("🔧 READING PROVIDER AND MODEL FROM CONFIG (parallel)")
+                    async let providerResult = apiService.readConfigValue(key: "GOOSE_PROVIDER")
+                    async let modelResult = apiService.readConfigValue(key: "GOOSE_MODEL")
+                    
+                    guard let provider = await providerResult,
+                        let model = await modelResult
                     else {
                         throw APIError.noData
                     }
@@ -493,16 +499,40 @@ struct ChatView: View {
                         sessionId: sessionId, provider: provider, model: model)
                     print("✅ PROVIDER UPDATED FOR SESSION: \(sessionId)")
 
-                    // Apply server-side prompts (desktop_prompt.md + recipe if present)
-                    print("🔧 UPDATING AGENT FROM SESSION: \(sessionId)")
-                    try await apiService.updateFromSession(sessionId: sessionId)
-                    print("✅ AGENT UPDATED FROM SESSION: \(sessionId)")
-
-                    // Load enabled extensions just like desktop does
-                    print("🔧 LOADING ENABLED EXTENSIONS FOR SESSION: \(sessionId)")
-                    try await apiService.loadEnabledExtensions(sessionId: sessionId)
+                    // Apply server-side prompts and load extensions in parallel
+                    print("🔧 STARTING AGENT UPDATE AND EXTENSION LOAD (parallel) for session: \(sessionId)")
+                    async let updateFromSessionTask: Void = apiService.updateFromSession(sessionId: sessionId)
+                    async let loadExtensionsTask: Void = apiService.loadEnabledExtensions(sessionId: sessionId)
+                    try await (updateFromSessionTask, loadExtensionsTask)
+                    print("✅ AGENT UPDATED AND EXTENSIONS LOADED for session: \(sessionId)")
 
                     currentSessionId = sessionId
+                    
+                    // Mark as activated since we just created it with full model/extensions
+                    await MainActor.run {
+                        isSessionActivated = true
+                    }
+                    
+                    // Log total session creation time
+                    let totalElapsed = Date().timeIntervalSince(sessionStartTime)
+                    print("⏱️ [SESSION_START] Session ready in \(String(format: "%.2f", totalElapsed))s")
+                } else {
+                    // Resuming an existing session - activate it if needed
+                    if !isSessionActivated {
+                        print("📱 Activating resumed session with model/extensions...")
+                        guard let sessionId = currentSessionId else {
+                            throw APIError.invalidResponse
+                        }
+                        
+                        // Resume with full model and extensions loading
+                        let (_, _) = try await apiService.resumeAgent(
+                            sessionId: sessionId, loadModelAndExtensions: true)
+                        print("✅ Session activated with model/extensions")
+                        
+                        await MainActor.run {
+                            isSessionActivated = true
+                        }
+                    }
                 }
 
                 guard let sessionId = currentSessionId else {
@@ -639,7 +669,7 @@ struct ChatView: View {
                     // Throttle to avoid excessive scrolling during rapid updates
                     if self.shouldAutoScroll {
                         let now = Date()
-                        if now.timeIntervalSince(self.lastScrollUpdate) > 0.1 {  // Throttle to 10 updates per second
+                        if now.timeIntervalSince(self.lastScrollUpdate) > 0.05 {  // Throttle to 20 updates per second for smoother scrolling
                             self.lastScrollUpdate = now
                             self.scrollRefreshTrigger = UUID()
                         }
@@ -1282,33 +1312,14 @@ struct ChatView: View {
                     sessionIdToResume = sessionId
                 }
                 
-                // Resume the session
-                let (resumedSessionId, sessionMessages) = try await apiService.resumeAgent(
-                    sessionId: sessionIdToResume)
-                print("✅ SESSION RESUMED: \(resumedSessionId)")
-                print("📝 Loaded \(sessionMessages.count) messages")
-
-                // Read provider and model from config (same as new session)
-                print("🔧 READING PROVIDER AND MODEL FROM CONFIG")
-                guard let provider = await apiService.readConfigValue(key: "GOOSE_PROVIDER"),
-                    let model = await apiService.readConfigValue(key: "GOOSE_MODEL")
-                else {
-                    throw APIError.noData
-                }
-
-                print("🔧 UPDATING PROVIDER TO \(provider) WITH MODEL \(model)")
-                try await apiService.updateProvider(
-                    sessionId: resumedSessionId, provider: provider, model: model)
-                print("✅ PROVIDER UPDATED FOR RESUMED SESSION: \(resumedSessionId)")
-
-                // Apply server-side prompts (desktop_prompt.md + recipe if present)
-                print("🔧 UPDATING AGENT FROM SESSION: \(resumedSessionId)")
-                try await apiService.updateFromSession(sessionId: resumedSessionId)
-                print("✅ AGENT UPDATED FROM SESSION: \(resumedSessionId)")
-
-                // Load enabled extensions just like desktop does (same as new session)
-                print("🔧 LOADING ENABLED EXTENSIONS FOR RESUMED SESSION: \(resumedSessionId)")
-                try await apiService.loadEnabledExtensions(sessionId: resumedSessionId)
+                // Fetch session messages (not actually resuming yet - just loading for browsing)
+                let (fetchedSessionId, sessionMessages) = try await apiService.resumeAgent(
+                    sessionId: sessionIdToResume, loadModelAndExtensions: false)
+                print("✅ SESSION MESSAGES FETCHED: \(fetchedSessionId)")
+                print("📝 Loaded \(sessionMessages.count) messages for browsing")
+                
+                // Skip provider/extensions setup for browsing - will be done on first message send
+                // This makes session loading instant (just fetch and display messages)
 
                 // Update all state on main thread at once
                 await MainActor.run {
@@ -1319,17 +1330,28 @@ struct ChatView: View {
                     toolCallMessageMap.removeAll()
 
                     // Set new state with forced UI refresh
-                    currentSessionId = resumedSessionId
+                    currentSessionId = fetchedSessionId
 
                     // Force UI refresh by clearing and setting messages
                     messages.removeAll()
+                    print("📊 ═════════════════════════════════════════")
+                    print("📊 CHATVIEW: Setting messages for UI display")
+                    print("📊 ═════════════════════════════════════════")
+                    print("📊 Received \(sessionMessages.count) messages from API")
+                    print("📊 About to set to messages array...")
                     messages = sessionMessages
+                    print("📊 Messages array now has \(messages.count) messages (should be \(sessionMessages.count))")
+                    
+                    // Verify they match
+                    if messages.count != sessionMessages.count {
+                        print("📊 ⚠️⚠️⚠️ MISMATCH! Expected \(sessionMessages.count) but got \(messages.count) ⚠️⚠️⚠️")
+                    }
 
                     // Rebuild tool call state BEFORE checking if we should poll
                     // (since shouldPollForUpdates checks activeToolCalls)
                     rebuildToolCallState(from: sessionMessages)
 
-                    print("📊 Messages array now has \(messages.count) messages")
+                    print("📊 Messages after rebuild: \(messages.count)")
                     print("📊 First message ID: \(messages.first?.id ?? "none")")
                     print("📊 Last message ID: \(messages.last?.id ?? "none")")
 
@@ -1342,8 +1364,12 @@ struct ChatView: View {
                     // Check if we should start polling for live updates
                     if shouldPollForUpdates(sessionMessages) {
                         print("🔄 Session appears to be waiting for response, starting polling...")
-                        startPollingForUpdates(sessionId: resumedSessionId)
+                        startPollingForUpdates(sessionId: fetchedSessionId)
                     }
+                    
+                    // Mark as not activated - model/extensions will load on first message
+                    isSessionActivated = false
+                    print("📱 Session loaded without model/extensions (will activate on first message)")
                     
                     // Clear loading state
                     isLoadingSession = false
@@ -1377,6 +1403,7 @@ struct ChatView: View {
         toolCallMessageMap.removeAll()
         currentSessionId = nil
         isLoading = false
+        isSessionActivated = false  // Reset activation flag
 
         print("🆕 Created new session - cleared all state")
     }
@@ -1416,11 +1443,53 @@ struct ChatSession: Identifiable, Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case description
+        case name  // New API uses 'name'
+        case description  // Old API used 'description'
         case messageCount = "message_count"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case workingDir = "working_dir"
+    }
+    
+    // Regular memberwise initializer for tests and mocks
+    init(id: String, description: String, messageCount: Int, createdAt: String, updatedAt: String, workingDir: String? = nil) {
+        self.id = id
+        self.description = description
+        self.messageCount = messageCount
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.workingDir = workingDir
+    }
+    
+    // Custom decoder to handle both 'name' and 'description' fields
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        
+        // Try to decode 'name' first (new API), fall back to 'description' (old API), default to empty string
+        if let name = try? container.decode(String.self, forKey: .name) {
+            description = name
+        } else if let desc = try? container.decode(String.self, forKey: .description) {
+            description = desc
+        } else {
+            description = ""
+        }
+        
+        messageCount = try container.decode(Int.self, forKey: .messageCount)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+        workingDir = try? container.decode(String.self, forKey: .workingDir)
+    }
+    
+    // Custom encoder to support both formats
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(description, forKey: .name)  // Encode as 'name' for new API
+        try container.encode(messageCount, forKey: .messageCount)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encodeIfPresent(workingDir, forKey: .workingDir)
     }
     
     static func == (lhs: ChatSession, rhs: ChatSession) -> Bool {
