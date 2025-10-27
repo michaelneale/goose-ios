@@ -31,11 +31,11 @@ struct MarkdownText: View {
                 }
             }
             
-            // Render tables with full-bleed (break out of container padding)
+            // Render tables with full-bleed (break out of all container padding)
             ForEach(tables) { table in
                 MarkdownTableView(tableData: table)
-                    .padding(.leading, -12)  // Offset the container's leading padding
-                    .padding(.trailing, -12) // Offset any trailing padding
+                    .padding(.leading, -28)  // Offset AssistantMessageView (12pt) + ChatView (.horizontal = 16pt)
+                    .padding(.trailing, -28) // Same for trailing
                     .frame(maxWidth: .infinity)
             }
         }
@@ -87,6 +87,7 @@ struct MarkdownText: View {
         previousText = text
     }
 }
+
 
 
 struct MarkdownParser {

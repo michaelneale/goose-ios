@@ -28,6 +28,7 @@ struct TableData: Hashable, Identifiable {
 struct MarkdownTableView: View {
     let tableData: TableData
     @Environment(\.colorScheme) var colorScheme
+    @State private var columnWidths: [CGFloat] = []
     
     private let cellPadding: CGFloat = 8
     private let minCellWidth: CGFloat = 80
@@ -61,6 +62,31 @@ struct MarkdownTableView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderColor, lineWidth: 1)
         )
+        .onAppear {
+            calculateColumnWidths()
+        }
+    }
+    
+    // MARK: - Column Width Calculation
+    
+    private func calculateColumnWidths() {
+        var widths: [CGFloat] = Array(repeating: minCellWidth, count: tableData.headers.count)
+        
+        // Measure header widths
+        for (index, header) in tableData.headers.enumerated() {
+            let width = header.widthOfString(usingFont: UIFont.systemFont(ofSize: headerFontSize, weight: .semibold))
+            widths[index] = max(widths[index], width + cellPadding * 2)
+        }
+        
+        // Measure cell widths
+        for row in tableData.rows {
+            for (index, cell) in row.enumerated() where index < widths.count {
+                let width = cell.widthOfString(usingFont: UIFont.systemFont(ofSize: cellFontSize))
+                widths[index] = max(widths[index], width + cellPadding * 2)
+            }
+        }
+        
+        columnWidths = widths
     }
     
     // MARK: - Header Row
@@ -72,7 +98,7 @@ struct MarkdownTableView: View {
                     .font(.system(size: headerFontSize, weight: .semibold))
                     .foregroundColor(.primary)
                     .padding(cellPadding)
-                    .frame(minWidth: minCellWidth, alignment: alignmentFor(column: index))
+                    .frame(width: columnWidths.indices.contains(index) ? columnWidths[index] : minCellWidth, alignment: alignmentFor(column: index))
                     .background(headerBackgroundColor)
                 
                 if index < tableData.headers.count - 1 {
@@ -92,7 +118,7 @@ struct MarkdownTableView: View {
                     .font(.system(size: cellFontSize))
                     .foregroundColor(.primary)
                     .padding(cellPadding)
-                    .frame(minWidth: minCellWidth, alignment: alignmentFor(column: colIndex))
+                    .frame(width: columnWidths.indices.contains(colIndex) ? columnWidths[colIndex] : minCellWidth, alignment: alignmentFor(column: colIndex))
                     .background(rowBackgroundColor(index: index))
                 
                 if colIndex < row.count - 1 {
@@ -133,6 +159,16 @@ struct MarkdownTableView: View {
         case .trailing:
             return .trailing
         }
+    }
+}
+
+// MARK: - String Extension for Width Calculation
+
+extension String {
+    func widthOfString(usingFont font: UIFont) -> CGFloat {
+        let fontAttributes = [NSAttributedString.Key.font: font]
+        let size = self.size(withAttributes: fontAttributes)
+        return size.width
     }
 }
 
