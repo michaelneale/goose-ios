@@ -3,98 +3,141 @@ import Markdown
 
 
 // MARK: - Markdown Text View with Table and Code Block Support
+
 struct MarkdownText: View {
     let text: String
     var isUserMessage: Bool = false
-    @State private var cachedAttributedText: AttributedString?
-    @State private var tables: [TableData] = []
-    @State private var codeBlocks: [CodeBlockData] = []
+    @State private var contentItems: [MarkdownContentItem] = []
     @State private var previousText = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Regular markdown text
-            if let attributedText = cachedAttributedText, !attributedText.characters.isEmpty {
-                Group {
-                    if isUserMessage {
-                        Text(attributedText)
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundColor(.white)
-                            .lineLimit(nil)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text(attributedText)
-                            .font(.system(size: 14, weight: .regular))
-                            .multilineTextAlignment(.leading)
-                            .textSelection(.enabled)
+            ForEach(contentItems) { item in
+                switch item {
+                case .text(let attributedText):
+                    Group {
+                        if isUserMessage {
+                            Text(attributedText)
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundColor(.white)
+                                .lineLimit(nil)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text(attributedText)
+                                .font(.system(size: 14, weight: .regular))
+                                .multilineTextAlignment(.leading)
+                                .textSelection(.enabled)
+                        }
                     }
+                    
+                case .codeBlock(let codeBlock):
+                    CodeBlockView(codeBlock: codeBlock)
+                    
+                case .table(let table):
+                    MarkdownTableView(tableData: table)
+                        .padding(.leading, -28)
+                        .padding(.trailing, -28)
                 }
-            }
-            
-            // Render code blocks
-            ForEach(codeBlocks) { codeBlock in
-                CodeBlockView(codeBlock: codeBlock)
-            }
-            
-            // Render tables - they handle their own positioning and scrolling
-            ForEach(tables) { table in
-                MarkdownTableView(tableData: table)
-                    .padding(.leading, -28)  // Break out of container padding
-                    .padding(.trailing, -28) // Break out to allow full-width scrolling
             }
         }
         .onAppear {
-            if cachedAttributedText == nil {
+            if contentItems.isEmpty {
                 parseContent()
             }
         }
         .onChange(of: text) { _, newText in
-            // For streaming, check if we need to reparse
             let hasTable = newText.contains("|") && newText.contains("---")
-            let hadTable = previousText.contains("|") && previousText.contains("---")
             let hasCodeBlock = newText.contains("```")
-            let hadCodeBlock = previousText.contains("```")
             
-            if !newText.hasPrefix(previousText) || (hasTable && !hadTable) || (hasCodeBlock && !hadCodeBlock) {
-                // Text changed significantly or special content detected - reparse
-                withAnimation(.easeOut(duration: 0.15)) {
-                    parseContent()
-                }
+            if !newText.hasPrefix(previousText) || hasTable || hasCodeBlock {
+                parseContent()
             } else if newText != previousText {
-                // Simple append for streaming
-                let delta = String(newText.dropFirst(previousText.count))
-                if let cached = cachedAttributedText {
-                    if delta.contains("**") || delta.contains("*") || delta.contains("`") || 
-                       delta.contains("[") || delta.contains("#") || delta.contains("\n\n") {
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            parseContent()
-                        }
-                    } else {
-                        // Plain text - just append efficiently
-                        withAnimation(.easeOut(duration: 0.1)) {
-                            cachedAttributedText = cached + AttributedString(delta)
-                        }
-                    }
-                } else {
-                    parseContent()
-                }
+                // For simple text additions during streaming, just reparse
+                parseContent()
             }
             previousText = newText
         }
-        .animation(.easeOut(duration: 0.1), value: cachedAttributedText)
     }
     
     private func parseContent() {
-        // Extract tables and code blocks first
-        tables = MarkdownParser.extractTables(text)
-        codeBlocks = MarkdownParser.extractCodeBlocks(text)
-        
-        // Parse the rest as attributed string (tables and code blocks will be skipped)
-        cachedAttributedText = MarkdownParser.parseWithoutTablesAndCodeBlocks(text)
+        contentItems = MarkdownParser.parseSequentially(text)
         previousText = text
     }
 }
+
+// MARK: - Markdown Content Items (for preserving order)
+
+enum MarkdownContentItem: Identifiable {
+    case text(AttributedString)
+    case codeBlock(CodeBlockData)
+    case table(TableData)
+    
+    var id: String {
+        switch self {
+        case .text(let attr):
+            return "text_\(attr.description.prefix(50).hashValue)"
+        case .codeBlock(let block):
+            return "code_\(block.id)"
+        case .table(let table):
+            return "table_\(table.id)"
+        }
+    }
+}
+
+// MARK: - Sequential Markdown Parser
+
+extension MarkdownParser {
+    static func parseSequentially(_ text: String) -> [MarkdownContentItem] {
+        let trimmedText = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let document = Document(parsing: trimmedText)
+        
+        var items: [MarkdownContentItem] = []
+        var currentTextBuffer = AttributedString()
+        
+        for child in document.children {
+            if let table = child as? Markdown.Table {
+                // Flush any accumulated text before the table
+                if !currentTextBuffer.characters.isEmpty {
+                    items.append(.text(currentTextBuffer))
+                    currentTextBuffer = AttributedString()
+                }
+                
+                // Add the table
+                if let tableData = extractTableData(from: table) {
+                    items.append(.table(tableData))
+                }
+            } else if let codeBlock = child as? CodeBlock {
+                // Flush any accumulated text before the code block
+                if !currentTextBuffer.characters.isEmpty {
+                    items.append(.text(currentTextBuffer))
+                    currentTextBuffer = AttributedString()
+                }
+                
+                // Add the code block
+                let language = codeBlock.language
+                items.append(.codeBlock(CodeBlockData(code: codeBlock.code, language: language)))
+            } else {
+                // Regular markdown element - add to text buffer
+                currentTextBuffer.append(processElement(child))
+            }
+        }
+        
+        // Flush any remaining text
+        if !currentTextBuffer.characters.isEmpty {
+            // Remove trailing newlines
+            while currentTextBuffer.characters.last == "\n" {
+                currentTextBuffer = AttributedString(currentTextBuffer.characters.dropLast())
+            }
+            if !currentTextBuffer.characters.isEmpty {
+                items.append(.text(currentTextBuffer))
+            }
+        }
+        
+        return items
+    }
+}
+
 
 
 
