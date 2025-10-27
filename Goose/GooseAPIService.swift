@@ -193,7 +193,7 @@ class GooseAPIService: ObservableObject {
     }
 
     // MARK: - Session Resume
-    func resumeAgent(sessionId: String) async throws -> (sessionId: String, messages: [Message]) {
+    func resumeAgent(sessionId: String, loadModelAndExtensions: Bool = false) async throws -> (sessionId: String, messages: [Message]) {
         do {
             guard let url = URL(string: "\(self.baseURL)/agent/resume") else {
                 throw APIError.invalidURL
@@ -204,11 +204,14 @@ class GooseAPIService: ObservableObject {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
 
-            let body: [String: Any] = ["session_id": sessionId]
+            let body: [String: Any] = [
+                "session_id": sessionId,
+                "load_model_and_extensions": loadModelAndExtensions
+            ]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
             // Debug logging
-            print("📤 Resuming session: '\(sessionId)'")
+            print("📤 Resuming session: '\(sessionId)' (load_model_and_extensions: \(loadModelAndExtensions))")
             print("📤 URL: \(url)")
             if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
                 print("📤 Request body: \(bodyString)")
@@ -220,13 +223,54 @@ class GooseAPIService: ObservableObject {
                 throw APIError.invalidResponse
             }
 
+            // Log the response for debugging
+            print("📥 Resume response status: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📥 Resume response body (first 500 chars): \(String(responseString.prefix(500)))")
+            }
+
             if httpResponse.statusCode != 200 {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                print("🚨 Resume failed with status \(httpResponse.statusCode): \(errorBody)")
                 throw APIError.httpError(httpResponse.statusCode, errorBody)
             }
 
             let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
-            return (agentResponse.id, agentResponse.conversation ?? [])
+            let messages = agentResponse.conversation ?? []
+            
+            print("📊 ═══════════════════════════════════════════════════════")
+            print("📊 RESUME SUMMARY for session: \(sessionId)")
+            print("📊 ═══════════════════════════════════════════════════════")
+            print("📊 Returned message count: \(messages.count)")
+            if messages.isEmpty {
+                print("📊 ⚠️⚠️⚠️ WARNING: ZERO messages returned! ⚠️⚠️⚠️")
+            } else {
+                print("📊 First message:")
+                print("📊   - ID: \(messages.first!.id)")
+                print("📊   - Role: \(messages.first!.role)")
+                print("📊   - Content items: \(messages.first!.content.count)")
+                print("📊 Last message:")
+                print("📊   - ID: \(messages.last!.id)")
+                print("📊   - Role: \(messages.last!.role)")
+                print("📊   - Content items: \(messages.last!.content.count)")
+                print("📊 All message IDs:")
+                for (idx, msg) in messages.enumerated() {
+                    let preview = msg.content.first.map { content -> String in
+                        switch content {
+                        case .text(let tc): return String(tc.text.prefix(50))
+                        case .toolRequest(let tr): return "TOOL_REQ[\(tr.toolCall.name)]"
+                        case .toolResponse(let tr): return "TOOL_RESP[\(tr.toolResult.status)]"
+                        case .summarizationRequested: return "SUMMARIZATION"
+                        case .toolConfirmationRequest: return "TOOL_CONFIRM"
+                        case .conversationCompacted: return "COMPACTED"
+                        }
+                    } ?? "EMPTY"
+                    print("📊   [\(idx)] \(msg.id.prefix(8))... \(msg.role) - \(preview)")
+                }
+            }
+            print("📊 ═══════════════════════════════════════════════════════")
+            
+            return (agentResponse.id, messages)
         }
     }
 
