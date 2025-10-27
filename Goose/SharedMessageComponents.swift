@@ -1,71 +1,89 @@
 import SwiftUI
 import Markdown
 
-// MARK: - Markdown Text View with Caching
+// MARK: - Markdown Text View with Table Support
 struct MarkdownText: View {
     let text: String
     var isUserMessage: Bool = false
     @State private var cachedAttributedText: AttributedString?
+    @State private var tables: [TableData] = []
     @State private var previousText = ""
     
     var body: some View {
-        Group {
-            if isUserMessage {
-                Text(cachedAttributedText ?? AttributedString(text))
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(.white)
-                    .lineLimit(nil)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text(cachedAttributedText ?? AttributedString(text))
-                    .font(.system(size: 14, weight: .regular))
-                    .multilineTextAlignment(.leading)
-                    .textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 12) {
+            // Regular markdown text
+            if let attributedText = cachedAttributedText, !attributedText.characters.isEmpty {
+                Group {
+                    if isUserMessage {
+                        Text(attributedText)
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(.white)
+                            .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(attributedText)
+                            .font(.system(size: 14, weight: .regular))
+                            .multilineTextAlignment(.leading)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            
+            // Render tables
+            ForEach(tables) { table in
+                MarkdownTableView(tableData: table)
             }
         }
         .onAppear {
             if cachedAttributedText == nil {
-                cachedAttributedText = MarkdownParser.parse(text)
-                previousText = text
+                parseContent()
             }
         }
         .onChange(of: text) { _, newText in
-            // Improved streaming: only reparse if text structure changed
-            if !newText.hasPrefix(previousText) {
-                // Text was modified (not appended) - full reparse needed
+            // For streaming, check if we need to reparse
+            let hasTable = newText.contains("|") && newText.contains("---")
+            let hadTable = previousText.contains("|") && previousText.contains("---")
+            
+            if !newText.hasPrefix(previousText) || (hasTable && !hadTable) {
+                // Text changed significantly or table detected - reparse
                 withAnimation(.easeOut(duration: 0.15)) {
-                    cachedAttributedText = MarkdownParser.parse(newText)
+                    parseContent()
                 }
             } else if newText != previousText {
-                // Text was appended - efficient delta parsing
+                // Simple append for streaming
                 let delta = String(newText.dropFirst(previousText.count))
                 if let cached = cachedAttributedText {
-                    // Simple append for streaming - only reparse if delta contains markdown syntax
                     if delta.contains("**") || delta.contains("*") || delta.contains("`") || 
                        delta.contains("[") || delta.contains("#") || delta.contains("\n\n") {
-                        // Markdown syntax detected - reparse to maintain formatting
                         withAnimation(.easeOut(duration: 0.15)) {
-                            cachedAttributedText = MarkdownParser.parse(newText)
+                            parseContent()
                         }
                     } else {
-                        // Plain text - just append efficiently with smooth transition
+                        // Plain text - just append efficiently
                         withAnimation(.easeOut(duration: 0.1)) {
                             cachedAttributedText = cached + AttributedString(delta)
                         }
                     }
                 } else {
-                    cachedAttributedText = MarkdownParser.parse(newText)
+                    parseContent()
                 }
             }
             previousText = newText
         }
         .animation(.easeOut(duration: 0.1), value: cachedAttributedText)
     }
+    
+    private func parseContent() {
+        // Extract tables first
+        tables = MarkdownParser.extractTables(text)
+        
+        // Parse the rest as attributed string (tables will be skipped)
+        cachedAttributedText = MarkdownParser.parseWithoutTables(text)
+        previousText = text
+    }
 }
 
-// MARK: - Markdown Parser
-struct MarkdownParser {
     static func parse(_ text: String) -> AttributedString {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let document = Document(parsing: trimmedText)
@@ -198,6 +216,104 @@ struct MarkdownParser {
         default:
             return AttributedString(element.plainText)
         }
+    }
+    
+    // MARK: - Table Support
+    
+    /// Extract all tables from markdown text
+    static func extractTables(_ text: String) -> [TableData] {
+        let document = Document(parsing: text)
+        var tables: [TableData] = []
+        
+        func findTables(in element: Markup) {
+            if let table = element as? Table {
+                if let tableData = extractTableData(from: table) {
+                    tables.append(tableData)
+                }
+            }
+            
+            // Recursively search children
+            for child in element.children {
+                findTables(in: child)
+            }
+        }
+        
+        for child in document.children {
+            findTables(in: child)
+        }
+        
+        return tables
+    }
+    
+    /// Extract table data from a Table markup element
+    private static func extractTableData(from table: Table) -> TableData? {
+        var headers: [String] = []
+        var rows: [[String]] = []
+        var alignments: [TextAlignment] = []
+        
+        // Extract headers
+        if let head = table.head {
+            for cell in head.cells {
+                headers.append(cell.plainText.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+        
+        // Extract column alignments
+        for columnIndex in 0..<table.columnAlignments.count {
+            let alignment = table.columnAlignments[columnIndex]
+            switch alignment {
+            case .left:
+                alignments.append(.leading)
+            case .center:
+                alignments.append(.center)
+            case .right:
+                alignments.append(.trailing)
+            @unknown default:
+                alignments.append(.leading)
+            }
+        }
+        
+        // Extract data rows
+        if let body = table.body {
+            for row in body.rows {
+                var rowData: [String] = []
+                for cell in row.cells {
+                    rowData.append(cell.plainText.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+                // Ensure row has same number of columns as headers
+                while rowData.count < headers.count {
+                    rowData.append("")
+                }
+                rows.append(rowData)
+            }
+        }
+        
+        // Only return if we have headers and at least one row
+        guard !headers.isEmpty, !rows.isEmpty else { return nil }
+        
+        return TableData(headers: headers, rows: rows, columnAlignments: alignments)
+    }
+    
+    /// Parse markdown without rendering tables (they'll be rendered separately)
+    static func parseWithoutTables(_ text: String) -> AttributedString {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let document = Document(parsing: trimmedText)
+        
+        var attributedString = AttributedString()
+        for child in document.children {
+            // Skip tables - they'll be rendered as SwiftUI views
+            if child is Table {
+                continue
+            }
+            attributedString.append(processElement(child))
+        }
+        
+        // Trim trailing newlines
+        while attributedString.characters.last == "\n" {
+            attributedString = AttributedString(attributedString.characters.dropLast())
+        }
+        
+        return attributedString.characters.isEmpty ? AttributedString(trimmedText) : attributedString
     }
 }
 
