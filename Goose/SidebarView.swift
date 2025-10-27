@@ -182,9 +182,12 @@ struct SidebarView: View {
                                         agent: agent,
                                         isCurrent: agentStorage.currentAgentId == agent.id,
                                         onTap: {
-                                            ConfigurationHandler.shared.switchToAgent(agent)
-                                            withAnimation(.easeInOut(duration: 0.3)) {
+                                            // Close sidebar first for smooth UX, then switch agent
+                                            withAnimation(.easeInOut(duration: 0.25)) {
                                                 isShowing = false
+                                            }
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                                                ConfigurationHandler.shared.switchToAgent(agent)
                                             }
                                         },
                                         onRename: {
