@@ -11,7 +11,7 @@ struct MarkdownText: View {
     @State private var previousText = ""
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             ForEach(contentItems) { item in
                 switch item {
                 case .text(let attributedText):
