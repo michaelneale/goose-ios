@@ -1028,6 +1028,11 @@ struct CodeBlockView: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            
+            // Bottom divider
+            Divider()
+                .background(borderColor.opacity(0.3))
+                .padding(.top, 8)
         }
         .background(backgroundColor)
         .cornerRadius(8)
@@ -1095,6 +1100,7 @@ struct CodeBlockView: View {
             : Color(red: 0.85, green: 0.85, blue: 0.85)
     }
 }
+
 
 
 
