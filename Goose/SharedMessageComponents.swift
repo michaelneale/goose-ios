@@ -958,7 +958,6 @@ struct SyntaxHighlighter {
         highlightPattern(#"#[0-9a-fA-F]{3,6}"#, in: &attributedString, color: Color(red: 0.8, green: 0.2, blue: 0.2))
     }
 }
-}
 
 struct CodeBlockView: View {
     let codeBlock: CodeBlockData
