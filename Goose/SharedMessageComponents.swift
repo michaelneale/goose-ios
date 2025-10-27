@@ -87,7 +87,7 @@ struct MarkdownText: View {
 
 struct MarkdownParser {
     static func parse(_ text: String) -> AttributedString {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedText = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         let document = Document(parsing: trimmedText)
         
         var attributedString = AttributedString()
@@ -228,7 +228,7 @@ struct MarkdownParser {
         var tables: [TableData] = []
         
         func findTables(in element: Markup) {
-            if let table = element as? Table {
+            if let table = element as? Markdown.Table {
                 if let tableData = extractTableData(from: table) {
                     tables.append(tableData)
                 }
@@ -248,7 +248,7 @@ struct MarkdownParser {
     }
     
     /// Extract table data from a Table markup element
-    private static func extractTableData(from table: Table) -> TableData? {
+    private static func extractTableData(from table: Markdown.Table) -> TableData? {
         var headers: [String] = []
         var rows: [[String]] = []
         var alignments: [TextAlignment] = []
@@ -256,7 +256,7 @@ struct MarkdownParser {
         // Extract headers
         if let head = table.head {
             for cell in head.cells {
-                headers.append(cell.plainText.trimmingCharacters(in: .whitespacesAndNewlines))
+                headers.append(cell.plainText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
             }
         }
         
@@ -280,7 +280,7 @@ struct MarkdownParser {
             for row in body.rows {
                 var rowData: [String] = []
                 for cell in row.cells {
-                    rowData.append(cell.plainText.trimmingCharacters(in: .whitespacesAndNewlines))
+                    rowData.append(cell.plainText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
                 }
                 // Ensure row has same number of columns as headers
                 while rowData.count < headers.count {
@@ -298,13 +298,13 @@ struct MarkdownParser {
     
     /// Parse markdown without rendering tables (they'll be rendered separately)
     static func parseWithoutTables(_ text: String) -> AttributedString {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedText = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         let document = Document(parsing: trimmedText)
         
         var attributedString = AttributedString()
         for child in document.children {
             // Skip tables - they'll be rendered as SwiftUI views
-            if child is Table {
+            if child is Markdown.Table {
                 continue
             }
             attributedString.append(processElement(child))
