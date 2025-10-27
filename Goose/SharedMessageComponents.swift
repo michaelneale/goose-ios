@@ -230,12 +230,30 @@ struct MarkdownParser {
     private static func processInline(_ element: InlineMarkup) -> AttributedString {
         switch element {
         case let text as Markdown.Text:
-            // Add spacing after colons if not already present
-            let processedText = text.plainText.replacingOccurrences(
+            // Add spacing after common punctuation if not already present
+            var processedText = text.plainText
+            
+            // Add space after colons
+            processedText = processedText.replacingOccurrences(
                 of: #":(\S)"#,
                 with: ": $1",
                 options: .regularExpression
             )
+            
+            // Add space after commas
+            processedText = processedText.replacingOccurrences(
+                of: #",(\S)"#,
+                with: ", $1",
+                options: .regularExpression
+            )
+            
+            // Add space after semicolons
+            processedText = processedText.replacingOccurrences(
+                of: #";(\S)"#,
+                with: "; $1",
+                options: .regularExpression
+            )
+            
             return AttributedString(processedText)
             
         case let strong as Strong:
@@ -1077,6 +1095,7 @@ struct CodeBlockView: View {
             : Color(red: 0.85, green: 0.85, blue: 0.85)
     }
 }
+
 
 
 
