@@ -31,12 +31,11 @@ struct MarkdownText: View {
                 }
             }
             
-            // Render tables with full-bleed (break out of all container padding)
+            // Render tables - aligned left with text, but extend to right edge
             ForEach(tables) { table in
                 MarkdownTableView(tableData: table)
-                    .padding(.leading, -28)  // Offset AssistantMessageView (12pt) + ChatView (.horizontal = 16pt)
-                    .padding(.trailing, -28) // Same for trailing
-                    .frame(maxWidth: .infinity)
+                    .padding(.trailing, -28) // Break out to right edge (12pt + 16pt)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .onAppear {
@@ -87,6 +86,7 @@ struct MarkdownText: View {
         previousText = text
     }
 }
+
 
 
 
