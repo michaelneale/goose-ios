@@ -511,20 +511,28 @@ struct CodeBlockView: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 0) {
-                // Language label if available
+                // Language label if available - with colored badge
                 if let language = codeBlock.language, !language.isEmpty {
-                    Text(language)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, padding)
-                        .padding(.top, 8)
-                        .padding(.bottom, 4)
+                    HStack(spacing: 6) {
+                        Text(language.uppercased())
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(languageColor)
+                            .cornerRadius(4)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, padding)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
                 }
                 
                 // Code content
                 Text(codeBlock.code)
                     .font(.system(size: fontSize, design: .monospaced))
-                    .foregroundColor(.primary)
+                    .foregroundColor(codeTextColor)
                     .padding(padding)
                     .textSelection(.enabled)
             }
@@ -538,13 +546,118 @@ struct CodeBlockView: View {
         )
     }
     
+    // Language-specific colors for badges
+    private var languageColor: Color {
+        guard let language = codeBlock.language?.lowercased() else {
+            return .gray
+        }
+        
+        switch language {
+        case "swift":
+            return Color.orange
+        case "python", "py":
+            return Color.blue
+        case "javascript", "js", "typescript", "ts":
+            return Color.yellow.opacity(0.8)
+        case "ruby", "rb":
+            return Color.red
+        case "rust", "rs":
+            return Color.orange.opacity(0.8)
+        case "go":
+            return Color.cyan
+        case "java", "kotlin":
+            return Color.orange.opacity(0.7)
+        case "c", "cpp", "c++":
+            return Color.blue.opacity(0.7)
+        case "shell", "bash", "sh", "zsh":
+            return Color.green
+        case "json":
+            return Color.purple.opacity(0.7)
+        case "xml", "html":
+            return Color.orange.opacity(0.6)
+        case "css", "scss":
+            return Color.blue.opacity(0.6)
+        case "sql":
+            return Color.indigo
+        case "markdown", "md":
+            return Color.gray
+        default:
+            return Color.gray
+        }
+    }
+    
     private var backgroundColor: Color {
+        guard let language = codeBlock.language?.lowercased() else {
+            return defaultBackgroundColor
+        }
+        
+        // Subtle tinted backgrounds based on language
+        let baseColor: Color
+        switch language {
+        case "swift":
+            baseColor = Color.orange
+        case "python", "py":
+            baseColor = Color.blue
+        case "javascript", "js", "typescript", "ts":
+            baseColor = Color.yellow
+        case "ruby", "rb":
+            baseColor = Color.red
+        case "rust", "rs":
+            baseColor = Color.orange
+        case "go":
+            baseColor = Color.cyan
+        case "shell", "bash", "sh", "zsh":
+            baseColor = Color.green
+        case "json":
+            baseColor = Color.purple
+        default:
+            return defaultBackgroundColor
+        }
+        
+        // Apply very subtle tint
+        return colorScheme == .dark 
+            ? baseColor.opacity(0.08)
+            : baseColor.opacity(0.04)
+    }
+    
+    private var defaultBackgroundColor: Color {
         colorScheme == .dark 
             ? Color(.systemGray6) 
             : Color(.systemGray6).opacity(0.5)
     }
     
     private var borderColor: Color {
-        Color(.systemGray4).opacity(0.5)
+        guard let language = codeBlock.language?.lowercased() else {
+            return Color(.systemGray4).opacity(0.5)
+        }
+        
+        // Colored borders matching the language
+        let baseColor: Color
+        switch language {
+        case "swift":
+            baseColor = Color.orange
+        case "python", "py":
+            baseColor = Color.blue
+        case "javascript", "js", "typescript", "ts":
+            baseColor = Color.yellow
+        case "ruby", "rb":
+            baseColor = Color.red
+        case "rust", "rs":
+            baseColor = Color.orange
+        case "go":
+            baseColor = Color.cyan
+        case "shell", "bash", "sh", "zsh":
+            baseColor = Color.green
+        case "json":
+            baseColor = Color.purple
+        default:
+            return Color(.systemGray4).opacity(0.5)
+        }
+        
+        return baseColor.opacity(0.3)
+    }
+    
+    private var codeTextColor: Color {
+        colorScheme == .dark ? .white : .black
     }
 }
