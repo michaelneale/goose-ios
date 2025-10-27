@@ -230,7 +230,13 @@ struct MarkdownParser {
     private static func processInline(_ element: InlineMarkup) -> AttributedString {
         switch element {
         case let text as Markdown.Text:
-            return AttributedString(text.plainText)
+            // Add spacing after colons if not already present
+            let processedText = text.plainText.replacingOccurrences(
+                of: #":(\S)"#,
+                with: ": $1",
+                options: .regularExpression
+            )
+            return AttributedString(processedText)
             
         case let strong as Strong:
             var strongText = AttributedString()
@@ -1074,3 +1080,4 @@ struct CodeBlockView: View {
 
 
 
+}
