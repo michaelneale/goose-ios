@@ -17,6 +17,24 @@ struct AgentConfiguration: Identifiable, Codable, Equatable {
         self.lastUsed = lastUsed
     }
     
+    /// Generate a default name based on the URL pattern
+    static func defaultName(for url: String) -> String? {
+        let lowercaseURL = url.lowercased()
+        
+        // Check for demo-goosed pattern
+        if lowercaseURL.contains("demo-goosed") {
+            return "Trial"
+        }
+        
+        // Check for cloudflare-tunnel-proxy pattern
+        if lowercaseURL.contains("cloudflare-tunnel-proxy") {
+            return "Desktop"
+        }
+        
+        // No default name for other patterns
+        return nil
+    }
+    
     /// Display name for the agent (custom name or formatted URL)
     var displayName: String {
         if let name = name, !name.isEmpty {
@@ -76,8 +94,9 @@ class AgentStorage: ObservableObject {
             currentAgentId = existing.id
             saveCurrentAgentId()
         } else {
-            // Add the current configuration as an unnamed agent
-            let agent = AgentConfiguration(name: nil, url: currentURL, secret: currentSecret)
+            // Add the current configuration with a default name if URL matches a pattern
+            let defaultName = AgentConfiguration.defaultName(for: currentURL)
+            let agent = AgentConfiguration(name: defaultName, url: currentURL, secret: currentSecret)
             savedAgents.insert(agent, at: 0)
             currentAgentId = agent.id
             saveAgents()
@@ -214,8 +233,9 @@ class AgentStorage: ObservableObject {
             saveCurrentAgentId()
             return updated
         } else {
-            // Create new agent
-            let agent = AgentConfiguration(name: name, url: url, secret: secret)
+            // Create new agent with default name if no custom name provided
+            let finalName = name ?? AgentConfiguration.defaultName(for: url)
+            let agent = AgentConfiguration(name: finalName, url: url, secret: secret)
             saveAgent(agent)
             currentAgentId = agent.id
             saveCurrentAgentId()
