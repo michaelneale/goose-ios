@@ -11,9 +11,11 @@ struct MarkdownTestView: View {
     @Environment(\.dismiss) private var dismiss
     
     private let testMarkdown = """
-# Heading 1
-## Heading 2
-### Heading 3
+# Markdown Rendering Test
+
+This view tests all markdown features with proper styling.
+
+## Text Formatting
 
 This is a paragraph with **bold text**, *italic text*, and `inline code`.
 
@@ -23,32 +25,79 @@ Here's a [link to example](https://example.com).
 
 ### Unordered List
 - First item
-- Second item
-- Third item with more text to test wrapping behavior
+- Second item with **bold**
+- Third item with `code`
 
 ### Ordered List
 1. First numbered item
 2. Second numbered item
 3. Third numbered item
 
-## Code Block
+## Code Blocks with Language Styling
 
+### Swift
 ```swift
-func example() {
-    print("Hello, World!")
+func greet(name: String) -> String {
+    return "Hello, \\(name)!"
 }
 ```
 
-## Table
+### Python
+```python
+def calculate_sum(a, b):
+    return a + b
 
+result = calculate_sum(5, 3)
+print(f"Result: {result}")
+```
+
+### JavaScript
+```javascript
+const fetchData = async () => {
+    const response = await fetch('/api/data');
+    return response.json();
+};
+```
+
+### Shell
+```shell
+#!/bin/bash
+echo "Running deployment..."
+npm run build
+npm run deploy
+```
+
+### JSON
+```json
+{
+    "name": "Goose",
+    "version": "1.0.0",
+    "features": ["markdown", "tables", "code"]
+}
+```
+
+### Ruby
+```ruby
+class User
+  attr_accessor :name, :email
+  
+  def initialize(name, email)
+    @name = name
+    @email = email
+  end
+end
+```
+
+## Tables
+
+### Simple Table
 | Name | Age | City |
 |------|----:|------|
 | Alice | 30 | New York |
 | Bob | 25 | San Francisco |
 | Charlie | 35 | Los Angeles |
 
-## Wide Table (Test Scrolling)
-
+### Wide Table (Test Scrolling)
 | Sunday | Monday | Tuesday | Wednesday | Thursday | Friday | Saturday |
 |:------:|:------:|:-------:|:---------:|:--------:|:------:|:--------:|
 | | | | | | 1 | 2 |
@@ -67,8 +116,42 @@ This paragraph comes **before** a table.
 | Bold | ✅ |
 | Italic | ✅ |
 | Code | ✅ |
+| Tables | ✅ |
+| Code Blocks | ✅ |
 
 And this paragraph comes **after** the table.
+
+## More Languages
+
+### TypeScript
+```typescript
+interface User {
+    name: string;
+    age: number;
+}
+
+const user: User = { name: "Alice", age: 30 };
+```
+
+### Rust
+```rust
+fn main() {
+    let numbers = vec![1, 2, 3, 4, 5];
+    let sum: i32 = numbers.iter().sum();
+    println!("Sum: {}", sum);
+}
+```
+
+### Go
+```go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello from Go!")
+}
+```
 
 ## Edge Cases
 
@@ -78,65 +161,53 @@ Empty cells in table:
 |---|---|---|
 | 1 | | 3 |
 | | 2 | |
+| 4 | 5 | 6 |
 
-Very long text in a cell to test wrapping:
-
-| Short | Very Long Text Column |
-|-------|----------------------|
-| A | This is a very long piece of text that should demonstrate how the table handles content that extends beyond normal cell width |
-| B | Another long piece of text to ensure consistent behavior across multiple rows |
+Code without language:
+```
+This is a code block without a specified language.
+It should still render properly with default styling.
+```
 """
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Test in assistant message context
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Assistant Message Context")
+                    // Assistant message context
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Assistant Message Style")
                             .font(.headline)
-                            .padding(.horizontal)
+                            .foregroundColor(.secondary)
                         
-                        HStack(alignment: .top, spacing: 0) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                MarkdownText(text: testMarkdown)
-                            }
-                            .fixedSize(horizontal: false, vertical: true)
-                            
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 12)
-                        .padding(.bottom, 8)
-                        .padding(.top, 8)
+                        MarkdownText(text: testMarkdown)
+                            .padding()
+                            .background(Color(.systemGray6).opacity(0.3))
+                            .cornerRadius(12)
                     }
-                    .background(Color(.systemBackground))
                     
                     Divider()
+                        .padding(.vertical)
                     
-                    // Test in user message context
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("User Message Context")
+                    // User message context
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("User Message Style")
                             .font(.headline)
-                            .padding(.horizontal)
+                            .foregroundColor(.secondary)
                         
-                        HStack {
-                            Spacer()
-                            MarkdownText(text: "**User message** with *markdown*", isUserMessage: true)
-                                .padding(12)
-                                .background(Color.blue)
-                                .cornerRadius(16)
-                        }
-                        .padding(.horizontal)
+                        MarkdownText(text: "**User message** with `code` and *formatting*", isUserMessage: true)
+                            .padding()
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(12)
                     }
                 }
-                .padding(.vertical)
+                .padding()
             }
             .navigationTitle("Markdown Test")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") {
+                    Button("Done") {
                         dismiss()
                     }
                 }
@@ -145,10 +216,6 @@ Very long text in a cell to test wrapping:
     }
 }
 
-#if DEBUG
-struct MarkdownTestView_Previews: PreviewProvider {
-    static var previews: some View {
-        MarkdownTestView()
-    }
+#Preview {
+    MarkdownTestView()
 }
-#endif
