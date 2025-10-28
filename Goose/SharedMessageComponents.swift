@@ -51,13 +51,29 @@ struct MarkdownText: View {
             let hasCodeBlock = newText.contains("```")
             
             if !newText.hasPrefix(previousText) || hasTable || hasCodeBlock {
-                parseContent()
+                // Text was modified (not appended) or has special content - full reparse with animation
+                withAnimation(.easeOut(duration: 0.15)) {
+                    parseContent()
+                }
             } else if newText != previousText {
-                // For simple text additions during streaming, just reparse
-                parseContent()
+                // Text was appended - check if delta contains markdown syntax
+                let delta = String(newText.dropFirst(previousText.count))
+                if delta.contains("**") || delta.contains("*") || delta.contains("`") || 
+                   delta.contains("[") || delta.contains("#") || delta.contains("\n\n") {
+                    // Markdown syntax detected - reparse with animation
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        parseContent()
+                    }
+                } else {
+                    // Plain text - reparse with faster animation for smooth streaming
+                    withAnimation(.easeOut(duration: 0.1)) {
+                        parseContent()
+                    }
+                }
             }
             previousText = newText
         }
+        .animation(.easeOut(duration: 0.1), value: contentItems.map { $0.id })
     }
     
     private func parseContent() {
