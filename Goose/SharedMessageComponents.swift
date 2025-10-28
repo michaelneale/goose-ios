@@ -1,6 +1,44 @@
 import SwiftUI
 import Markdown
 
+// MARK: - Cached Regex Patterns
+
+/// Cache for compiled regex patterns to avoid recreating them on every use
+private enum RegexCache {
+    // Text processing patterns
+    static let colonSpacing = try! NSRegularExpression(pattern: #":(\S)"#, options: [])
+    static let commaSpacing = try! NSRegularExpression(pattern: #",(\S)"#, options: [])
+    static let semicolonSpacing = try! NSRegularExpression(pattern: #";(\S)"#, options: [])
+    
+    // Syntax highlighting patterns
+    static let doubleQuoteString = try! NSRegularExpression(pattern: #""[^"\\]*(?:\\.[^"\\]*)*""#, options: [])
+    static let singleQuoteString = try! NSRegularExpression(pattern: #"'[^'\\]*(?:\\.[^'\\]*)*'"#, options: [])
+    static let templateLiteral = try! NSRegularExpression(pattern: #"`[^`]*`"#, options: [])
+    static let singleLineComment = try! NSRegularExpression(pattern: #"//[^\n]*"#, options: [])
+    static let hashComment = try! NSRegularExpression(pattern: #"#[^\n]*"#, options: [])
+    static let multiLineComment = try! NSRegularExpression(pattern: #"/\*[\s\S]*?\*/"#, options: [])
+    static let numbers = try! NSRegularExpression(pattern: #"\b\d+\.?\d*\b"#, options: [])
+    static let functionCall = try! NSRegularExpression(pattern: #"(\w+)\s*\("#, options: [])
+    
+    // Language-specific patterns
+    static let pythonDecorator = try! NSRegularExpression(pattern: #"@\w+"#, options: [])
+    static let shellVariable = try! NSRegularExpression(pattern: #"\$\w+"#, options: [])
+    static let rubySymbol = try! NSRegularExpression(pattern: #":\w+"#, options: [])
+    static let rubyInstanceVar = try! NSRegularExpression(pattern: #"@\w+"#, options: [])
+    static let rustMacro = try! NSRegularExpression(pattern: #"\w+!"#, options: [])
+    static let rustLifetime = try! NSRegularExpression(pattern: #"'\w+"#, options: [])
+    static let htmlTag = try! NSRegularExpression(pattern: #"</?[^>]+>"#, options: [])
+    static let htmlAttribute = try! NSRegularExpression(pattern: #"\w+(?==["'])"#, options: [])
+    static let cssSelector = try! NSRegularExpression(pattern: #"[.#]?[\w-]+(?=\s*\{)"#, options: [])
+    static let cssProperty = try! NSRegularExpression(pattern: #"[\w-]+(?=\s*:)"#, options: [])
+    static let cssColor = try! NSRegularExpression(pattern: #"#[0-9a-fA-F]{3,6}"#, options: [])
+    static let jsonProperty = try! NSRegularExpression(pattern: #""([^"]+)"\s*:"#, options: [])
+    
+    // Helper to create word boundary patterns dynamically
+    static func wordBoundaryPattern(_ word: String) -> NSRegularExpression {
+        return try! NSRegularExpression(pattern: "\\b" + NSRegularExpression.escapedPattern(for: word) + "\\b", options: [])
+    }
+}
 
 // MARK: - Markdown Text View with Table and Code Block Support
 
@@ -250,25 +288,13 @@ struct MarkdownParser {
             var processedText = text.plainText
             
             // Add space after colons
-            processedText = processedText.replacingOccurrences(
-                of: #":(\S)"#,
-                with: ": $1",
-                options: .regularExpression
-            )
+            processedText = RegexCache.colonSpacing.stringByReplacingMatches(in: processedText, range: NSRange(processedText.startIndex..., in: processedText), withTemplate: ": $1")
             
             // Add space after commas
-            processedText = processedText.replacingOccurrences(
-                of: #",(\S)"#,
-                with: ", $1",
-                options: .regularExpression
-            )
+            processedText = RegexCache.commaSpacing.stringByReplacingMatches(in: processedText, range: NSRange(processedText.startIndex..., in: processedText), withTemplate: ", $1")
             
             // Add space after semicolons
-            processedText = processedText.replacingOccurrences(
-                of: #";(\S)"#,
-                with: "; $1",
-                options: .regularExpression
-            )
+            processedText = RegexCache.semicolonSpacing.stringByReplacingMatches(in: processedText, range: NSRange(processedText.startIndex..., in: processedText), withTemplate: "; $1")
             
             return AttributedString(processedText)
             
@@ -673,7 +699,7 @@ struct SyntaxHighlighter {
         highlightNumbers(&attributedString, code)
         
         // Highlight decorators
-        highlightPattern(#"@\w+"#, in: &attributedString, color: .orange)
+        highlightRegex(RegexCache.pythonDecorator, in: &attributedString, color: .orange)
     }
     
     // MARK: - JavaScript Highlighting
@@ -702,8 +728,32 @@ struct SyntaxHighlighter {
     private static func highlightPattern(_ pattern: String, in attributedString: inout AttributedString, color: Color, bold: Bool = false) {
         let string = String(attributedString.characters)
         
-        do {
-            let regex = try NSRegularExpression(pattern: "\\b" + pattern + "\\b", options: [])
+        let regex = RegexCache.wordBoundaryPattern(pattern)
+        let matches = regex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in matches {
+            if let range = Range(match.range, in: string) {
+                let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
+                let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
+                
+                attributedString[startIndex..<endIndex].foregroundColor = color
+                if bold {
+                    attributedString[startIndex..<endIndex].font = .system(size: 13, weight: .semibold, design: .monospaced)
+                }
+            }
+        }
+    }
+    
+    private static func highlightStrings(_ attributedString: inout AttributedString, _ code: String) {
+        let string = String(attributedString.characters)
+        
+        let regexes = [
+            RegexCache.doubleQuoteString,
+            RegexCache.singleQuoteString,
+            RegexCache.templateLiteral
+        ]
+        
+        for regex in regexes {
             let matches = regex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
             
             for match in matches {
@@ -711,42 +761,8 @@ struct SyntaxHighlighter {
                     let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
                     let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
                     
-                    attributedString[startIndex..<endIndex].foregroundColor = color
-                    if bold {
-                        attributedString[startIndex..<endIndex].font = .system(size: 13, weight: .semibold, design: .monospaced)
-                    }
+                    attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.8, green: 0.2, blue: 0.2)
                 }
-            }
-        } catch {
-            // Ignore regex errors
-        }
-    }
-    
-    private static func highlightStrings(_ attributedString: inout AttributedString, _ code: String) {
-        let string = String(attributedString.characters)
-        
-        // Match strings with single quotes, double quotes, and template literals
-        let patterns = [
-            #""[^"\\]*(?:\\.[^"\\]*)*""#,  // Double quotes
-            #"'[^'\\]*(?:\\.[^'\\]*)*'"#,  // Single quotes
-            #"`[^`]*`"#                     // Template literals
-        ]
-        
-        for pattern in patterns {
-            do {
-                let regex = try NSRegularExpression(pattern: pattern, options: [])
-                let matches = regex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
-                
-                for match in matches {
-                    if let range = Range(match.range, in: string) {
-                        let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
-                        let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
-                        
-                        attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.8, green: 0.2, blue: 0.2)
-                    }
-                }
-            } catch {
-                // Ignore regex errors
             }
         }
     }
@@ -754,37 +770,11 @@ struct SyntaxHighlighter {
     private static func highlightComments(_ attributedString: inout AttributedString, _ code: String, commentPrefix: String = "//") {
         let string = String(attributedString.characters)
         
-        // Single line comments
-        let singleLinePattern = commentPrefix == "#" ? #"#[^\n]*"# : #"//[^\n]*"#
+        let regexes: [NSRegularExpression] = commentPrefix == "#" 
+            ? [RegexCache.hashComment, RegexCache.multiLineComment]
+            : [RegexCache.singleLineComment, RegexCache.multiLineComment]
         
-        // Multi-line comments (for languages that support them)
-        let multiLinePattern = #"/\*[\s\S]*?\*/"#
-        
-        for pattern in [singleLinePattern, multiLinePattern] {
-            do {
-                let regex = try NSRegularExpression(pattern: pattern, options: [])
-                let matches = regex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
-                
-                for match in matches {
-                    if let range = Range(match.range, in: string) {
-                        let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
-                        let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
-                        
-                        attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.4, green: 0.6, blue: 0.4)
-                        attributedString[startIndex..<endIndex].font = .system(size: 13, weight: .regular, design: .monospaced).italic()
-                    }
-                }
-            } catch {
-                // Ignore regex errors
-            }
-        }
-    }
-    
-    private static func highlightNumbers(_ attributedString: inout AttributedString, _ code: String) {
-        let string = String(attributedString.characters)
-        
-        do {
-            let regex = try NSRegularExpression(pattern: #"\b\d+\.?\d*\b"#, options: [])
+        for regex in regexes {
             let matches = regex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
             
             for match in matches {
@@ -792,11 +782,25 @@ struct SyntaxHighlighter {
                     let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
                     let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
                     
-                    attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.0, green: 0.5, blue: 1.0)
+                    attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.4, green: 0.6, blue: 0.4)
+                    attributedString[startIndex..<endIndex].font = .system(size: 13, weight: .regular, design: .monospaced).italic()
                 }
             }
-        } catch {
-            // Ignore regex errors
+        }
+    }
+    
+    private static func highlightNumbers(_ attributedString: inout AttributedString, _ code: String) {
+        let string = String(attributedString.characters)
+        
+        let matches = RegexCache.numbers.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in matches {
+            if let range = Range(match.range, in: string) {
+                let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
+                let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
+                
+                attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.0, green: 0.5, blue: 1.0)
+            }
         }
     }
     
@@ -805,23 +809,20 @@ struct SyntaxHighlighter {
         // Highlight property names
         let string = String(attributedString.characters)
         
-        do {
-            // Property names
-            let propRegex = try NSRegularExpression(pattern: #""([^"]+)"\s*:"#, options: [])
-            let propMatches = propRegex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
-            
-            for match in propMatches {
-                if match.numberOfRanges > 1 {
-                    let propRange = match.range(at: 1)
-                    if let range = Range(propRange, in: string) {
-                        let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: propRange.location - 1) // Include quote
-                        let endIndex = attributedString.characters.index(startIndex, offsetBy: propRange.length + 2) // Include both quotes
-                        
-                        attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.0, green: 0.5, blue: 0.7)
-                    }
+        // Property names
+        let propMatches = RegexCache.jsonProperty.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in propMatches {
+            if match.numberOfRanges > 1 {
+                let propRange = match.range(at: 1)
+                if let range = Range(propRange, in: string) {
+                    let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: propRange.location - 1) // Include quote
+                    let endIndex = attributedString.characters.index(startIndex, offsetBy: propRange.length + 2) // Include both quotes
+                    
+                    attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.0, green: 0.5, blue: 0.7)
                 }
             }
-        } catch {}
+        }
         
         highlightStrings(&attributedString, code)
         highlightNumbers(&attributedString, code)
@@ -860,7 +861,7 @@ struct SyntaxHighlighter {
         highlightNumbers(&attributedString, code)
         
         // Highlight variables
-        highlightPattern(#"\$\w+"#, in: &attributedString, color: .orange)
+        highlightRegex(RegexCache.shellVariable, in: &attributedString, color: .orange)
     }
     
     private static func highlightRuby(_ attributedString: inout AttributedString, _ code: String) {
@@ -875,10 +876,10 @@ struct SyntaxHighlighter {
         highlightNumbers(&attributedString, code)
         
         // Highlight symbols
-        highlightPattern(#":\w+"#, in: &attributedString, color: Color(red: 0.7, green: 0.4, blue: 0.0))
+        highlightRegex(RegexCache.rubySymbol, in: &attributedString, color: Color(red: 0.7, green: 0.4, blue: 0.0))
         
         // Highlight instance variables
-        highlightPattern(#"@\w+"#, in: &attributedString, color: .orange)
+        highlightRegex(RegexCache.rubyInstanceVar, in: &attributedString, color: .orange)
     }
     
     private static func highlightGo(_ attributedString: inout AttributedString, _ code: String) {
@@ -917,42 +918,38 @@ struct SyntaxHighlighter {
         highlightNumbers(&attributedString, code)
         
         // Highlight macros
-        highlightPattern(#"\w+!"#, in: &attributedString, color: .orange)
+        highlightRegex(RegexCache.rustMacro, in: &attributedString, color: .orange)
         
         // Highlight lifetimes
-        highlightPattern(#"'\w+"#, in: &attributedString, color: Color(red: 0.7, green: 0.4, blue: 0.0))
+        highlightRegex(RegexCache.rustLifetime, in: &attributedString, color: Color(red: 0.7, green: 0.4, blue: 0.0))
     }
     
     private static func highlightHTML(_ attributedString: inout AttributedString, _ code: String) {
         let string = String(attributedString.characters)
         
-        do {
-            // HTML tags
-            let tagRegex = try NSRegularExpression(pattern: #"</?[^>]+>"#, options: [])
-            let tagMatches = tagRegex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
-            
-            for match in tagMatches {
-                if let range = Range(match.range, in: string) {
-                    let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
-                    let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
-                    
-                    attributedString[startIndex..<endIndex].foregroundColor = .blue
-                }
+        // HTML tags
+        let tagMatches = RegexCache.htmlTag.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in tagMatches {
+            if let range = Range(match.range, in: string) {
+                let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
+                let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
+                
+                attributedString[startIndex..<endIndex].foregroundColor = .blue
             }
-            
-            // Attributes
-            let attrRegex = try NSRegularExpression(pattern: #"\w+(?==["'])"#, options: [])
-            let attrMatches = attrRegex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
-            
-            for match in attrMatches {
-                if let range = Range(match.range, in: string) {
-                    let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
-                    let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
-                    
-                    attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.7, green: 0.4, blue: 0.0)
-                }
+        }
+        
+        // Attributes
+        let attrMatches = RegexCache.htmlAttribute.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in attrMatches {
+            if let range = Range(match.range, in: string) {
+                let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
+                let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
+                
+                attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.7, green: 0.4, blue: 0.0)
             }
-        } catch {}
+        }
         
         highlightStrings(&attributedString, code)
         highlightComments(&attributedString, code, commentPrefix: "<!--")
@@ -961,41 +958,55 @@ struct SyntaxHighlighter {
     private static func highlightCSS(_ attributedString: inout AttributedString, _ code: String) {
         let string = String(attributedString.characters)
         
-        do {
-            // CSS selectors
-            let selectorRegex = try NSRegularExpression(pattern: #"[.#]?[\w-]+(?=\s*\{)"#, options: [])
-            let selectorMatches = selectorRegex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
-            
-            for match in selectorMatches {
-                if let range = Range(match.range, in: string) {
-                    let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
-                    let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
-                    
-                    attributedString[startIndex..<endIndex].foregroundColor = .purple
-                    attributedString[startIndex..<endIndex].font = .system(size: 13, weight: .semibold, design: .monospaced)
-                }
+        // CSS selectors
+        let selectorMatches = RegexCache.cssSelector.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in selectorMatches {
+            if let range = Range(match.range, in: string) {
+                let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
+                let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
+                
+                attributedString[startIndex..<endIndex].foregroundColor = .purple
+                attributedString[startIndex..<endIndex].font = .system(size: 13, weight: .semibold, design: .monospaced)
             }
-            
-            // CSS properties
-            let propRegex = try NSRegularExpression(pattern: #"[\w-]+(?=\s*:)"#, options: [])
-            let propMatches = propRegex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
-            
-            for match in propMatches {
-                if let range = Range(match.range, in: string) {
-                    let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
-                    let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
-                    
-                    attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.0, green: 0.5, blue: 0.7)
-                }
+        }
+        
+        // CSS properties
+        let propMatches = RegexCache.cssProperty.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in propMatches {
+            if let range = Range(match.range, in: string) {
+                let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
+                let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
+                
+                attributedString[startIndex..<endIndex].foregroundColor = Color(red: 0.0, green: 0.5, blue: 0.7)
             }
-        } catch {}
+        }
         
         highlightStrings(&attributedString, code)
         highlightNumbers(&attributedString, code)
         highlightComments(&attributedString, code, commentPrefix: "/*")
         
         // Highlight colors
-        highlightPattern(#"#[0-9a-fA-F]{3,6}"#, in: &attributedString, color: Color(red: 0.8, green: 0.2, blue: 0.2))
+        highlightRegex(RegexCache.cssColor, in: &attributedString, color: Color(red: 0.8, green: 0.2, blue: 0.2))
+    }
+    
+    // MARK: - Helper for direct regex highlighting
+    private static func highlightRegex(_ regex: NSRegularExpression, in attributedString: inout AttributedString, color: Color, bold: Bool = false) {
+        let string = String(attributedString.characters)
+        let matches = regex.matches(in: string, options: [], range: NSRange(location: 0, length: string.count))
+        
+        for match in matches {
+            if let range = Range(match.range, in: string) {
+                let startIndex = attributedString.characters.index(attributedString.startIndex, offsetBy: match.range.location)
+                let endIndex = attributedString.characters.index(startIndex, offsetBy: match.range.length)
+                
+                attributedString[startIndex..<endIndex].foregroundColor = color
+                if bold {
+                    attributedString[startIndex..<endIndex].font = .system(size: 13, weight: .semibold, design: .monospaced)
+                }
+            }
+        }
     }
 }
 
