@@ -17,6 +17,7 @@ struct ContentView: View {
     private let loadMoreDaysIncrement: Int = 5  // Load 5 more days when "Load More" is clicked
 
     // MARK: - Load More Sessions (load older sessions)
+    @EnvironmentObject var noticeCenter: AppNoticeCenter
     func loadMoreSessions() async {
         guard !isLoadingMore && hasMoreSessions else { return }
         
@@ -230,6 +231,9 @@ struct ContentView: View {
                         configurationHandler.clearError()
                     }
                 }
+            }
+            .overlay(alignment: .top) {
+                AppNoticeOverlay()
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshSessions"))) { _ in
                 // Refresh sessions when settings are saved
