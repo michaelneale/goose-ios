@@ -263,6 +263,7 @@ class GooseAPIService: ObservableObject {
                         case .summarizationRequested: return "SUMMARIZATION"
                         case .toolConfirmationRequest: return "TOOL_CONFIRM"
                         case .conversationCompacted: return "COMPACTED"
+                        case .systemNotification(let sn): return "SYS_NOTIF[\(sn.notificationType)]"
                         }
                     } ?? "EMPTY"
                     print("📊   [\(idx)] \(msg.id.prefix(8))... \(msg.role) - \(preview)")

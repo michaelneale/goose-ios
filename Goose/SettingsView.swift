@@ -222,6 +222,14 @@ struct SettingsView: View {
                         UserDefaults.standard.set(originalKey, forKey: "goose_secret_key")
                     }
                 }
+                
+                #if DEBUG
+                Section(header: Text("Debug Tools")) {
+                    NavigationLink(destination: MarkdownTestView()) {
+                        Label("Test Markdown Rendering", systemImage: "doc.text.magnifyingglass")
+                    }
+                }
+                #endif
             }
         }
     }
