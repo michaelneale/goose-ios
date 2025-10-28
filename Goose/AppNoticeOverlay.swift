@@ -68,20 +68,19 @@ struct AppNoticeOverlay: View {
     @ViewBuilder
     private func actionButton(for notice: AppNotice) -> some View {
         switch notice {
-        case .tunnelDisabled:
+        case .tunnelDisabled, .tunnelUnreachable:
+            // Small help link instead of big button - just need to enable tunneling
             Button(action: {
                 showingInstructionsSheet = true
             }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "info.circle.fill")
-                    Text("View Setup Instructions")
+                HStack(spacing: 4) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 12))
+                    Text("How to enable tunneling")
+                        .font(.system(size: 13))
                 }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(backgroundColor(for: notice))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Color.white)
-                .cornerRadius(8)
+                .foregroundColor(.white.opacity(0.9))
+                .underline()
             }
             
         case .appNeedsUpdate:
@@ -104,7 +103,7 @@ struct AppNoticeOverlay: View {
     
     private func backgroundColor(for notice: AppNotice) -> Color {
         switch notice {
-        case .tunnelDisabled:
+        case .tunnelDisabled, .tunnelUnreachable:
             return .orange
         case .appNeedsUpdate:
             return .blue

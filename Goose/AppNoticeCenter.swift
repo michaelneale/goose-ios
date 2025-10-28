@@ -3,12 +3,15 @@ import SwiftUI
 /// Global notice types that can be displayed to the user
 enum AppNotice: Equatable {
     case tunnelDisabled
+    case tunnelUnreachable
     case appNeedsUpdate
     
     var title: String {
         switch self {
         case .tunnelDisabled:
-            return "Connection Failed"
+            return "Tunnel Not Enabled"
+        case .tunnelUnreachable:
+            return "Cannot Connect"
         case .appNeedsUpdate:
             return "Update Required"
         }
@@ -18,6 +21,8 @@ enum AppNotice: Equatable {
         switch self {
         case .tunnelDisabled:
             return "Unable to reach your Goose agent. Please enable tunneling in the Goose desktop app."
+        case .tunnelUnreachable:
+            return "Cannot reach your Goose agent. Make sure the Goose desktop app is running with tunneling enabled."
         case .appNeedsUpdate:
             return "The desktop app needs to be updated to work with this version of the mobile app."
         }
@@ -25,7 +30,7 @@ enum AppNotice: Equatable {
     
     var icon: String {
         switch self {
-        case .tunnelDisabled:
+        case .tunnelDisabled, .tunnelUnreachable:
             return "network.slash"
         case .appNeedsUpdate:
             return "arrow.down.circle"

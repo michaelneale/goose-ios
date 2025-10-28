@@ -20,8 +20,57 @@ class GooseAPIService: ObservableObject {
     var isTrialMode: Bool {
         return baseURL.contains("demo-goosed.fly.dev")
     }
+    
+    // Private network detection (tailscale, private IPs)
+    private var isPrivateNetworkURL: Bool {
+        return baseURL.contains(".ts.net") || baseURL.contains("://100.")
+    }
 
     private init() {}
+    
+    // MARK: - Centralized Error Handling
+    
+    /// Handle API errors and set appropriate notices
+    private func handleAPIError(_ error: Error, context: String = "") {
+        if isTrialMode { return }
+        
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .httpError(let code, _):
+                if code == 503 {
+                    AppNoticeCenter.shared.setNotice(.tunnelDisabled)
+                }
+            case .decodingError:
+                AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
+            default:
+                break
+            }
+        } else if error is DecodingError {
+            AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
+        } else if let urlError = error as? URLError {
+            // Connection failures on private networks likely mean tunnel isn't running
+            if urlError.code == .cannotConnectToHost && isPrivateNetworkURL {
+                AppNoticeCenter.shared.setNotice(.tunnelUnreachable)
+            }
+        }
+        
+        if !context.isEmpty {
+            print("🚨 \(context): \(error)")
+        }
+    }
+    
+    /// Handle HTTP status codes and set appropriate notices
+    private func handleHTTPStatus(_ statusCode: Int, body: String, context: String = "") {
+        if isTrialMode { return }
+        
+        if statusCode == 503 {
+            AppNoticeCenter.shared.setNotice(.tunnelDisabled)
+        }
+        
+        if !context.isEmpty {
+            print("🚨 \(context) - HTTP \(statusCode): \(body)")
+        }
+    }
 
     // MARK: - Proper SSE Streaming Implementation
     func startChatStreamWithSSE(
@@ -131,14 +180,7 @@ class GooseAPIService: ObservableObject {
                     } else {
                         // Get error details for connection test
                         let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                        print(
-                            "🚨 Connection Test Failed - HTTP \(httpResponse.statusCode): \(errorBody)"
-                        )
-                        // Set notice for 503 errors (only when not in trial mode)
-                        if httpResponse.statusCode == 503 && !self.isTrialMode {
-                            AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-                        }
-                        
+                        handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Connection Test Failed")
                         self.connectionError = "HTTP \(httpResponse.statusCode): \(errorBody)"
                     }
                 }
@@ -189,12 +231,7 @@ class GooseAPIService: ObservableObject {
 
             if httpResponse.statusCode != 200 {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                
-                // Set notice for 503 errors (only when not in trial mode)
-                if httpResponse.statusCode == 503 && !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-                }
-                
+                handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Start Agent")
                 throw APIError.httpError(httpResponse.statusCode, errorBody)
             }
 
@@ -202,10 +239,7 @@ class GooseAPIService: ObservableObject {
             return (agentResponse.id, agentResponse.conversation ?? [])
         }
         catch let error as DecodingError {
-            // Handle missing field errors (only when not in trial mode)
-            if !self.isTrialMode {
-                AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-            }
+            handleAPIError(APIError.decodingError(error), context: "Start Agent")
             throw APIError.decodingError(error)
         }
     }
@@ -249,13 +283,7 @@ class GooseAPIService: ObservableObject {
 
             if httpResponse.statusCode != 200 {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                print("🚨 Resume failed with status \(httpResponse.statusCode): \(errorBody)")
-                
-                // Set notice for 503 errors (only when not in trial mode)
-                if httpResponse.statusCode == 503 && !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-                }
-                
+                handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Resume Agent")
                 throw APIError.httpError(httpResponse.statusCode, errorBody)
             }
 
@@ -298,10 +326,7 @@ class GooseAPIService: ObservableObject {
             return (agentResponse.id, messages)
         }
         catch let error as DecodingError {
-            // Handle missing field errors (only when not in trial mode)
-            if !self.isTrialMode {
-                AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-            }
+            handleAPIError(APIError.decodingError(error), context: "Resume Agent")
             throw APIError.decodingError(error)
         }
     }
@@ -330,12 +355,7 @@ class GooseAPIService: ObservableObject {
 
         if httpResponse.statusCode != 200 {
             let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-            
-            // Set notice for 503 errors (only when not in trial mode)
-            if httpResponse.statusCode == 503 && !self.isTrialMode {
-                AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-            }
-            
+            handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Update From Session")
             throw APIError.httpError(httpResponse.statusCode, errorBody)
         }
 
@@ -474,25 +494,17 @@ class GooseAPIService: ObservableObject {
             }
 
             if httpResponse.statusCode != 200 {
-                let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                
-                // Set notice for 503 errors (only when not in trial mode)
-                if httpResponse.statusCode == 503 && !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-                }
-                
-                throw APIError.httpError(httpResponse.statusCode, errorBody)
-            }
+            let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+            handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Update From Session")
+            throw APIError.httpError(httpResponse.statusCode, errorBody)
+        }
 
             print("✅ Provider updated to \(provider) with model \(model ?? "default")")
             
             // Clear config cache when agent changes
             clearConfigCache()
         } catch let error as DecodingError {
-            print("🚨 Decoding error updating provider: \(error)")
-            if !self.isTrialMode {
-                AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-            }
+            handleAPIError(APIError.decodingError(error), context: "Update Provider")
             throw APIError.decodingError(error)
         }
     }
@@ -519,13 +531,7 @@ class GooseAPIService: ObservableObject {
 
             if httpResponse.statusCode != 200 {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                
-                // Set notice for 503 errors (only when not in trial mode)
-                if httpResponse.statusCode == 503 && !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-                }
-                
-                print("⚠️ Failed to get extensions config: \(errorBody)")
+                handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Load Extensions")
                 return
             }
 
@@ -536,9 +542,7 @@ class GooseAPIService: ObservableObject {
                 let extensions = extensionsConfig["extensions"] as? [[String: Any]]
             else {
                 print("⚠️ Failed to parse extensions config")
-                if !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-                }
+                handleAPIError(APIError.noData, context: "Load Extensions - parse error")
                 return
             }
 
@@ -553,10 +557,7 @@ class GooseAPIService: ObservableObject {
                 }
             }
         } catch let error as DecodingError {
-            print("🚨 Decoding error loading extensions: \(error)")
-            if !self.isTrialMode {
-                AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-            }
+            handleAPIError(APIError.decodingError(error), context: "Load Extensions")
             throw error
         }
     }
@@ -634,23 +635,11 @@ class GooseAPIService: ObservableObject {
                 return insights
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                print("🚨 Failed to fetch insights: \(httpResponse.statusCode) - \(errorBody)")
-                
-                // Set notice for 503 errors (only when not in trial mode)
-                if httpResponse.statusCode == 503 && !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-                }
+                handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Fetch Insights")
                 return nil
             }
         } catch {
-            if let decodingError = error as? DecodingError {
-                print("🚨 Decoding error fetching insights: \(decodingError)")
-                if !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-                }
-            } else {
-                print("🚨 Error fetching insights: \(error)")
-            }
+            handleAPIError(error, context: "Fetch Insights")
             return nil
         }
     }
@@ -688,24 +677,11 @@ class GooseAPIService: ObservableObject {
                 return sessionsResponse.sessions
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
-                print("🚨 Sessions fetch failed - HTTP \(httpResponse.statusCode): \(errorBody)")
-                
-                // Set notice for 503 errors (only when not in trial mode)
-                if httpResponse.statusCode == 503 && !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-                }
+                handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Fetch Sessions")
                 return []
             }
         } catch {
-            if let decodingError = error as? DecodingError {
-                print("🚨 Decoding error fetching sessions: \(decodingError)")
-                if !self.isTrialMode {
-                    AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-                }
-            } else {
-                print("🚨 Error fetching sessions: \(error)")
-            }
-
+            handleAPIError(error, context: "Fetch Sessions")
             return []
         }
     }
@@ -760,13 +736,8 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
         print("🚀 SSE Response Headers: \(httpResponse.allHeaderFields)")
 
         guard httpResponse.statusCode == 200 else {
-            // Store error status for later
+            // Store error status for later - errors are handled by earlier API calls
             errorStatusCode = httpResponse.statusCode
-            
-            // Set notice for 503 errors (only when not in trial mode)
-            if httpResponse.statusCode == 503 && !GooseAPIService.shared.isTrialMode {
-                AppNoticeCenter.shared.setNotice(.tunnelDisabled)
-            }
             // Let it continue so we can capture the error body
             completionHandler(.allow)
             return
@@ -846,12 +817,7 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
                             return
                         }
                     } catch {
-                        // Check if it's a decoding error
-                        if let decodingError = error as? DecodingError {
-                            if !GooseAPIService.shared.isTrialMode {
-                                AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
-                            }
-                        }
+                        // Errors are handled by earlier API calls
                         print("🚨 Failed to decode SSE event: \(error)")
                         DispatchQueue.main.async {
                             self.onError(error)
