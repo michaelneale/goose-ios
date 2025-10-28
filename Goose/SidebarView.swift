@@ -110,18 +110,31 @@ struct SidebarView: View {
             groups[path]?.append(session)
         }
         
-        // Sort groups alphabetically, but put "Unknown" last
+        // Sort groups by most recent activity (newest first), but put "Unknown" last
         let sortedGroups = groups.sorted { group1, group2 in
+            // Always put "Unknown" at the end
             if group1.key == "Unknown" { return false }
             if group2.key == "Unknown" { return true }
+            
+            // Find the most recent session in each group
+            let mostRecent1 = group1.value.compactMap { formatter.date(from: $0.updatedAt) }.max()
+            let mostRecent2 = group2.value.compactMap { formatter.date(from: $0.updatedAt) }.max()
+            
+            // Sort by most recent activity (newer groups first)
+            if let date1 = mostRecent1, let date2 = mostRecent2 {
+                return date1 > date2
+            }
+            // If one has no valid dates, put it after the one that does
+            if mostRecent1 != nil { return true }
+            if mostRecent2 != nil { return false }
+            // Both have no dates, alphabetical fallback
             return group1.key < group2.key
         }
         
         // Return groups with formatted labels and sorted sessions
         return sortedGroups.map { path, sessions in
-            // Extract just the directory name for the label
-            let components = path.split(separator: "/")
-            let label = String(components.last ?? "Unknown").uppercased()
+            // Use the full path for the label in folder mode
+            let label = path.uppercased()
             
             // Sort sessions within each group by updated time (newest first)
             let sortedSessions = sessions.sorted { s1, s2 in
@@ -327,7 +340,7 @@ struct SidebarView: View {
                                 
                                 // Sessions for this date/directory
                                 ForEach(sessions) { session in
-                                    SessionRowView(session: session, showDirectory: !groupByDirectory)
+                                    SessionRowView(session: session, showDirectoryName: !groupByDirectory)
                                         .onTapGesture {
                                             onSessionSelect(session.id)
                                             withAnimation(.easeInOut(duration: 0.3)) {
@@ -462,7 +475,7 @@ struct DateSectionHeader: View {
 // MARK: - Session Row View
 struct SessionRowView: View {
     let session: ChatSession
-    var showDirectory: Bool = false
+    var showDirectoryName: Bool = false  // Show just the directory name (date mode only)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -494,17 +507,16 @@ struct SessionRowView: View {
                 }
             }
             
-            // Show directory path when in date mode
-            if showDirectory, let workingDir = session.workingDir {
+            // Show directory name in date mode only (folder mode already has it in the header)
+            if showDirectoryName, let workingDir = session.workingDir {
                 HStack(spacing: 4) {
                     Image(systemName: "folder")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
-                    Text(workingDir)
+                    Text(session.directoryName)
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
-                        .truncationMode(.middle)
                 }
             }
         }
