@@ -132,7 +132,10 @@ struct SidebarView: View {
                 return date1 > date2
             }
             
-            return (label, sortedSessions)
+            // Only take the most recent 3 sessions from each folder
+            let limitedSessions = Array(sortedSessions.prefix(3))
+            
+            return (label, limitedSessions)
         }
     }
     
