@@ -43,7 +43,9 @@
 		D3BC33FE2EA16CF30057E748 /* TrialModeBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FD2EA16CF30057E748 /* TrialModeBanner.swift */; };
 		D3BC34002EA1713D0057E748 /* NodeMatrix.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC33FF2EA1713D0057E748 /* NodeMatrix.swift */; };
 		D3BC34042EA19D990057E748 /* NodeFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BC34032EA19D990057E748 /* NodeFocus.swift */; };
-/* End PBXBuildFile section */
+		8542CDA2877E4BEF8ADA8A5C001 /* AppNoticeCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8542CDA2877E4BEF8ADA8A5C000 /* AppNoticeCenter.swift */; };
+		4D6CA113A6714967B9BA0CA1001 /* AppNoticeOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D6CA113A6714967B9BA0CA1000 /* AppNoticeOverlay.swift */; };
+	/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputManager.swift; sourceTree = "<group>"; };
@@ -84,13 +86,17 @@
 		D3BC34032EA19D990057E748 /* NodeFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeFocus.swift; sourceTree = "<group>"; };
 		EA377AE97CC0C621896375E7 /* MarkdownTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTableView.swift; sourceTree = "<group>"; };
 		FE1A3D767C87B30740AC05D2 /* StackedToolCallsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackedToolCallsView.swift; sourceTree = "<group>"; };
-/* End PBXFileReference section */
+		8542CDA2877E4BEF8ADA8A5C000 /* AppNoticeCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNoticeCenter.swift; sourceTree = "<group>"; };
+		4D6CA113A6714967B9BA0CA1000 /* AppNoticeOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNoticeOverlay.swift; sourceTree = "<group>"; };
+	/* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A1234567890ABCDEF996 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8542CDA2877E4BEF8ADA8A5C001 /* AppNoticeCenter.swift in Sources */,
+				4D6CA113A6714967B9BA0CA1001 /* AppNoticeOverlay.swift in Sources */,
 				A1234567890ABCDEF020 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -138,6 +144,9 @@
 				83ACD8A92E827DB500379D0E /* Info.plist */,
 				A1234567890ABCDEF000 /* GooseApp.swift */,
 				A1234567890ABCDEF002 /* ContentView.swift */,
+				8542CDA2877E4BEF8ADA8A5C000 /* AppNoticeCenter.swift */,
+				4D6CA113A6714967B9BA0CA1000 /* AppNoticeOverlay.swift */,
+
 				AE15643668F34C98B329A6FA /* CalendarExtensions.swift */,
 				A1234567890ABCDEF009 /* ChatView.swift */,
 				0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */,
@@ -242,6 +251,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8542CDA2877E4BEF8ADA8A5C001 /* AppNoticeCenter.swift in Sources */,
+				4D6CA113A6714967B9BA0CA1001 /* AppNoticeOverlay.swift in Sources */,
 				A1234567890ABCDEF003 /* ContentView.swift in Sources */,
 				838F2DF02E9E270300E2FC48 /* ChatInputView.swift in Sources */,
 				837D4D732EA6FAD6000A95B7 /* SessionsCard.swift in Sources */,

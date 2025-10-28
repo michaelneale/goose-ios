@@ -581,8 +581,30 @@ struct ChatView: View {
             } catch {
                 await MainActor.run {
                     isLoading = false
+                }
+                
+                // Handle specific error types
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .httpError(let code, let body):
+                        print("🚨 Session setup HTTP error \(code): \(body)")
+                        // Set notice for 503 errors (only when not in trial mode)
+                        if code == 503 && !apiService.isTrialMode {
+                            AppNoticeCenter.shared.setNotice(.tunnelDisabled)
+                        }
+                    case .decodingError(let decodingError):
+                        print("🚨 Session setup decoding error: \(decodingError)")
+                        if !apiService.isTrialMode {
+                            AppNoticeCenter.shared.setNotice(.appNeedsUpdate)
+                        }
+                    default:
+                        print("🚨 Session setup error: \(error)")
+                    }
+                } else {
                     print("🚨 Session setup error: \(error)")
-
+                }
+                
+                await MainActor.run {
                     let errorMessage = Message(
                         role: .assistant,
                         text: "❌ Failed to initialize session: \(error.localizedDescription)"
