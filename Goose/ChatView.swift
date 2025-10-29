@@ -4,6 +4,7 @@ struct ChatView: View {
     @Binding var showingSidebar: Bool
     let onBackToWelcome: () -> Void
     @StateObject private var apiService = GooseAPIService.shared
+    @StateObject private var messageQueue = MessageQueue.shared
     @State private var messages: [Message] = []
     @State private var inputText = ""
     @State private var isLoading = false
@@ -13,6 +14,7 @@ struct ChatView: View {
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
     @State private var currentSessionId: String?
+    @State private var isFlushingQueue = false
     @State private var isSettingsPresented = false
 
     @FocusState private var isInputFocused: Bool
@@ -168,6 +170,29 @@ struct ChatView: View {
                                 .padding(.horizontal)
                                 .id("polling-indicator")
                             }
+                            
+                            // Show queued messages
+                            ForEach(messageQueue.queuedMessages) { queuedMsg in
+                                HStack(alignment: .top, spacing: 12) {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 28))
+                                        .foregroundColor(.blue)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text("Queued")
+                                                .font(.system(size: 14, weight: .semibold))
+                                            Image(systemName: "clock.arrow.circlepath")
+                                                .font(.system(size: 12))
+                                        }
+                                        .foregroundColor(.orange)
+                                        
+                                        Text(queuedMsg.text)
+                                            .font(.system(size: 16))
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
 
                             // Add space at the bottom so the last message can scroll above the input area
                             // This is actual content space, not padding, so it scrolls with the messages
@@ -293,6 +318,17 @@ struct ChatView: View {
                         .font(.system(size: 16))
                         .foregroundColor(.primary)
                         .lineLimit(1)
+                    
+                    // Queued messages indicator
+                    if messageQueue.hasMessages {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 12))
+                            Text("\(messageQueue.count)")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(.orange)
+                    }
 
                     Spacer()
                 }
@@ -339,6 +375,7 @@ struct ChatView: View {
             Task {
                 await apiService.testConnection()
             }
+            startConnectionMonitoring()
 
             // Listen for initial message from WelcomeView
             NotificationCenter.default.addObserver(
@@ -419,10 +456,129 @@ struct ChatView: View {
         }
     }
 
+    /// Monitor connection state and flush queue when online
+    private func startConnectionMonitoring() {
+        // Check connection state periodically
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            Task {
+                await apiService.testConnection()
+                
+                // If we're back online and have queued messages, flush them
+                if apiService.isOnline && messageQueue.hasMessages {
+                    print("🌐 Back online - flushing \(messageQueue.count) queued messages")
+                    flushQueuedMessages()
+                }
+            }
+        }
+    }
+
     private func sendMessage() {
         let trimmedText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty && !isLoading else { return }
-
+        
+        // Check if we're offline - queue the message
+        if !apiService.isOnline {
+            print("📴 Offline - queueing message")
+            messageQueue.enqueue(text: trimmedText, sessionId: currentSessionId)
+            inputText = ""
+            return
+        }
+        
+        sendMessageNow(trimmedText)
+    }
+    
+    /// Flush queued messages when connection is restored
+    private func flushQueuedMessages() {
+        // Prevent concurrent flush operations
+        guard apiService.isOnline && !isFlushingQueue else { return }
+        guard messageQueue.hasMessages else { return }
+        
+        isFlushingQueue = true
+        
+        // Process messages sequentially
+        Task {
+            await flushNextMessage()
+        }
+    }
+    
+    /// Flush the next message in the queue (recursive)
+    private func flushNextMessage() async {
+        guard let queuedMsg = messageQueue.queuedMessages.first else {
+            // Queue is empty, we're done
+            await MainActor.run {
+                isFlushingQueue = false
+            }
+            return
+        }
+        
+        print("📤 Flushing queued message: '\(queuedMsg.text.prefix(50))...' for session: \(queuedMsg.sessionId ?? "new")")
+        
+        // Check if we need to switch sessions
+        if let targetSessionId = queuedMsg.sessionId, targetSessionId != currentSessionId {
+            print("🔄 Switching to session \(targetSessionId) for queued message")
+            await MainActor.run {
+                loadSession(targetSessionId)
+            }
+            // Wait a bit for session to load
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        }
+        
+        // Send the message and wait for completion
+        let success = await sendMessageNowAsync(queuedMsg.text)
+        
+        if success {
+            // Only dequeue on success
+            await MainActor.run {
+                messageQueue.dequeue(queuedMsg.id)
+            }
+            // Process next message
+            await flushNextMessage()
+        } else {
+            // Stop flushing on failure, will retry on next connection check
+            print("⚠️ Failed to send queued message, will retry later")
+            await MainActor.run {
+                isFlushingQueue = false
+            }
+        }
+    }
+    
+    /// Send a message asynchronously and return success status
+    private func sendMessageNowAsync(_ trimmedText: String) async -> Bool {
+        // Wait if currently loading to avoid race conditions
+        var attempts = 0
+        while isLoading && attempts < 20 {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            attempts += 1
+        }
+        
+        if isLoading {
+            print("⚠️ Still loading after waiting, aborting send")
+            return false
+        }
+        
+        // Add message to UI
+        let userMessage = Message(role: .user, text: trimmedText)
+        await MainActor.run {
+            messages.append(userMessage)
+            isLoading = true
+            shouldAutoScroll = true
+            stopPollingForUpdates()
+        }
+        
+        // Start the chat stream
+        await MainActor.run {
+            startChatStream()
+        }
+        
+        // Wait for the stream to complete
+        while isLoading {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        }
+        
+        return true
+    }
+    
+    private func sendMessageNow(_ trimmedText: String) {
         // Stop voice input if active to prevent transcription after send
         if voiceManager.isListening {
             voiceManager.setMode(.normal)

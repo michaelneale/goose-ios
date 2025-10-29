@@ -5,6 +5,7 @@ class GooseAPIService: ObservableObject {
     static let shared = GooseAPIService()
 
     @Published var isConnected = false
+    @Published var isOnline = true  // Track if we can reach the server
     @Published var connectionError: String?
 
     // The configured URL
@@ -177,6 +178,7 @@ class GooseAPIService: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse {
                 let connected = httpResponse.statusCode == 200
                 await MainActor.run {
+                    self.isOnline = true
                     self.isConnected = connected
                     if connected {
                         self.connectionError = nil
@@ -197,6 +199,7 @@ class GooseAPIService: ObservableObject {
             }
         } catch {
             await MainActor.run {
+                self.isOnline = false
                 self.isConnected = false
                 self.connectionError = error.localizedDescription
             }

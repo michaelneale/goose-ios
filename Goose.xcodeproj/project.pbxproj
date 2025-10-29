@@ -10,6 +10,7 @@
 		5FB46C8A5B96A5D68C7CA66F /* VoiceInputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */; };
 		832B7A0E2EA9E166000FB7AB /* TrialMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832B7A0D2EA9E166000FB7AB /* TrialMode.swift */; };
 		83398FCC2EA0D47900EB958C /* TrialModeInstructionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83398FCB2EA0D47900EB958C /* TrialModeInstructionsView.swift */; };
+		MQ1234567890ABCDEF001 /* MessageQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = MQ1234567890ABCDEF000 /* MessageQueue.swift */; };
 		834A2CB82E98D93A00D15D6A /* ContinuousVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834A2CB72E98D93A00D15D6A /* ContinuousVoiceManager.swift */; };
 		834A2CB92E98D93B00D15D6A /* EnhancedVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834A2CB82E98D93B00D15D6A /* EnhancedVoiceManager.swift */; };
 		837D4D732EA6FAD6000A95B7 /* SessionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 837D4D722EA6FAD6000A95B7 /* SessionsCard.swift */; };
@@ -51,6 +52,7 @@
 		0F2CBE33C0F236E880C9F178 /* VoiceInputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputManager.swift; sourceTree = "<group>"; };
 		832B7A0D2EA9E166000FB7AB /* TrialMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrialMode.swift; path = Goose/TrialMode.swift; sourceTree = "<group>"; };
 		83398FCB2EA0D47900EB958C /* TrialModeInstructionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialModeInstructionsView.swift; sourceTree = "<group>"; };
+		MQ1234567890ABCDEF000 /* MessageQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageQueue.swift; sourceTree = "<group>"; };
 		834A2CB72E98D93A00D15D6A /* ContinuousVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContinuousVoiceManager.swift; path = Goose/ContinuousVoiceManager.swift; sourceTree = "<group>"; };
 		834A2CB82E98D93B00D15D6A /* EnhancedVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedVoiceManager.swift; sourceTree = "<group>"; };
 		837D4D722EA6FAD6000A95B7 /* SessionsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SessionsCard.swift; path = Goose/SessionsCard.swift; sourceTree = "<group>"; };
@@ -95,8 +97,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8542CDA2877E4BEF8ADA8A5C001 /* AppNoticeCenter.swift in Sources */,
-				4D6CA113A6714967B9BA0CA1001 /* AppNoticeOverlay.swift in Sources */,
 				A1234567890ABCDEF020 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -160,6 +160,7 @@
 				D32A01842EAA7D8F00AF9DD0 /* ToolViews.swift */,
 				A1234567890ABCDEF017 /* SettingsView.swift */,
 				A1234567890ABCDEF011 /* Message.swift */,
+				MQ1234567890ABCDEF000 /* MessageQueue.swift */,
 				A1234567890ABCDEF013 /* GooseAPIService.swift */,
 				A1234567890ABCDEF004 /* Assets.xcassets */,
 				A1234567890ABCDEF006 /* Preview Content */,
@@ -275,6 +276,7 @@
 				D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */,
 				A1234567890ABCDEF012 /* Message.swift in Sources */,
 				83398FCC2EA0D47900EB958C /* TrialModeInstructionsView.swift in Sources */,
+				MQ1234567890ABCDEF001 /* MessageQueue.swift in Sources */,
 				83ACD8AB2E827DB500379D0E /* ConfigurationHandler.swift in Sources */,
 				834A2CB82E98D93A00D15D6A /* ContinuousVoiceManager.swift in Sources */,
 				834A2CB92E98D93B00D15D6A /* EnhancedVoiceManager.swift in Sources */,
