@@ -21,11 +21,23 @@ struct SidebarView: View {
     // Grouping mode state
     @State private var groupByDirectory: Bool = false
     
+    // Cached groupings to avoid recomputation on every render
+    @State private var cachedGroupedByDate: [(String, [ChatSession])] = []
+    @State private var cachedGroupedByDirectory: [(String, [ChatSession])] = []
+    @State private var hasWorkingDirs: Bool = false
+    
     // Agent management from main branch
     @StateObject private var agentStorage = AgentStorage.shared
     @State private var showingRenameDialog = false
     @State private var agentToRename: AgentConfiguration?
     @State private var newAgentName = ""
+    
+    // Static ISO8601 formatter to avoid recreating on each computation
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
     // Dynamic sidebar width based on device
     private var sidebarWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
@@ -41,17 +53,15 @@ struct SidebarView: View {
         UIDevice.current.userInterfaceIdiom == .pad
     }
     
-    // Group sessions by date
-    private var groupedSessions: [(String, [ChatSession])] {
+    // Compute sessions grouped by date
+    private func computeGroupedByDate() -> [(String, [ChatSession])] {
         let calendar = Calendar.current  // Use local timezone
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
         
         // Group sessions by date
         var groups: [Date: [ChatSession]] = [:]
         
         for session in cachedSessions {
-            guard let sessionDate = formatter.date(from: session.updatedAt) else {
+            guard let sessionDate = Self.iso8601Formatter.date(from: session.updatedAt) else {
                 continue
             }
             
@@ -69,8 +79,8 @@ struct SidebarView: View {
         return sortedGroups.map { date, sessions in
             let label = formatDateHeader(date)
             let sortedSessions = sessions.sorted { s1, s2 in
-                guard let date1 = formatter.date(from: s1.updatedAt),
-                      let date2 = formatter.date(from: s2.updatedAt) else {
+                guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
+                      let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
                     return false
                 }
                 return date1 > date2
@@ -93,11 +103,8 @@ struct SidebarView: View {
         }
     }
     
-    // Group sessions by working directory
-    private var groupedSessionsByDirectory: [(String, [ChatSession])] {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        
+    // Compute sessions grouped by working directory
+    private func computeGroupedByDirectory() -> [(String, [ChatSession])] {
         // Group sessions by working directory
         var groups: [String: [ChatSession]] = [:]
         
@@ -117,8 +124,8 @@ struct SidebarView: View {
             if group2.key == "Unknown" { return true }
             
             // Find the most recent session in each group
-            let mostRecent1 = group1.value.compactMap { formatter.date(from: $0.updatedAt) }.max()
-            let mostRecent2 = group2.value.compactMap { formatter.date(from: $0.updatedAt) }.max()
+            let mostRecent1 = group1.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
+            let mostRecent2 = group2.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
             
             // Sort by most recent activity (newer groups first)
             if let date1 = mostRecent1, let date2 = mostRecent2 {
@@ -138,8 +145,8 @@ struct SidebarView: View {
             
             // Sort sessions within each group by updated time (newest first)
             let sortedSessions = sessions.sorted { s1, s2 in
-                guard let date1 = formatter.date(from: s1.updatedAt),
-                      let date2 = formatter.date(from: s2.updatedAt) else {
+                guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
+                      let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
                     return false
                 }
                 return date1 > date2
@@ -152,9 +159,16 @@ struct SidebarView: View {
         }
     }
     
+    // Update cached groupings when sessions change
+    private func updateGroupings() {
+        cachedGroupedByDate = computeGroupedByDate()
+        cachedGroupedByDirectory = computeGroupedByDirectory()
+        hasWorkingDirs = cachedSessions.contains(where: { $0.workingDir != nil && !$0.workingDir!.isEmpty })
+    }
+    
     // Get the appropriate grouping based on mode
     private var currentGrouping: [(String, [ChatSession])] {
-        return groupByDirectory ? groupedSessionsByDirectory : groupedSessions
+        return groupByDirectory ? cachedGroupedByDirectory : cachedGroupedByDate
     }
 
     var body: some View {
@@ -277,7 +291,7 @@ struct SidebarView: View {
                                 .frame(height: 24)
                             
                             // Group by toggle - only show if there are sessions with non-empty working directories
-                            if cachedSessions.contains(where: { $0.workingDir != nil && !$0.workingDir!.isEmpty }) {
+                            if hasWorkingDirs {
                                 HStack(spacing: 8) {
                                     Button(action: {
                                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -448,6 +462,14 @@ struct SidebarView: View {
             }
         } message: {
             Text("Enter a name for this agent")
+        }
+        .onAppear {
+            // Compute groupings on initial load
+            updateGroupings()
+        }
+        .onChange(of: cachedSessions) { _ in
+            // Recompute groupings when sessions change
+            updateGroupings()
         }
     }
 }
