@@ -18,6 +18,18 @@ struct NodeFocus: View {
                     Text("\(session.messageCount) message\(session.messageCount == 1 ? "" : "s")")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
+                    
+                    // Working directory
+                    if let workingDir = session.workingDir {
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 9))
+                            Text(session.directoryName)
+                                .font(.system(size: 10))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.secondary.opacity(0.8))
+                    }
                 }
                 
                 Spacer()
@@ -67,7 +79,8 @@ struct NodeFocus: View {
                 description: "Working on iOS app features",
                 messageCount: 12,
                 createdAt: "2024-01-15T10:30:00Z",
-                updatedAt: "2024-01-15T14:45:00Z"
+                updatedAt: "2024-01-15T14:45:00Z",
+                workingDir: "/Users/test/project"
             ),
             onDismiss: {
                 print("Dismiss tapped")

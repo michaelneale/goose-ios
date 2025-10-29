@@ -88,6 +88,19 @@ struct SessionsCard: View {
                     Text(timeAgo)
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
+                    
+                    // Working directory
+                    if let workingDir = session.workingDir {
+                        HStack(spacing: 6) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 12))
+                            Text(workingDir)
+                                .font(.system(size: 13))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .foregroundColor(.secondary.opacity(0.8))
+                    }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 
@@ -187,7 +200,8 @@ struct SessionsCard: View {
                     description: "Building a SwiftUI app with node visualization",
                     messageCount: 42,
                     createdAt: formatter.string(from: twoHoursAgo),
-                    updatedAt: formatter.string(from: twoHoursAgo)
+                    updatedAt: formatter.string(from: twoHoursAgo),
+                    workingDir: nil
                 ),
                 onClose: {
                     print("Close tapped")
