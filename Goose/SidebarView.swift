@@ -340,7 +340,7 @@ struct SidebarView: View {
                                 
                                 // Sessions for this date/directory
                                 ForEach(sessions) { session in
-                                    SessionRowView(session: session, showDirectoryName: !groupByDirectory)
+                                    SessionRowView(session: session)
                                         .onTapGesture {
                                             onSessionSelect(session.id)
                                             withAnimation(.easeInOut(duration: 0.3)) {
@@ -475,16 +475,31 @@ struct DateSectionHeader: View {
 // MARK: - Session Row View
 struct SessionRowView: View {
     let session: ChatSession
-    var showDirectoryName: Bool = false  // Show just the directory name (date mode only)
+    var showFolder: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 12) {
-                // Session name
-                Text(session.title)
-                    .font(.system(size: 15, weight: .medium))
-                    .lineLimit(1)
-                    .foregroundColor(.primary)
+            HStack(spacing: 8) {
+                // Session name with folder inline
+                HStack(spacing: 4) {
+                    Text(session.title)
+                        .font(.system(size: 15, weight: .medium))
+                        .lineLimit(1)
+                        .foregroundColor(.primary)
+                    
+                    // Show folder name inline if available and enabled
+                    if showFolder, let workingDir = session.workingDir, !workingDir.isEmpty {
+                        HStack(spacing: 2) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
+                            Text(session.directoryName)
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
                 
                 Spacer()
                 
@@ -504,19 +519,6 @@ struct SessionRowView: View {
                     Text("\(session.messageCount)")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
-                }
-            }
-            
-            // Show directory name in date mode only (folder mode already has it in the header)
-            if showDirectoryName, let workingDir = session.workingDir {
-                HStack(spacing: 4) {
-                    Image(systemName: "folder")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                    Text(session.directoryName)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
                 }
             }
         }
