@@ -144,6 +144,9 @@ class GooseAPIService: ObservableObject {
 
         // Store the delegate reference to prevent deallocation
         objc_setAssociatedObject(task, "delegate", delegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        
+        // Store the session reference so it can be invalidated when task completes/cancels
+        objc_setAssociatedObject(task, "session", session, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
         task.resume()
         return task
@@ -772,6 +775,9 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
     func urlSession(
         _ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?
     ) {
+        // CRITICAL: Invalidate the session to prevent memory leak
+        session.finishTasksAndInvalidate()
+        
         if let error = error {
             DispatchQueue.main.async {
                 self.onError(error)
