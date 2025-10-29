@@ -12,6 +12,18 @@ struct ChatInputView: View {
     @Environment(\.colorScheme) var colorScheme
     @FocusState.Binding var isFocused: Bool
     
+    // Helper to detect if running on Mac (including iOS apps on Mac)
+    private var isRunningOnMac: Bool {
+        #if targetEnvironment(macCatalyst)
+        return true
+        #else
+        if #available(iOS 14.0, *) {
+            return ProcessInfo.processInfo.isiOSAppOnMac
+        }
+        return false
+        #endif
+    }
+    
     // Configuration
     var placeholder: String = "I want to..."
     var showPlusButton: Bool = false
@@ -57,7 +69,7 @@ struct ChatInputView: View {
                             lineWidth: 1
                         )
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isRunningOnMac ? 0 : 16)
                 .padding(.top, 8)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
@@ -79,7 +91,7 @@ struct ChatInputView: View {
                         
                         Spacer()
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, isRunningOnMac ? 0 : 16)
                     .padding(.top, 16)
                     .padding(.bottom, 12)
                     
@@ -102,7 +114,7 @@ struct ChatInputView: View {
                             lineWidth: 1
                         )
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isRunningOnMac ? 0 : 16)
                 .padding(.top, 8)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                 .animation(.easeInOut(duration: 0.2), value: inputHeight)
@@ -134,7 +146,7 @@ struct ChatInputView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, isRunningOnMac ? 0 : 16)
                     .padding(.top, 16)
                     .padding(.bottom, 12)
                     
@@ -155,7 +167,7 @@ struct ChatInputView: View {
                             lineWidth: 1
                         )
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isRunningOnMac ? 0 : 16)
                 .padding(.top, 8)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                 .animation(.easeInOut(duration: 0.2), value: inputHeight)
@@ -319,7 +331,7 @@ struct ChatInputView: View {
                     x: 0,
                     y: 0
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isRunningOnMac ? 0 : 16)
                 .padding(.bottom, 0)
             }
             .zIndex(1) // Input on top
