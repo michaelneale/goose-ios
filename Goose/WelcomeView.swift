@@ -116,7 +116,8 @@ struct WelcomeView: View {
                                                 // Update the trigger point to prevent immediate re-triggers
                                                 lastLoadTriggeredAtOffset = daysOffset
                                                 
-                                                Task {
+                                                // Use detached task to avoid blocking UI thread during swipe
+                                                Task.detached {
                                                     await onLoadMore()
                                                 }
                                             }
