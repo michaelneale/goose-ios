@@ -304,13 +304,20 @@ struct NodeMatrix: View {
                 DragGesture(minimumDistance: 10)
                     .updating($isDragging) { value, state, transaction in
                         state = true
+                        // Disable animations during drag for smooth performance
+                        transaction.animation = nil
                     }
                     .onChanged { value in
                         let horizontalAmount = value.translation.width
                         let verticalAmount = abs(value.translation.height)
                         
                         if abs(horizontalAmount) > verticalAmount {
-                            dragOffset = horizontalAmount
+                            // Disable animation for immediate drag response
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                dragOffset = horizontalAmount
+                            }
                         }
                     }
                     .onEnded { value in
