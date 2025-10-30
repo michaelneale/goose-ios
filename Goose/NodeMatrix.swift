@@ -15,6 +15,15 @@ struct NodeMatrix: View {
     @State private var dashPhase: CGFloat = 0
     @State private var containerOffset: CGFloat = 0
     @State private var geometrySize: CGSize = .zero
+    
+    // MARK: - Shared Date Formatter
+    /// Reusable date formatter to avoid expensive recreation
+    private static let dateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+    
 // MARK: - Position Cache
 /// Cache structure: [cacheKey: [sessionId: position]]
 /// cacheKey format: "dateLabel-widthxheight"
@@ -79,10 +88,7 @@ struct NodeMatrix: View {
         let target = targetDate(for: offset)
         
         let filtered = sessions.filter { session in
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            
-            guard let sessionDate = formatter.date(from: session.updatedAt) else {
+            guard let sessionDate = Self.dateFormatter.date(from: session.updatedAt) else {
                 return false
             }
             
@@ -90,10 +96,8 @@ struct NodeMatrix: View {
         }
         
         let sorted = filtered.sorted { session1, session2 in
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            guard let date1 = formatter.date(from: session1.updatedAt),
-                  let date2 = formatter.date(from: session2.updatedAt) else {
+            guard let date1 = Self.dateFormatter.date(from: session1.updatedAt),
+                  let date2 = Self.dateFormatter.date(from: session2.updatedAt) else {
                 return false
             }
             return date1 < date2
@@ -115,10 +119,7 @@ struct NodeMatrix: View {
         let target = targetDate(for: offset)
         
         let filtered = sessions.filter { session in
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            
-            guard let sessionDate = formatter.date(from: session.updatedAt) else {
+            guard let sessionDate = Self.dateFormatter.date(from: session.updatedAt) else {
                 return false
             }
             
@@ -126,10 +127,8 @@ struct NodeMatrix: View {
         }
         
         let sorted = filtered.sorted { session1, session2 in
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            guard let date1 = formatter.date(from: session1.updatedAt),
-                  let date2 = formatter.date(from: session2.updatedAt) else {
+            guard let date1 = Self.dateFormatter.date(from: session1.updatedAt),
+                  let date2 = Self.dateFormatter.date(from: session2.updatedAt) else {
                 return false
             }
             return date1 < date2
@@ -304,13 +303,20 @@ struct NodeMatrix: View {
                 DragGesture(minimumDistance: 10)
                     .updating($isDragging) { value, state, transaction in
                         state = true
+                        // Disable animations during drag for smooth performance
+                        transaction.animation = nil
                     }
                     .onChanged { value in
                         let horizontalAmount = value.translation.width
                         let verticalAmount = abs(value.translation.height)
                         
                         if abs(horizontalAmount) > verticalAmount {
-                            dragOffset = horizontalAmount
+                            // Disable animation for immediate drag response
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                dragOffset = horizontalAmount
+                            }
                         }
                     }
                     .onEnded { value in
