@@ -371,10 +371,18 @@ struct ChatView: View {
             ) { notification in
                 if let message = notification.userInfo?["message"] as? String,
                    let sessionId = notification.userInfo?["sessionId"] as? String {
-                    // Load the session first
-                    loadSession(sessionId)
-                    // Then set the input text and send
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Only load session if it's different from current
+                    if currentSessionId != sessionId {
+                        print("📨 Switching to session \(sessionId) to send message")
+                        loadSession(sessionId)
+                        // Then set the input text and send
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            inputText = message
+                            sendMessage()
+                        }
+                    } else {
+                        print("📨 Already in session \(sessionId), sending message directly")
+                        // Already in the right session, just send the message
                         inputText = message
                         sendMessage()
                     }
@@ -1284,10 +1292,19 @@ struct ChatView: View {
         }
 
         Task {
+            // Only clear messages if we're switching to a different session
+            let isSwitchingSession = currentSessionId != sessionId
+            
             // Show loading indicator
             await MainActor.run {
                 isLoadingSession = true
-                messages.removeAll()  // Clear messages while loading
+                // Only clear messages when switching to a different session
+                if isSwitchingSession {
+                    messages.removeAll()  // Clear messages while loading different session
+                    print("🔄 Switching to different session, clearing messages")
+                } else {
+                    print("🔄 Reloading current session, keeping existing messages visible")
+                }
             }
             
             do {
@@ -1355,19 +1372,22 @@ struct ChatView: View {
                     // Set new state with forced UI refresh
                     currentSessionId = fetchedSessionId
 
-                    // Force UI refresh by clearing and setting messages
-                    messages.removeAll()
-                    print("📊 ═════════════════════════════════════════")
-                    print("📊 CHATVIEW: Setting messages for UI display")
-                    print("📊 ═════════════════════════════════════════")
-                    print("📊 Received \(sessionMessages.count) messages from API")
-                    print("📊 About to set to messages array...")
-                    messages = sessionMessages
-                    print("📊 Messages array now has \(messages.count) messages (should be \(sessionMessages.count))")
-                    
-                    // Verify they match
-                    if messages.count != sessionMessages.count {
-                        print("📊 ⚠️⚠️⚠️ MISMATCH! Expected \(sessionMessages.count) but got \(messages.count) ⚠️⚠️⚠️")
+                    // Only update messages if switching sessions OR messages are empty OR server has MORE messages
+                    // We keep existing messages visible during session activation (when resuming after loading)
+                    if isSwitchingSession || messages.isEmpty || sessionMessages.count > messages.count {
+                        print("📊 ═════════════════════════════════════════")
+                        print("📊 CHATVIEW: Updating messages for UI display")
+                        print("📊 ═════════════════════════════════════════")
+                        print("📊 Received \(sessionMessages.count) messages from API")
+                        print("📊 Current messages: \(messages.count)")
+                        print("📊 Reason: switching=\(isSwitchingSession), empty=\(messages.isEmpty), newMessages=\(sessionMessages.count > messages.count)")
+                        
+                        // Clear and set messages
+                        messages.removeAll()
+                        messages = sessionMessages
+                        print("📊 Messages array now has \(messages.count) messages")
+                    } else {
+                        print("📊 Keeping existing \(messages.count) messages visible (no refresh needed)")
                     }
 
                     // Rebuild tool call state BEFORE checking if we should poll
