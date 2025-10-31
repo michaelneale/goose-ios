@@ -161,9 +161,118 @@ struct SidebarView: View {
     
     // Update cached groupings when sessions change
     private func updateGroupings() {
-        cachedGroupedByDate = computeGroupedByDate()
-        cachedGroupedByDirectory = computeGroupedByDirectory()
-        hasWorkingDirs = cachedSessions.contains(where: { $0.workingDir != nil && !$0.workingDir!.isEmpty })
+        let sessions = cachedSessions // Capture current sessions
+        
+        Task {
+            // Compute groupings on background thread
+            let groupedByDate = await Task.detached {
+                self.computeGroupedByDateSync(sessions: sessions)
+            }.value
+            
+            let groupedByDirectory = await Task.detached {
+                self.computeGroupedByDirectorySync(sessions: sessions)
+            }.value
+            
+            let hasWorkingDirsValue = sessions.contains(where: { $0.workingDir != nil && !$0.workingDir!.isEmpty })
+            
+            // Update UI on main thread
+            await MainActor.run {
+                self.cachedGroupedByDate = groupedByDate
+                self.cachedGroupedByDirectory = groupedByDirectory
+                self.hasWorkingDirs = hasWorkingDirsValue
+            }
+        }
+    }
+    
+    // Synchronous version for background computation
+    private func computeGroupedByDateSync(sessions: [ChatSession]) -> [(String, [ChatSession])] {
+        let calendar = Calendar.current
+        var groups: [Date: [ChatSession]] = [:]
+        
+        for session in sessions {
+            guard let sessionDate = Self.iso8601Formatter.date(from: session.updatedAt) else {
+                continue
+            }
+            
+            let startOfDay = calendar.startOfDay(for: sessionDate)
+            
+            if groups[startOfDay] == nil {
+                groups[startOfDay] = []
+            }
+            groups[startOfDay]?.append(session)
+        }
+        
+        let sortedGroups = groups.sorted { $0.key > $1.key }
+        
+        return sortedGroups.map { date, sessions in
+            let label = self.formatDateHeaderSync(date)
+            let sortedSessions = sessions.sorted { s1, s2 in
+                guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
+                      let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
+                    return false
+                }
+                return date1 > date2
+            }
+            return (label, sortedSessions)
+        }
+    }
+    
+    private func formatDateHeaderSync(_ date: Date) -> String {
+        let calendar = Calendar.current
+        
+        if calendar.isDateInToday(date) {
+            return "TODAY"
+        } else if calendar.isDateInYesterday(date) {
+            return "YESTERDAY"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE, MMM d"
+            return formatter.string(from: date).uppercased()
+        }
+    }
+    
+    private func computeGroupedByDirectorySync(sessions: [ChatSession]) -> [(String, [ChatSession])] {
+        var groups: [String: [ChatSession]] = [:]
+        
+        for session in sessions {
+            let path = session.groupingPath
+            
+            if groups[path] == nil {
+                groups[path] = []
+            }
+            groups[path]?.append(session)
+        }
+        
+        let sortedGroups = groups.sorted { group1, group2 in
+            if group1.key == "Unknown" { return false }
+            if group2.key == "Unknown" { return true }
+            
+            let mostRecent1 = group1.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
+            let mostRecent2 = group2.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
+            
+            if let date1 = mostRecent1, let date2 = mostRecent2 {
+                return date1 > date2
+            }
+            if mostRecent1 != nil { return true }
+            if mostRecent2 != nil { return false }
+            return group1.key < group2.key
+        }
+        
+        return sortedGroups.map { path, sessions in
+            let label = path.uppercased()
+            
+            let sortedSessions = sessions.sorted { s1, s2 in
+                guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
+                      let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
+                    return false
+                }
+                return date1 > date2
+            }
+            
+            let limitedSessions = Array(sortedSessions.prefix(3))
+            
+            return (label, limitedSessions)
+        }
     }
     
     // Get the appropriate grouping based on mode
