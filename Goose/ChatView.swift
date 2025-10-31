@@ -1097,9 +1097,6 @@ struct ChatView: View {
         var currentGroupIndices: [Int] = []
         var groupStartIndex: Int? = nil
         
-        print("\n🔎 === GROUPING ANALYSIS (Thread-Aware) ===")
-        print("📊 Analyzing \(messages.count) messages for grouping")
-        
         for (index, message) in messages.enumerated() {
             // Track user messages with actual text (not empty)
             if message.role == .user {
@@ -1112,15 +1109,9 @@ struct ChatView: View {
                 
                 if !userText.isEmpty {
                     // Real user message - this breaks the group (new conversation turn)
-                    print("📋 [\(index)] USER (with text): '\(userText.prefix(40))...' - BREAKS GROUP (new turn)")
-                    
                     // Finalize current group before breaking
                     if currentGroup.count > 1, let startIdx = groupStartIndex {
-                        print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-                        print("        Indices: \(currentGroupIndices)")
                         groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
-                    } else if currentGroup.count == 1 {
-                        print("     ⚠️ Only 1 message in group - not grouping")
                     }
                     
                     currentGroup = []
@@ -1128,7 +1119,6 @@ struct ChatView: View {
                     groupStartIndex = nil
                 } else {
                     // Empty user message - skip but don't break group
-                    print("📋 [\(index)] USER (empty) - skipping")
                 }
                 continue
             }
@@ -1142,22 +1132,10 @@ struct ChatView: View {
             
             let hasToolCalls = !getToolCallsForMessage(message.id).isEmpty
             
-            if message.role == .assistant {
-                if hasToolCalls {
-                    print("📋 [\(index)] ASSISTANT \(message.id.prefix(8)): hasText=\(hasTextContent), hasTools=\(hasToolCalls)")
-                } else {
-                    print("📋 [\(index)] ASSISTANT (no tools) - breaks grouping")
-                    if !currentGroup.isEmpty {
-                        print("     ⚠️ Breaking current group of \(currentGroup.count) messages")
-                    }
-                }
-            }
-            
             if message.role == .assistant && hasToolCalls {
                 // Assistant message with tool calls - can start or continue a group
                 if hasTextContent {
                     // Text + tool calls - this can START a new group
-                    print("     ✅ TEXT+TOOLS - can start group")
                     if currentGroup.isEmpty {
                         // Start new group with this message
                         groupStartIndex = index
@@ -1166,8 +1144,6 @@ struct ChatView: View {
                     } else {
                         // Already in a group - finalize previous and start new
                         if currentGroup.count > 1, let startIdx = groupStartIndex {
-                            print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-                            print("        Indices: \(currentGroupIndices)")
                             groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
                         }
                         // Start new group
@@ -1177,7 +1153,6 @@ struct ChatView: View {
                     }
                 } else {
                     // No text, just tool calls - CONTINUE existing group or start new
-                    print("     ✅ TOOL-ONLY - adding to group")
                     if currentGroup.isEmpty {
                         groupStartIndex = index
                     }
@@ -1187,11 +1162,7 @@ struct ChatView: View {
             } else {
                 // Non-tool-call assistant message breaks the group
                 if currentGroup.count > 1, let startIdx = groupStartIndex {
-                    print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-                    print("        Indices: \(currentGroupIndices)")
                     groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
-                } else if currentGroup.count == 1 {
-                    print("     ⚠️ Only 1 message in group - not grouping")
                 }
                 currentGroup = []
                 currentGroupIndices = []
@@ -1200,19 +1171,8 @@ struct ChatView: View {
         }
         
         if currentGroup.count > 1, let startIdx = groupStartIndex {
-            print("     🎯 FINALIZING LAST GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-            print("        Indices: \(currentGroupIndices)")
             groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
-        } else if currentGroup.count == 1 {
-            print("     ⚠️ Last group only has 1 message - not grouping")
         }
-        
-        print("🔎 Total groups found: \(groups.count)")
-        for (idx, group) in groups.enumerated() {
-            print("   Group \(idx + 1): \(group.messageIds.count) messages starting at index \(group.startIndex)")
-            print("      Indices: \(group.indices)")
-        }
-        print("🔎 === END GROUPING ANALYSIS ===\n")
         
         return groups
     }
