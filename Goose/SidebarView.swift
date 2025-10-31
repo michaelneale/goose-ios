@@ -18,26 +18,22 @@ struct SidebarView: View {
     let isLoadingMore: Bool
     let hasMoreSessions: Bool
     
-    // Grouping mode state
-    @State private var groupByDirectory: Bool = false
-    
-    // Cached groupings to avoid recomputation on every render
-    @State private var cachedGroupedByDate: [(String, [ChatSession])] = []
-    @State private var cachedGroupedByDirectory: [(String, [ChatSession])] = []
-    @State private var hasWorkingDirs: Bool = false
-    
-    // Agent management from main branch
+    // Agent management
     @StateObject private var agentStorage = AgentStorage.shared
     @State private var showingRenameDialog = false
     @State private var agentToRename: AgentConfiguration?
     @State private var newAgentName = ""
     
-    // Static ISO8601 formatter to avoid recreating on each computation
+    // Cached date groupings to avoid recomputation on every render
+    @State private var cachedGroupedByDate: [(String, [ChatSession])] = []
+    
+    // Static ISO8601 formatter to avoid recreating
     private static let iso8601Formatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
+    
     // Dynamic sidebar width based on device
     private var sidebarWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
@@ -53,31 +49,26 @@ struct SidebarView: View {
         UIDevice.current.userInterfaceIdiom == .pad
     }
     
-    // Compute sessions grouped by date
-    private func computeGroupedByDate() -> [(String, [ChatSession])] {
-        let calendar = Calendar.current  // Use local timezone
-        
-        // Group sessions by date
+    // Group sessions by date for displaying with headers
+    private func groupSessionsByDate(sessions: [ChatSession]) -> [(String, [ChatSession])] {
+        let calendar = Calendar.current
         var groups: [Date: [ChatSession]] = [:]
         
-        for session in cachedSessions {
+        for session in sessions {
             guard let sessionDate = Self.iso8601Formatter.date(from: session.updatedAt) else {
                 continue
             }
             
             let startOfDay = calendar.startOfDay(for: sessionDate)
-            
-            if groups[startOfDay] == nil {
-                groups[startOfDay] = []
-            }
-            groups[startOfDay]?.append(session)
+            groups[startOfDay, default: []].append(session)
         }
         
-        // Sort groups by date (newest first) and format labels
+        // Sort groups by date (newest first)
         let sortedGroups = groups.sorted { $0.key > $1.key }
         
         return sortedGroups.map { date, sessions in
             let label = formatDateHeader(date)
+            // Sort sessions within each group by updated time (newest first)
             let sortedSessions = sessions.sorted { s1, s2 in
                 guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
                       let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
@@ -90,7 +81,7 @@ struct SidebarView: View {
     }
     
     private func formatDateHeader(_ date: Date) -> String {
-        let calendar = Calendar.current  // Use local timezone
+        let calendar = Calendar.current
         
         if calendar.isDateInToday(date) {
             return "TODAY"
@@ -100,184 +91,22 @@ struct SidebarView: View {
             let formatter = DateFormatter()
             formatter.dateFormat = "EEEE, MMM d"
             return formatter.string(from: date).uppercased()
-        }
-    }
-    
-    // Compute sessions grouped by working directory
-    private func computeGroupedByDirectory() -> [(String, [ChatSession])] {
-        // Group sessions by working directory
-        var groups: [String: [ChatSession]] = [:]
-        
-        for session in cachedSessions {
-            let path = session.groupingPath
-            
-            if groups[path] == nil {
-                groups[path] = []
-            }
-            groups[path]?.append(session)
-        }
-        
-        // Sort groups by most recent activity (newest first), but put "Unknown" last
-        let sortedGroups = groups.sorted { group1, group2 in
-            // Always put "Unknown" at the end
-            if group1.key == "Unknown" { return false }
-            if group2.key == "Unknown" { return true }
-            
-            // Find the most recent session in each group
-            let mostRecent1 = group1.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
-            let mostRecent2 = group2.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
-            
-            // Sort by most recent activity (newer groups first)
-            if let date1 = mostRecent1, let date2 = mostRecent2 {
-                return date1 > date2
-            }
-            // If one has no valid dates, put it after the one that does
-            if mostRecent1 != nil { return true }
-            if mostRecent2 != nil { return false }
-            // Both have no dates, alphabetical fallback
-            return group1.key < group2.key
-        }
-        
-        // Return groups with formatted labels and sorted sessions
-        return sortedGroups.map { path, sessions in
-            // Use the full path for the label in folder mode
-            let label = path.uppercased()
-            
-            // Sort sessions within each group by updated time (newest first)
-            let sortedSessions = sessions.sorted { s1, s2 in
-                guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
-                      let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
-                    return false
-                }
-                return date1 > date2
-            }
-            
-            // Only take the most recent 3 sessions from each folder
-            let limitedSessions = Array(sortedSessions.prefix(3))
-            
-            return (label, limitedSessions)
         }
     }
     
     // Update cached groupings when sessions change
     private func updateGroupings() {
-        let sessions = cachedSessions // Capture current sessions
+        let sessions = cachedSessions
         
         Task {
-            // Compute groupings on background thread
             let groupedByDate = await Task.detached {
-                self.computeGroupedByDateSync(sessions: sessions)
+                self.groupSessionsByDate(sessions: sessions)
             }.value
             
-            let groupedByDirectory = await Task.detached {
-                self.computeGroupedByDirectorySync(sessions: sessions)
-            }.value
-            
-            let hasWorkingDirsValue = sessions.contains(where: { $0.workingDir != nil && !$0.workingDir!.isEmpty })
-            
-            // Update UI on main thread
             await MainActor.run {
                 self.cachedGroupedByDate = groupedByDate
-                self.cachedGroupedByDirectory = groupedByDirectory
-                self.hasWorkingDirs = hasWorkingDirsValue
             }
         }
-    }
-    
-    // Synchronous version for background computation
-    private func computeGroupedByDateSync(sessions: [ChatSession]) -> [(String, [ChatSession])] {
-        let calendar = Calendar.current
-        var groups: [Date: [ChatSession]] = [:]
-        
-        for session in sessions {
-            guard let sessionDate = Self.iso8601Formatter.date(from: session.updatedAt) else {
-                continue
-            }
-            
-            let startOfDay = calendar.startOfDay(for: sessionDate)
-            
-            if groups[startOfDay] == nil {
-                groups[startOfDay] = []
-            }
-            groups[startOfDay]?.append(session)
-        }
-        
-        let sortedGroups = groups.sorted { $0.key > $1.key }
-        
-        return sortedGroups.map { date, sessions in
-            let label = self.formatDateHeaderSync(date)
-            let sortedSessions = sessions.sorted { s1, s2 in
-                guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
-                      let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
-                    return false
-                }
-                return date1 > date2
-            }
-            return (label, sortedSessions)
-        }
-    }
-    
-    private func formatDateHeaderSync(_ date: Date) -> String {
-        let calendar = Calendar.current
-        
-        if calendar.isDateInToday(date) {
-            return "TODAY"
-        } else if calendar.isDateInYesterday(date) {
-            return "YESTERDAY"
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEEE, MMM d"
-            return formatter.string(from: date).uppercased()
-        }
-    }
-    
-    private func computeGroupedByDirectorySync(sessions: [ChatSession]) -> [(String, [ChatSession])] {
-        var groups: [String: [ChatSession]] = [:]
-        
-        for session in sessions {
-            let path = session.groupingPath
-            
-            if groups[path] == nil {
-                groups[path] = []
-            }
-            groups[path]?.append(session)
-        }
-        
-        let sortedGroups = groups.sorted { group1, group2 in
-            if group1.key == "Unknown" { return false }
-            if group2.key == "Unknown" { return true }
-            
-            let mostRecent1 = group1.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
-            let mostRecent2 = group2.value.compactMap { Self.iso8601Formatter.date(from: $0.updatedAt) }.max()
-            
-            if let date1 = mostRecent1, let date2 = mostRecent2 {
-                return date1 > date2
-            }
-            if mostRecent1 != nil { return true }
-            if mostRecent2 != nil { return false }
-            return group1.key < group2.key
-        }
-        
-        return sortedGroups.map { path, sessions in
-            let label = path.uppercased()
-            
-            let sortedSessions = sessions.sorted { s1, s2 in
-                guard let date1 = Self.iso8601Formatter.date(from: s1.updatedAt),
-                      let date2 = Self.iso8601Formatter.date(from: s2.updatedAt) else {
-                    return false
-                }
-                return date1 > date2
-            }
-            
-            let limitedSessions = Array(sortedSessions.prefix(3))
-            
-            return (label, limitedSessions)
-        }
-    }
-    
-    // Get the appropriate grouping based on mode
-    private var currentGrouping: [(String, [ChatSession])] {
-        return groupByDirectory ? cachedGroupedByDirectory : cachedGroupedByDate
     }
 
     var body: some View {
@@ -328,7 +157,7 @@ struct SidebarView: View {
 
                     Divider()
 
-                    // Sessions list with placeholders at top
+                    // Sessions list
                     GeometryReader { scrollGeometry in
                         ScrollView {
                             LazyVStack(spacing: 0) {
@@ -399,69 +228,18 @@ struct SidebarView: View {
                             Color.clear
                                 .frame(height: 24)
                             
-                            // Group by toggle - only show if there are sessions with non-empty working directories
-                            if hasWorkingDirs {
-                                HStack(spacing: 8) {
-                                    Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            groupByDirectory = false
-                                        }
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "calendar")
-                                                .font(.system(size: 12))
-                                            Text("Date")
-                                                .font(.system(size: 13, weight: groupByDirectory ? .regular : .semibold))
-                                        }
-                                        .foregroundColor(groupByDirectory ? .secondary : .primary)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(groupByDirectory ? Color.clear : Color(.systemGray5))
-                                        .cornerRadius(8)
-                                    }
-                                    .buttonStyle(.plain)
-                                    
-                                    Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            groupByDirectory = true
-                                        }
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "folder")
-                                                .font(.system(size: 12))
-                                            Text("Folder")
-                                                .font(.system(size: 13, weight: groupByDirectory ? .semibold : .regular))
-                                        }
-                                        .foregroundColor(groupByDirectory ? .primary : .secondary)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(groupByDirectory ? Color(.systemGray5) : Color.clear)
-                                        .cornerRadius(8)
-                                    }
-                                    .buttonStyle(.plain)
-                                    
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                            }
-                            
-                            // Spacer to push sessions further down
-                            Color.clear
-                                .frame(height: 24)
-                            
                             // Push sessions to bottom if fewer than 5
                             if cachedSessions.count < 5 {
                                 Color.clear
                                     .frame(height: scrollGeometry.size.height * 0.3)
                             }
 
-                            // Grouped sessions with headers (date or directory)
-                            ForEach(currentGrouping, id: \.0) { dateLabel, sessions in
+                            // Sessions grouped by date
+                            ForEach(cachedGroupedByDate, id: \.0) { dateLabel, sessions in
                                 // Date section header
                                 DateSectionHeader(label: dateLabel)
                                 
-                                // Sessions for this date/directory
+                                // Sessions for this date
                                 ForEach(sessions) { session in
                                     SessionRowView(session: session)
                                         .onTapGesture {
@@ -573,11 +351,9 @@ struct SidebarView: View {
             Text("Enter a name for this agent")
         }
         .onAppear {
-            // Compute groupings on initial load
             updateGroupings()
         }
         .onChange(of: cachedSessions) { _ in
-            // Recompute groupings when sessions change
             updateGroupings()
         }
     }
@@ -606,31 +382,15 @@ struct DateSectionHeader: View {
 // MARK: - Session Row View
 struct SessionRowView: View {
     let session: ChatSession
-    var showFolder: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                // Session name with folder inline
-                HStack(spacing: 4) {
-                    Text(session.title)
-                        .font(.system(size: 15, weight: .medium))
-                        .lineLimit(1)
-                        .foregroundColor(.primary)
-                    
-                    // Show folder name inline if available and enabled
-                    if showFolder, let workingDir = session.workingDir, !workingDir.isEmpty {
-                        HStack(spacing: 2) {
-                            Image(systemName: "folder")
-                                .font(.system(size: 9))
-                                .foregroundColor(.secondary)
-                            Text(session.directoryName)
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                }
+                // Session name
+                Text(session.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
                 
                 Spacer()
                 
