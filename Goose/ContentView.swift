@@ -27,25 +27,11 @@ struct ContentView: View {
         
         let allSessions = await GooseAPIService.shared.fetchSessions()
         
+        // Filter sessions on background thread
+        let newDaysBack = currentDaysLoaded + loadMoreDaysIncrement
+        let sessionsInRange = await filterSessionsByDate(allSessions, daysBack: newDaysBack)
+        
         await MainActor.run {
-            // Calculate current date range
-            let calendar = Calendar.current  // Use local timezone
-            let now = Date()
-            
-            // Increment the days loaded
-            let newDaysBack = currentDaysLoaded + loadMoreDaysIncrement
-            let cutoffDate = calendar.date(byAdding: .day, value: -newDaysBack, to: now) ?? now
-            
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            
-            let sessionsInRange = allSessions.filter { session in
-                guard let sessionDate = formatter.date(from: session.updatedAt) else {
-                    return false
-                }
-                return sessionDate >= cutoffDate
-            }
-            
             let previousCount = cachedSessions.count
             self.cachedSessions = sessionsInRange
             self.hasMoreSessions = allSessions.count > sessionsInRange.count
@@ -64,6 +50,27 @@ struct ContentView: View {
             
             isLoadingMore = false
         }
+    }
+    
+    // MARK: - Background Session Filtering
+    
+    /// Filter sessions by date on a background thread to avoid blocking UI
+    private func filterSessionsByDate(_ sessions: [ChatSession], daysBack: Int) async -> [ChatSession] {
+        return await Task.detached {
+            let calendar = Calendar.current
+            let now = Date()
+            let cutoffDate = calendar.date(byAdding: .day, value: -daysBack, to: now) ?? now
+            
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            return sessions.filter { session in
+                guard let sessionDate = formatter.date(from: session.updatedAt) else {
+                    return false
+                }
+                return sessionDate >= cutoffDate
+            }
+        }.value
     }
     
     // Helper to estimate days loaded based on session dates
@@ -265,24 +272,10 @@ struct ContentView: View {
         print("🔄 Refreshing sessions after chat...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
         
+        // Filter sessions on background thread
+        let sessionsInRange = await filterSessionsByDate(fetchedSessions, daysBack: currentDaysLoaded)
+        
         await MainActor.run {
-            // Use UTC calendar for date comparison
-            let calendar = Calendar.current  // Use local timezone
-            let now = Date()
-            
-            // Use the tracked days loaded value
-            let cutoffDate = calendar.date(byAdding: .day, value: -currentDaysLoaded, to: now) ?? now
-            
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            
-            let sessionsInRange = fetchedSessions.filter { session in
-                guard let sessionDate = formatter.date(from: session.updatedAt) else {
-                    return false
-                }
-                return sessionDate >= cutoffDate
-            }
-            
             self.cachedSessions = sessionsInRange
             self.hasMoreSessions = fetchedSessions.count > sessionsInRange.count
             

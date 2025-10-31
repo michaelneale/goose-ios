@@ -371,10 +371,18 @@ struct ChatView: View {
             ) { notification in
                 if let message = notification.userInfo?["message"] as? String,
                    let sessionId = notification.userInfo?["sessionId"] as? String {
-                    // Load the session first
-                    loadSession(sessionId)
-                    // Then set the input text and send
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Only load session if it's different from current
+                    if currentSessionId != sessionId {
+                        print("📨 Switching to session \(sessionId) to send message")
+                        loadSession(sessionId)
+                        // Then set the input text and send
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            inputText = message
+                            sendMessage()
+                        }
+                    } else {
+                        print("📨 Already in session \(sessionId), sending message directly")
+                        // Already in the right session, just send the message
                         inputText = message
                         sendMessage()
                     }
@@ -1089,9 +1097,6 @@ struct ChatView: View {
         var currentGroupIndices: [Int] = []
         var groupStartIndex: Int? = nil
         
-        print("\n🔎 === GROUPING ANALYSIS (Thread-Aware) ===")
-        print("📊 Analyzing \(messages.count) messages for grouping")
-        
         for (index, message) in messages.enumerated() {
             // Track user messages with actual text (not empty)
             if message.role == .user {
@@ -1104,15 +1109,9 @@ struct ChatView: View {
                 
                 if !userText.isEmpty {
                     // Real user message - this breaks the group (new conversation turn)
-                    print("📋 [\(index)] USER (with text): '\(userText.prefix(40))...' - BREAKS GROUP (new turn)")
-                    
                     // Finalize current group before breaking
                     if currentGroup.count > 1, let startIdx = groupStartIndex {
-                        print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-                        print("        Indices: \(currentGroupIndices)")
                         groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
-                    } else if currentGroup.count == 1 {
-                        print("     ⚠️ Only 1 message in group - not grouping")
                     }
                     
                     currentGroup = []
@@ -1120,7 +1119,6 @@ struct ChatView: View {
                     groupStartIndex = nil
                 } else {
                     // Empty user message - skip but don't break group
-                    print("📋 [\(index)] USER (empty) - skipping")
                 }
                 continue
             }
@@ -1134,22 +1132,10 @@ struct ChatView: View {
             
             let hasToolCalls = !getToolCallsForMessage(message.id).isEmpty
             
-            if message.role == .assistant {
-                if hasToolCalls {
-                    print("📋 [\(index)] ASSISTANT \(message.id.prefix(8)): hasText=\(hasTextContent), hasTools=\(hasToolCalls)")
-                } else {
-                    print("📋 [\(index)] ASSISTANT (no tools) - breaks grouping")
-                    if !currentGroup.isEmpty {
-                        print("     ⚠️ Breaking current group of \(currentGroup.count) messages")
-                    }
-                }
-            }
-            
             if message.role == .assistant && hasToolCalls {
                 // Assistant message with tool calls - can start or continue a group
                 if hasTextContent {
                     // Text + tool calls - this can START a new group
-                    print("     ✅ TEXT+TOOLS - can start group")
                     if currentGroup.isEmpty {
                         // Start new group with this message
                         groupStartIndex = index
@@ -1158,8 +1144,6 @@ struct ChatView: View {
                     } else {
                         // Already in a group - finalize previous and start new
                         if currentGroup.count > 1, let startIdx = groupStartIndex {
-                            print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-                            print("        Indices: \(currentGroupIndices)")
                             groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
                         }
                         // Start new group
@@ -1169,7 +1153,6 @@ struct ChatView: View {
                     }
                 } else {
                     // No text, just tool calls - CONTINUE existing group or start new
-                    print("     ✅ TOOL-ONLY - adding to group")
                     if currentGroup.isEmpty {
                         groupStartIndex = index
                     }
@@ -1179,11 +1162,7 @@ struct ChatView: View {
             } else {
                 // Non-tool-call assistant message breaks the group
                 if currentGroup.count > 1, let startIdx = groupStartIndex {
-                    print("     🎯 FINALIZING GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-                    print("        Indices: \(currentGroupIndices)")
                     groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
-                } else if currentGroup.count == 1 {
-                    print("     ⚠️ Only 1 message in group - not grouping")
                 }
                 currentGroup = []
                 currentGroupIndices = []
@@ -1192,19 +1171,8 @@ struct ChatView: View {
         }
         
         if currentGroup.count > 1, let startIdx = groupStartIndex {
-            print("     🎯 FINALIZING LAST GROUP: \(currentGroup.count) messages starting at index \(startIdx)")
-            print("        Indices: \(currentGroupIndices)")
             groups.append((startIndex: startIdx, messageIds: currentGroup, indices: currentGroupIndices))
-        } else if currentGroup.count == 1 {
-            print("     ⚠️ Last group only has 1 message - not grouping")
         }
-        
-        print("🔎 Total groups found: \(groups.count)")
-        for (idx, group) in groups.enumerated() {
-            print("   Group \(idx + 1): \(group.messageIds.count) messages starting at index \(group.startIndex)")
-            print("      Indices: \(group.indices)")
-        }
-        print("🔎 === END GROUPING ANALYSIS ===\n")
         
         return groups
     }
@@ -1284,10 +1252,19 @@ struct ChatView: View {
         }
 
         Task {
+            // Only clear messages if we're switching to a different session
+            let isSwitchingSession = currentSessionId != sessionId
+            
             // Show loading indicator
             await MainActor.run {
                 isLoadingSession = true
-                messages.removeAll()  // Clear messages while loading
+                // Only clear messages when switching to a different session
+                if isSwitchingSession {
+                    messages.removeAll()  // Clear messages while loading different session
+                    print("🔄 Switching to different session, clearing messages")
+                } else {
+                    print("🔄 Reloading current session, keeping existing messages visible")
+                }
             }
             
             do {
@@ -1355,19 +1332,22 @@ struct ChatView: View {
                     // Set new state with forced UI refresh
                     currentSessionId = fetchedSessionId
 
-                    // Force UI refresh by clearing and setting messages
-                    messages.removeAll()
-                    print("📊 ═════════════════════════════════════════")
-                    print("📊 CHATVIEW: Setting messages for UI display")
-                    print("📊 ═════════════════════════════════════════")
-                    print("📊 Received \(sessionMessages.count) messages from API")
-                    print("📊 About to set to messages array...")
-                    messages = sessionMessages
-                    print("📊 Messages array now has \(messages.count) messages (should be \(sessionMessages.count))")
-                    
-                    // Verify they match
-                    if messages.count != sessionMessages.count {
-                        print("📊 ⚠️⚠️⚠️ MISMATCH! Expected \(sessionMessages.count) but got \(messages.count) ⚠️⚠️⚠️")
+                    // Only update messages if switching sessions OR messages are empty OR server has MORE messages
+                    // We keep existing messages visible during session activation (when resuming after loading)
+                    if isSwitchingSession || messages.isEmpty || sessionMessages.count > messages.count {
+                        print("📊 ═════════════════════════════════════════")
+                        print("📊 CHATVIEW: Updating messages for UI display")
+                        print("📊 ═════════════════════════════════════════")
+                        print("📊 Received \(sessionMessages.count) messages from API")
+                        print("📊 Current messages: \(messages.count)")
+                        print("📊 Reason: switching=\(isSwitchingSession), empty=\(messages.isEmpty), newMessages=\(sessionMessages.count > messages.count)")
+                        
+                        // Clear and set messages
+                        messages.removeAll()
+                        messages = sessionMessages
+                        print("📊 Messages array now has \(messages.count) messages")
+                    } else {
+                        print("📊 Keeping existing \(messages.count) messages visible (no refresh needed)")
                     }
 
                     // Rebuild tool call state BEFORE checking if we should poll
