@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct ChatView: View {
     @Binding var showingSidebar: Bool
@@ -24,6 +25,9 @@ struct ChatView: View {
     // Session loading state
     @State private var isLoadingSession = false
     @State private var isSessionActivated = false  // Track if model/extensions are loaded
+    
+    // Chat state tracking (matches desktop implementation)
+    @State private var chatState: ChatState = .idle
 
     // Voice features - shared with WelcomeView
     @ObservedObject var voiceManager: EnhancedVoiceManager
@@ -448,6 +452,9 @@ struct ChatView: View {
         inputText = ""
         isLoading = true
 
+        // Update chat state after sending message
+        updateChatState()
+
         // Re-enable auto-scroll when user sends a new message
         shouldAutoScroll = true
 
@@ -688,6 +695,9 @@ struct ChatView: View {
                     self.limitMessages()
                     self.limitToolCalls()
                 }
+                
+                // Update chat state after processing message
+                self.updateChatState()
             }
 
         case .error(let errorEvent):
@@ -709,6 +719,9 @@ struct ChatView: View {
                 )
             }
             activeToolCalls.removeAll()
+            
+            // Update chat state after stream finishes
+            updateChatState()
 
             // Force final scroll to bottom when streaming completes
             if shouldAutoScroll {
@@ -774,6 +787,54 @@ struct ChatView: View {
         currentStreamTask = nil
         isLoading = false
         stopPollingForUpdates()  // Also stop polling if any
+    }
+    
+    // MARK: - Chat State Management
+    
+    /// Update chat state based on current messages and tool calls
+    private func updateChatState() {
+        let newState = ChatState.from(messages: messages, activeToolCalls: activeToolCalls)
+        if chatState != newState {
+            let oldState = chatState
+            chatState = newState
+            print("🔄 Chat state changed: \(oldState.displayText) → \(newState.displayText)")
+            
+            // Send notification when session becomes idle or waiting for user
+            if newState.isIdle || newState.isWaitingForUser {
+                sendStateChangeNotification(state: newState)
+            }
+        }
+    }
+    
+    /// Send system notification when session state changes
+    private func sendStateChangeNotification(state: ChatState) {
+        guard let sessionId = currentSessionId else { return }
+        
+        let content = UNMutableNotificationContent()
+        
+        if state.isIdle {
+            content.title = "Session Complete"
+            content.body = "Session \(sessionId.prefix(8))... is ready"
+            content.sound = .default
+        } else if state.isWaitingForUser {
+            content.title = "Approval Needed"
+            content.body = "Session \(sessionId.prefix(8))... needs your confirmation"
+            content.sound = .default
+        }
+        
+        let request = UNNotificationRequest(
+            identifier: "session-\(sessionId)-\(state.rawValue)",
+            content: content,
+            trigger: nil  // Immediate
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("⚠️ Failed to send notification: \(error)")
+            } else {
+                print("✅ Sent notification for state: \(state.displayText)")
+            }
+        }
     }
 
     // MARK: - Session Polling for Live Updates
@@ -860,6 +921,9 @@ struct ChatView: View {
 
                             // Rebuild tool call state from messages
                             rebuildToolCallState(from: newMessages)
+                            
+                            // Update chat state after polling detects changes
+                            updateChatState()
 
                             noChangeCount = 0
                             lastHash = newHash
