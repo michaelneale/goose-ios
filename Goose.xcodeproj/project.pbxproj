@@ -14,6 +14,8 @@
 		834385142EB5C06300ACC05E /* AppNoticeCenter.swift in Frameworks */ = {isa = PBXBuildFile; fileRef = 8542CDA2877E4BEF8ADA8A5C000 /* AppNoticeCenter.swift */; };
 		834385152EB5C06300ACC05E /* AppNoticeOverlay.swift in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D6CA113A6714967B9BA0CA1000 /* AppNoticeOverlay.swift */; };
 		834385172EB5C56F00ACC05E /* ChatState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834385162EB5C56F00ACC05E /* ChatState.swift */; };
+		834385192EB5C90B00ACC05E /* SessionStateTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834385182EB5C90B00ACC05E /* SessionStateTracker.swift */; };
+		8343851B2EB5D44B00ACC05E /* PulseModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8343851A2EB5D44B00ACC05E /* PulseModifier.swift */; };
 		834A2CB82E98D93A00D15D6A /* ContinuousVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834A2CB72E98D93A00D15D6A /* ContinuousVoiceManager.swift */; };
 		834A2CB92E98D93B00D15D6A /* EnhancedVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834A2CB82E98D93B00D15D6A /* EnhancedVoiceManager.swift */; };
 		837D4D732EA6FAD6000A95B7 /* SessionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 837D4D722EA6FAD6000A95B7 /* SessionsCard.swift */; };
@@ -56,6 +58,8 @@
 		832B7A0D2EA9E166000FB7AB /* TrialMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrialMode.swift; path = Goose/TrialMode.swift; sourceTree = "<group>"; };
 		83398FCB2EA0D47900EB958C /* TrialModeInstructionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialModeInstructionsView.swift; sourceTree = "<group>"; };
 		834385162EB5C56F00ACC05E /* ChatState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ChatState.swift; path = Goose/ChatState.swift; sourceTree = "<group>"; };
+		834385182EB5C90B00ACC05E /* SessionStateTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SessionStateTracker.swift; path = Goose/SessionStateTracker.swift; sourceTree = "<group>"; };
+		8343851A2EB5D44B00ACC05E /* PulseModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PulseModifier.swift; path = Goose/PulseModifier.swift; sourceTree = "<group>"; };
 		834A2CB72E98D93A00D15D6A /* ContinuousVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContinuousVoiceManager.swift; path = Goose/ContinuousVoiceManager.swift; sourceTree = "<group>"; };
 		834A2CB82E98D93B00D15D6A /* EnhancedVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedVoiceManager.swift; sourceTree = "<group>"; };
 		837D4D722EA6FAD6000A95B7 /* SessionsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SessionsCard.swift; path = Goose/SessionsCard.swift; sourceTree = "<group>"; };
@@ -119,6 +123,8 @@
 		A1234567890ABCDEF990 = {
 			isa = PBXGroup;
 			children = (
+				8343851A2EB5D44B00ACC05E /* PulseModifier.swift */,
+				834385182EB5C90B00ACC05E /* SessionStateTracker.swift */,
 				834385162EB5C56F00ACC05E /* ChatState.swift */,
 				83EF04C62EB0393200D2D688 /* MarkdownTestView.swift */,
 				832B7A0D2EA9E166000FB7AB /* TrialMode.swift */,
@@ -275,6 +281,7 @@
 				C3E99F296500267DEFD596CA /* VoiceOutputManager.swift in Sources */,
 				D32A01832EAA7D8100AF9DD0 /* SharedMessageComponents.swift in Sources */,
 				834385172EB5C56F00ACC05E /* ChatState.swift in Sources */,
+				834385192EB5C90B00ACC05E /* SessionStateTracker.swift in Sources */,
 				8C4210473D62873842C1D790 /* MarkdownTableView.swift in Sources */,
 				D32A01852EAA7D8F00AF9DD0 /* ToolViews.swift in Sources */,
 				D3BC33FC2EA161BA0057E748 /* SafeAreaExtension.swift in Sources */,
@@ -290,6 +297,7 @@
 				A1234567890ABCDEF018 /* SettingsView.swift in Sources */,
 				D3BC33FA2EA1597B0057E748 /* WelcomeCard.swift in Sources */,
 				A1234567890ABCDEF001 /* GooseApp.swift in Sources */,
+				8343851B2EB5D44B00ACC05E /* PulseModifier.swift in Sources */,
 				D32A01812EAA7D7300AF9DD0 /* UserMessageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

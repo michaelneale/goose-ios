@@ -94,8 +94,26 @@ extension ChatState {
             return .compacting
         }
         
-        // Check for thinking state (last message from user, or has active tool calls)
-        if lastMessage.role == .user || !activeToolCalls.isEmpty {
+        // If there are active tool calls, we're thinking (waiting for tool results)
+        if !activeToolCalls.isEmpty {
+            return .thinking
+        }
+        
+        // Check if last message is ONLY a tool response (no actual user text)
+        let hasOnlyToolResponse = lastMessage.content.allSatisfy { content in
+            if case .toolResponse = content { return true }
+            return false
+        }
+        
+        // If last message is only tool responses and no active tool calls,
+        // the session is likely waiting for the assistant to process the results
+        // This is still "thinking" state
+        if hasOnlyToolResponse {
+            return .thinking
+        }
+        
+        // Check for thinking state (last message from user with actual content)
+        if lastMessage.role == .user {
             return .thinking
         }
         

@@ -28,6 +28,7 @@ struct ChatView: View {
     
     // Chat state tracking (matches desktop implementation)
     @State private var chatState: ChatState = .idle
+    @StateObject private var stateTracker = SessionStateTracker.shared
 
     // Voice features - shared with WelcomeView
     @ObservedObject var voiceManager: EnhancedVoiceManager
@@ -316,6 +317,15 @@ struct ChatView: View {
         }
 
         .onAppear {
+            // Request notification permission for background state changes
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+                if granted {
+                    print("✅ Notification permission granted")
+                } else if let error = error {
+                    print("⚠️ Notification permission error: \(error)")
+                }
+            }
+            
             // Set up voice manager callback (Transcribe mode)
             voiceManager.onSubmitMessage = { transcribedText in
                 inputText = transcribedText
@@ -799,6 +809,11 @@ struct ChatView: View {
             chatState = newState
             print("🔄 Chat state changed: \(oldState.displayText) → \(newState.displayText)")
             
+            // Broadcast state to global tracker so other views can see it
+            if let sessionId = currentSessionId {
+                stateTracker.updateState(sessionId: sessionId, state: newState)
+            }
+            
             // Send notification when session becomes idle or waiting for user
             if newState.isIdle || newState.isWaitingForUser {
                 sendStateChangeNotification(state: newState)
@@ -911,7 +926,7 @@ struct ChatView: View {
                     let (_, newMessages) = try await apiService.resumeAgent(sessionId: sessionId)
                     let newHash = messagesHash(newMessages)
 
-                    await MainActor.run {
+                    let shouldStopPolling = await MainActor.run { () -> Bool in
                         if newHash != lastHash {
                             // Content changed!
                             print("📡 Polling detected changes (hash: \(lastHash) -> \(newHash))")
@@ -932,15 +947,31 @@ struct ChatView: View {
                             // Reset poll interval when we find changes
                             pollInterval = 2.0
                         } else {
-                            // No changes
+                            // No changes in message content, but still check/update state
+                            // (backend might have finished processing without new messages yet)
+                            rebuildToolCallState(from: newMessages)
+                            updateChatState()
+                            
                             noChangeCount += 1
-                            print("📡 Poll check \(noChangeCount)/\(maxNoChangeChecks): no changes")
+                            print("📡 Poll check \(noChangeCount)/\(maxNoChangeChecks): no message changes (state: \(chatState.displayText))")
 
                             // Exponential backoff up to 5 seconds
                             if noChangeCount > 3 {
                                 pollInterval = min(pollInterval * 1.3, 5.0)
                             }
                         }
+                        
+                        // Check if we should stop polling (must be on MainActor to read chatState)
+                        if chatState.isIdle {
+                            print("📡 Session reached idle state, stopping polling")
+                            return true
+                        }
+                        
+                        return false
+                    }
+                    
+                    if shouldStopPolling {
+                        break
                     }
                 } catch {
                     // Check if it's a 404 - session might have been deleted
@@ -1094,19 +1125,20 @@ struct ChatView: View {
         )
         print("🔧 Tool call message map has \(newToolCallMessageMap.count) entries")
         
+        // Show what's active (this is critical for debugging polling)
+        if !newActiveToolCalls.isEmpty {
+            print("🔧 Active tool calls (waiting for responses):")
+            for (id, timing) in newActiveToolCalls {
+                print("   ⏳ \(id.prefix(8)): \(timing.toolCall.name)")
+            }
+        }
+        
         // Show sample of what was built
         if !newCompletedToolCalls.isEmpty {
             print("🔧 Sample completed tool calls:")
             for (id, completed) in newCompletedToolCalls.prefix(3) {
                 let msgId = newToolCallMessageMap[id] ?? "NO MESSAGE"
                 print("   🟢 \(id.prefix(8)): \(completed.toolCall.name) → Message \(msgId.prefix(8))")
-            }
-        }
-        
-        if !newToolCallMessageMap.isEmpty {
-            print("🔧 Sample message mappings:")
-            for (toolId, msgId) in newToolCallMessageMap.prefix(3) {
-                print("   🔗 Tool \(toolId.prefix(8)) → Message \(msgId.prefix(8))")
             }
         }
     }
@@ -1395,6 +1427,9 @@ struct ChatView: View {
                     // Rebuild tool call state BEFORE checking if we should poll
                     // (since shouldPollForUpdates checks activeToolCalls)
                     rebuildToolCallState(from: sessionMessages)
+                    
+                    // Update chat state and broadcast to tracker
+                    updateChatState()
 
                     print("📊 Messages after rebuild: \(messages.count)")
                     print("📊 First message ID: \(messages.first?.id ?? "none")")
@@ -1441,6 +1476,11 @@ struct ChatView: View {
             currentStreamTask = nil
         }
 
+        // Clear state from tracker if we had a session
+        if let oldSessionId = currentSessionId {
+            stateTracker.clearState(for: oldSessionId)
+        }
+
         // Clear all state for a fresh session
         messages.removeAll()
         activeToolCalls.removeAll()
@@ -1468,6 +1508,7 @@ struct ChatView: View {
             await MainActor.run {
                 messages = newMessages
                 rebuildToolCallState(from: newMessages)
+                updateChatState()  // Update state and broadcast to tracker
                 scrollRefreshTrigger = UUID()
                 print("✅ Session refreshed with \(newMessages.count) messages")
             }
