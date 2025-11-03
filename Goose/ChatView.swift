@@ -24,6 +24,7 @@ struct ChatView: View {
     // Session loading state
     @State private var isLoadingSession = false
     @State private var isSessionActivated = false  // Track if model/extensions are loaded
+    @State private var isActivatingSession = false  // Track activation during resume (keeps messages visible)
 
     // Voice features - shared with WelcomeView
     @ObservedObject var voiceManager: EnhancedVoiceManager
@@ -144,8 +145,21 @@ struct ChatView: View {
                                 }
                             }
                             
+                            // Show "activating" indicator when preparing session
+                            if isActivatingSession {
+                                HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Preparing session...")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                Spacer()
+                                }
+                                .padding(.horizontal)
+                                .id("activating-indicator")
+                            }
                             // Show "thinking" indicator if no active tool calls
-                            if isLoading && activeToolCalls.isEmpty {
+                            else if isLoading && activeToolCalls.isEmpty {
                                 HStack {
                                 ProgressView()
                                     .scaleEffect(0.8)
@@ -502,9 +516,14 @@ struct ChatView: View {
                         throw APIError.invalidResponse
                     }
                     
+                    await MainActor.run {
+                        isActivatingSession = true
+                    }
+                    
                     let activationStart = Date()
                     
                     // Load provider and extensions from server config (matches desktop)
+                    // IMPORTANT: Don't use the returned messages - we want to keep the user's new message visible
                     let (_, _) = try await apiService.resumeAgent(
                         sessionId: sessionId, loadModelAndExtensions: true)
                     print("✅ Provider and extensions loaded from config")
@@ -518,6 +537,7 @@ struct ChatView: View {
                     
                     await MainActor.run {
                         isSessionActivated = true
+                        isActivatingSession = false
                     }
                 }
 
