@@ -294,7 +294,6 @@ class ConfigurationHandler: ObservableObject {
             return false
         }
         
-        print("📱 Decoded configuration data: \(decodedData)")
         
         do {
             // Parse the JSON configuration
@@ -317,8 +316,6 @@ class ConfigurationHandler: ObservableObject {
         configurationError = nil
         configurationSuccess = false
         
-        print("📋 Applying configuration:")
-        print("   URL: '\(config.url)'")
         let baseURL: String
         if config.url.hasPrefix("http://") || config.url.hasPrefix("https://") {
             // Already has protocol, use as-is but remove :443 if present
@@ -328,8 +325,6 @@ class ConfigurationHandler: ObservableObject {
             baseURL = "https://\(config.url.replacingOccurrences(of: ":443", with: ""))"
         }
         
-        print("   Base URL: \(baseURL)")
-        print("   Secret: \(String(repeating: "*", count: config.secret.count))")
         
         // Save to UserDefaults
         UserDefaults.standard.set(baseURL, forKey: "goose_base_url")
@@ -346,7 +341,6 @@ class ConfigurationHandler: ObservableObject {
                 if success {
                     self.configurationSuccess = true
                     self.configurationError = nil
-                    print("✅ Configuration applied successfully!")
                     
                     // Ensure the new configuration is in the agent list
                     AgentStorage.shared.ensureCurrentAgentInList()
@@ -409,19 +403,16 @@ class ConfigurationHandler: ObservableObject {
             secret: "test"
         )
         applyConfiguration(config)
-        print("🎯 Reset to trial mode")
     }
     
     /// Save current configuration as an agent
     func saveCurrentConfigurationAsAgent(withName name: String? = nil) {
         let agent = AgentStorage.shared.saveCurrentConfiguration(withName: name)
-        print("💾 Saved agent configuration: \(agent.displayName)")
     }
     
     /// Switch to a saved agent configuration
     func switchToAgent(_ agent: AgentConfiguration) {
         AgentStorage.shared.switchToAgent(agent)
-        print("🔄 Switched to agent: \(agent.displayName)")
         
         // Test the connection
         Task {
