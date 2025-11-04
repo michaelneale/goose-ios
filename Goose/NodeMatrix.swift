@@ -577,6 +577,9 @@ struct DayContentView: View {
     @Binding var pulseAnimation: Bool
     @Binding var dashPhase: CGFloat
     
+    // Favorite storage for checking favorite status
+    @ObservedObject private var favoritesStorage = FavoriteSessionsStorage.shared
+    
     init(sessions: [ChatSession],
          selectedSessionId: String?,
          showDraftNode: Bool,
@@ -662,6 +665,7 @@ struct DayContentView: View {
                 ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
                     let position = getCachedPosition(session, index, geometry.size, sessions, dateLabel)
                     let isSelected = selectedSessionId == session.id
+                    let isFavorite = favoritesStorage.isFavorite(session.id)
                     let currentNodeSize = nodeSize(session.messageCount)
                     let currentTapTarget = tapTargetSize(currentNodeSize)
                     let currentHighlightRing = highlightRingSize(currentNodeSize)
@@ -674,6 +678,13 @@ struct DayContentView: View {
                                 .fill(Color.clear)
                                 .frame(width: currentTapTarget, height: currentTapTarget)
                             
+                            // Favorite indicator - subtle yellow glow
+                            if isFavorite && !isSelected {
+                                Circle()
+                                    .stroke(Color.yellow.opacity(0.6), lineWidth: 1.5)
+                                    .frame(width: currentHighlightRing, height: currentHighlightRing)
+                            }
+                            
                             if isSelected {
                                 Circle()
                                     .stroke(Color.blue, lineWidth: 2)
@@ -684,6 +695,8 @@ struct DayContentView: View {
                                 .fill(
                                     isSelected ?
                                     Color.blue :
+                                        isFavorite ?
+                                        Color.yellow.opacity(colorScheme == .dark ? 0.7 : 0.5) :
                                         (colorScheme == .dark ?
                                          Color.white.opacity(0.5) :
                                             Color.black.opacity(0.3))

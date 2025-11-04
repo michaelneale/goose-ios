@@ -54,11 +54,18 @@ struct SidebarView: View {
     }
     
     // Group sessions by date for displaying with headers
+    // Excludes favorited sessions to avoid duplication
     private func groupSessionsByDate(sessions: [ChatSession]) -> [(String, [ChatSession])] {
         let calendar = Calendar.current
         var groups: [Date: [ChatSession]] = [:]
+        let favoriteIds = favoritesStorage.favoriteSessionIds
         
         for session in sessions {
+            // Skip favorited sessions - they're shown in FAVORITES section
+            if favoriteIds.contains(session.id) {
+                continue
+            }
+            
             guard let sessionDate = Self.iso8601Formatter.date(from: session.updatedAt) else {
                 continue
             }
@@ -441,22 +448,24 @@ struct SessionRowView: View {
                 
                 Spacer()
                 
-                // Favorite button
+                // Favorite button with fixed width for alignment
                 Button(action: {
                     favoritesStorage.toggleFavorite(session.id)
                 }) {
                     Image(systemName: isFavorite ? "star.fill" : "star")
                         .font(.system(size: 13))
                         .foregroundColor(isFavorite ? .yellow : .secondary)
+                        .frame(width: 20, alignment: .center)
                 }
                 .buttonStyle(.plain)
                 
-                // Time ago
+                // Time ago with fixed width
                 Text(formatTime(session.updatedAt))
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
+                    .frame(width: 50, alignment: .trailing)
                 
-                // Message count with icon
+                // Message count with icon and fixed width
                 HStack(spacing: 4) {
                     Image("MessageIcon")
                         .resizable()
@@ -468,6 +477,7 @@ struct SessionRowView: View {
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
+                .frame(width: 36, alignment: .trailing)
             }
         }
         .padding(.horizontal, 16)
