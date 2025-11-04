@@ -174,6 +174,7 @@ struct ContentView: View {
                                     }
                                 }
                             )
+                            .id(selectedSessionId ?? "new")  // Force view recreation when session changes
                             .navigationBarHidden(true)
                         }
                     }
@@ -473,28 +474,40 @@ struct ChatViewWithInitialMessage: View {
     let onMessageSent: () -> Void
     let onBackToWelcome: () -> Void
     
+    @State private var hasHandledAppear = false  // Track if we've already handled onAppear
+    
     var body: some View {
         ChatView(showingSidebar: $showingSidebar, onBackToWelcome: onBackToWelcome, voiceManager: voiceManager, continuousVoiceManager: continuousVoiceManager)
             .onAppear {
+                // CRITICAL: Only handle onAppear once to prevent duplicate notifications
+                guard !hasHandledAppear else { return }
+                hasHandledAppear = true
+                
                 // Load session if one was selected
                 if let sessionId = selectedSessionId {
+                    // Capture the sessionId and clear it immediately to prevent reuse
+                    let capturedSessionId = sessionId
+                    onMessageSent()  // Clear selectedSessionId BEFORE posting notification
+                    
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         NotificationCenter.default.post(
                             name: Notification.Name("LoadSession"),
                             object: nil,
-                            userInfo: ["sessionId": sessionId]
+                            userInfo: ["sessionId": capturedSessionId]
                         )
-                        onMessageSent()
                     }
                 } else if shouldSendMessage && !initialMessage.isEmpty {
+                    // Capture and clear before posting
+                    let capturedMessage = initialMessage
+                    onMessageSent()  // Clear state BEFORE posting notification
+                    
                     // Send the initial message after a brief delay to ensure view is ready
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         NotificationCenter.default.post(
                             name: Notification.Name("SendInitialMessage"),
                             object: nil,
-                            userInfo: ["message": initialMessage]
+                            userInfo: ["message": capturedMessage]
                         )
-                        onMessageSent()
                     }
                 }
             }

@@ -30,6 +30,9 @@ struct ChatView: View {
     @ObservedObject var voiceManager: EnhancedVoiceManager
     @ObservedObject var continuousVoiceManager: ContinuousVoiceManager
 
+    // NotificationCenter observer tokens for cleanup
+    @State private var notificationObservers: [NSObjectProtocol] = []
+
     // Memory management
     private let maxMessages = 50  // Limit messages to prevent memory issues
     private let maxToolCalls = 20  // Limit tool calls to prevent memory issues
@@ -353,7 +356,7 @@ struct ChatView: View {
             }
 
             // Listen for initial message from WelcomeView
-            NotificationCenter.default.addObserver(
+            let observer1 = NotificationCenter.default.addObserver(
                 forName: Notification.Name("SendInitialMessage"),
                 object: nil,
                 queue: .main
@@ -363,9 +366,10 @@ struct ChatView: View {
                     sendMessage()
                 }
             }
+            notificationObservers.append(observer1)
 
             // Listen for session load from WelcomeView
-            NotificationCenter.default.addObserver(
+            let observer2 = NotificationCenter.default.addObserver(
                 forName: Notification.Name("LoadSession"),
                 object: nil,
                 queue: .main
@@ -374,9 +378,10 @@ struct ChatView: View {
                     loadSession(sessionId)
                 }
             }
+            notificationObservers.append(observer2)
 
             // Listen for message to be sent to specific session
-            NotificationCenter.default.addObserver(
+            let observer3 = NotificationCenter.default.addObserver(
                 forName: Notification.Name("SendMessageToSession"),
                 object: nil,
                 queue: .main
@@ -398,9 +403,16 @@ struct ChatView: View {
                     }
                 }
             }
+            notificationObservers.append(observer3)
         }
         .onDisappear {
             // Critical: Clean up when leaving the view
+            
+            // Remove all NotificationCenter observers to prevent memory leaks
+            for observer in notificationObservers {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            notificationObservers.removeAll()
             
             // Stop any active streaming
             if let task = currentStreamTask {
