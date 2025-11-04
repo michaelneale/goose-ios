@@ -201,13 +201,11 @@ struct ChatView: View {
                                 if isLoading {
                                 userIsScrolling = true
                                 shouldAutoScroll = false
-                                print("📜 User started scrolling - auto-scroll disabled")
                                 }
                             }
                             .onEnded { _ in
                                 // User finished scrolling gesture
                                 userIsScrolling = false
-                                print("📜 User finished scrolling gesture")
                             }
                     )
                     .onReceive(
@@ -387,7 +385,6 @@ struct ChatView: View {
                    let sessionId = notification.userInfo?["sessionId"] as? String {
                     // Only load session if it's different from current
                     if currentSessionId != sessionId {
-                        print("📨 Switching to session \(sessionId) to send message")
                         loadSession(sessionId)
                         // Then set the input text and send
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -395,7 +392,6 @@ struct ChatView: View {
                             sendMessage()
                         }
                     } else {
-                        print("📨 Already in session \(sessionId), sending message directly")
                         // Already in the right session, just send the message
                         inputText = message
                         sendMessage()
@@ -405,11 +401,9 @@ struct ChatView: View {
         }
         .onDisappear {
             // Critical: Clean up when leaving the view
-            print("🚪 ChatView disappearing - cleaning up tasks")
             
             // Stop any active streaming
             if let task = currentStreamTask {
-                print("🛑 Cancelling active stream on view disappear")
                 task.cancel()
                 currentStreamTask = nil
             }
@@ -452,7 +446,6 @@ struct ChatView: View {
 
         // Check if we're in a demo session - if so, start fresh
         if let sessionId = currentSessionId, TrialMode.shared.isDemoSession(sessionId) {
-            print("📺 Demo session detected - starting fresh session")
             // Clear the demo session state
             currentSessionId = nil
         }
@@ -485,16 +478,13 @@ struct ChatView: View {
                 // Create session if we don't have one
                 if currentSessionId == nil {
                     // Always create a new session when starting from welcome screen
-                    print("🆕 Creating new session (trial mode: \(apiService.isTrialMode))")
                     let (sessionId, initialMessages) = try await apiService.startAgent()
                     
                     // In trial mode, save this as the "Current Session"
                     if apiService.isTrialMode {
                         TrialMode.shared.saveTrialSessionId(sessionId)
-                        print("💾 Saved as Current Session in trial mode")
                     }
                     
-                    print("✅ SESSION CREATED: \(sessionId)")
 
                     // Load any initial messages from the session
                     if !initialMessages.isEmpty {
@@ -511,7 +501,6 @@ struct ChatView: View {
                 // Activate session if needed (same for NEW and EXISTING sessions)
                 // This matches desktop flow: resumeAgent + updateFromSession
                 if !isSessionActivated {
-                    print("📱 Activating session with provider/extensions/system-prompt...")
                     guard let sessionId = currentSessionId else {
                         throw APIError.invalidResponse
                     }
@@ -526,14 +515,11 @@ struct ChatView: View {
                     // IMPORTANT: Don't use the returned messages - we want to keep the user's new message visible
                     let (_, _) = try await apiService.resumeAgent(
                         sessionId: sessionId, loadModelAndExtensions: true)
-                    print("✅ Provider and extensions loaded from config")
                     
                     // Apply system prompt (desktop_prompt.md + recipe)
                     try await apiService.updateFromSession(sessionId: sessionId)
-                    print("✅ System prompt applied")
                     
                     let activationTime = Date().timeIntervalSince(activationStart)
-                    print("⏱️ Session activated in \(String(format: "%.2f", activationTime))s")
                     
                     await MainActor.run {
                         isSessionActivated = true
@@ -568,7 +554,6 @@ struct ChatView: View {
                         // This avoids duplicate work and handles network failures gracefully
                         currentStreamTask = nil
                         
-                        print("🔄 SSE failed, switching to polling mode to check for response...")
                         
                         // Start polling to check if response completed server-side
                         if let pollingSessionId = currentSessionId {
@@ -625,7 +610,6 @@ struct ChatView: View {
         // Only block events if we're explicitly switching sessions
         // Don't block normal streaming operation
         if currentStreamTask == nil {
-            print("⚠️ Ignoring SSE event - stream was cancelled")
             return
         }
 
@@ -654,7 +638,7 @@ struct ChatView: View {
                     }
                 case .summarizationRequested(_):
                     // Handle summarization requests - just log for now
-                    print("📝 Summarization requested for message: \(incomingMessage.id)")
+                    break
                 default:
                     break
                 }
@@ -664,7 +648,6 @@ struct ChatView: View {
             DispatchQueue.main.async {
                 // Double-check we still have an active session before updating UI
                 guard self.currentSessionId != nil else {
-                    print("⚠️ Ignoring UI update - session was cleared")
                     return
                 }
 
@@ -718,7 +701,6 @@ struct ChatView: View {
             messages.append(errorMessage)
 
         case .finish(let finishEvent):
-            print("Stream finished: \(finishEvent.reason)")
             for (id, activeCall) in activeToolCalls {
                 let duration = Date().timeIntervalSince(activeCall.startTime)
                 completedToolCalls[id] = CompletedToolCall(
@@ -743,16 +725,13 @@ struct ChatView: View {
                let textContent = lastMessage.content.first(where: { if case .text = $0 { return true } else { return false } }),
                case .text(let content) = textContent {
                 if voiceManager.voiceMode == .fullAudio {
-                    print("🎤 Speaking response in full audio mode")
                     voiceManager.speakResponse(content.text)
                 } else if continuousVoiceManager.isVoiceMode {
-                    print("🎤 Speaking response in continuous mode")
                     continuousVoiceManager.speakResponse(content.text)
                 }
             } else {
                 // If no assistant text, ensure continuous returns to listening
                 if continuousVoiceManager.isVoiceMode {
-                    print("ℹ️ No assistant text found; ensuring continuous returns to listening")
                     // Kick listening if stuck in processing with no TTS
                     Task { @MainActor in
                         if continuousVoiceManager.state == .processing {
@@ -763,25 +742,33 @@ struct ChatView: View {
             }
 
         case .modelChange(let modelEvent):
-            print("Model changed: \(modelEvent.model) (\(modelEvent.mode))")
+            break
 
         case .notification(_):
             // Just ignore notifications silently - they're too verbose for shell output
             break
 
         case .updateConversation(let updateEvent):
-            // Replace the entire conversation with the compacted version
+            // Merge conversation updates intelligently instead of replacing everything
             DispatchQueue.main.async {
-                print("📚 Updating conversation with \(updateEvent.conversation.count) messages")
-                self.messages = updateEvent.conversation
-                // Clear tool call tracking since we have a new conversation history
-                self.activeToolCalls.removeAll()
-                self.completedToolCalls.removeAll()
-                self.toolCallMessageMap.removeAll()
-                // Rebuild tool call state from the new messages
-                self.rebuildToolCallState(from: updateEvent.conversation)
-                // Trigger a UI refresh
-                self.scrollRefreshTrigger = UUID()
+                // Create a set of existing message IDs for quick lookup
+                let existingIds = Set(self.messages.map { $0.id })
+                
+                // Find new messages that we don't have yet
+                let newMessages = updateEvent.conversation.filter { !existingIds.contains($0.id) }
+                
+                // If we have new messages, append them
+                if !newMessages.isEmpty {
+                    self.messages.append(contentsOf: newMessages)
+                    
+                    // Rebuild tool call state from ALL messages
+                    self.rebuildToolCallState(from: self.messages)
+                    
+                    // Trigger a UI refresh
+                    self.scrollRefreshTrigger = UUID()
+                }
+                // If no new messages, the conversation was just compacted/cleaned on server side
+                // We can ignore it to avoid UI jumps
             }
 
         case .ping:
@@ -801,7 +788,6 @@ struct ChatView: View {
     /// Check if we should poll for updates based on message state
     private func shouldPollForUpdates(_ messages: [Message]) -> Bool {
         guard let lastMessage = messages.last else {
-            print("🔍 No messages, no polling")
             return false
         }
 
@@ -819,14 +805,12 @@ struct ChatView: View {
 
         let age = Date().timeIntervalSince(createdDate)
 
-        print("🔍 Last message role: \(lastMessage.role), age: \(Int(age))s")
 
         // Only poll if:
         // 1. Message is recent (< 2 minutes)
         // 2. AND last message is from user (waiting for assistant response)
         //    OR has active tool calls (assistant is still working)
         guard age < 120 && age > -60 else {
-            print("🔍 ❌ Too old (\(Int(age))s), won't poll")
             return false
         }
         
@@ -836,9 +820,7 @@ struct ChatView: View {
         
         let shouldPoll = isWaitingForResponse || hasActiveToolCalls
         if shouldPoll {
-            print("🔍 ✅ Will start polling (waiting for response: \(isWaitingForResponse), active tools: \(hasActiveToolCalls))")
         } else {
-            print("🔍 ❌ Session appears complete (last message from assistant, no active tools)")
         }
         return shouldPoll
     }
@@ -847,7 +829,6 @@ struct ChatView: View {
     private func startPollingForUpdates(sessionId: String) {
         stopPollingForUpdates()  // Cancel any existing polling
 
-        print("📡 Starting polling for session: \(sessionId)")
         isPollingForUpdates = true
 
         // Store a hash of current messages for comparison
@@ -873,7 +854,6 @@ struct ChatView: View {
                     await MainActor.run {
                         if newHash != lastHash {
                             // Content changed!
-                            print("📡 Polling detected changes (hash: \(lastHash) -> \(newHash))")
 
                             // Update messages
                             messages = newMessages
@@ -890,7 +870,6 @@ struct ChatView: View {
                         } else {
                             // No changes
                             noChangeCount += 1
-                            print("📡 Poll check \(noChangeCount)/\(maxNoChangeChecks): no changes")
 
                             // Exponential backoff up to 5 seconds
                             if noChangeCount > 3 {
@@ -910,13 +889,11 @@ struct ChatView: View {
                         break  // Stop polling completely
                     }
 
-                    print("⚠️ Polling error for session \(sessionId): \(error)")
                     // Don't stop on other errors, but increment no-change count
                     noChangeCount += 1
 
                     // If we get too many errors, stop polling
                     if noChangeCount >= maxNoChangeChecks {
-                        print("⚠️ Too many polling errors, stopping")
                         break
                     }
                 }
@@ -957,7 +934,6 @@ struct ChatView: View {
 
     /// Rebuild activeToolCalls and completedToolCalls from messages
     private func rebuildToolCallState(from messages: [Message]) {
-        print("🔧 Rebuilding tool call state from \(messages.count) messages")
 
         // Clear existing state
         var newActiveToolCalls: [String: ToolCallWithTiming] = [:]
@@ -1048,21 +1024,16 @@ struct ChatView: View {
         print(
             "🔧 Rebuilt: \(newActiveToolCalls.count) active, \(newCompletedToolCalls.count) completed"
         )
-        print("🔧 Tool call message map has \(newToolCallMessageMap.count) entries")
         
         // Show sample of what was built
         if !newCompletedToolCalls.isEmpty {
-            print("🔧 Sample completed tool calls:")
             for (id, completed) in newCompletedToolCalls.prefix(3) {
                 let msgId = newToolCallMessageMap[id] ?? "NO MESSAGE"
-                print("   🟢 \(id.prefix(8)): \(completed.toolCall.name) → Message \(msgId.prefix(8))")
             }
         }
         
         if !newToolCallMessageMap.isEmpty {
-            print("🔧 Sample message mappings:")
             for (toolId, msgId) in newToolCallMessageMap.prefix(3) {
-                print("   🔗 Tool \(toolId.prefix(8)) → Message \(msgId.prefix(8))")
             }
         }
     }
@@ -1073,7 +1044,6 @@ struct ChatView: View {
             task.cancel()
             pollingTask = nil
             isPollingForUpdates = false
-            print("🛑 Stopped polling")
         }
     }
 
@@ -1222,7 +1192,6 @@ struct ChatView: View {
             toolCallMessageMap = toolCallMessageMap.filter { $0.value != removedMessage.id }
         }
 
-        print("🧹 Memory cleanup: removed \(messagesToRemove) old messages")
     }
 
     private func limitToolCalls() {
@@ -1238,13 +1207,11 @@ struct ChatView: View {
             toolCallMessageMap.removeValue(forKey: toolCallId)
         }
 
-        print("🧹 Tool call cleanup: removed \(toolCallsToRemove) old tool calls")
     }
 
     func loadSession(_ sessionId: String) {
         // CRITICAL: Cancel any existing stream before switching sessions
         if let currentTask = currentStreamTask {
-            print("🛑 Cancelling existing stream before session switch")
             currentTask.cancel()
             currentStreamTask = nil
         }
@@ -1259,9 +1226,7 @@ struct ChatView: View {
                 // Only clear messages when switching to a different session
                 if isSwitchingSession {
                     messages.removeAll()  // Clear messages while loading different session
-                    print("🔄 Switching to different session, clearing messages")
                 } else {
-                    print("🔄 Reloading current session, keeping existing messages visible")
                 }
             }
             
@@ -1271,7 +1236,6 @@ struct ChatView: View {
                 
                 if isDemoSession {
                     // Show demo messages for this session
-                    print("📺 Loading demo session: \(sessionId)")
                     let demoMessages = TrialMode.shared.getMockMessages(for: sessionId)
                     
                     await MainActor.run {
@@ -1288,7 +1252,6 @@ struct ChatView: View {
                         messages = demoMessages
                         isLoadingSession = false
                         
-                        print("📺 Loaded \(demoMessages.count) demo messages")
                         
                         // Scroll to bottom
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -1303,7 +1266,6 @@ struct ChatView: View {
                 let sessionIdToResume: String
                 if apiService.isTrialMode && !isDemoSession {
                     // This is the real trial session - load it
-                    print("🎯 Trial mode: Loading real trial session")
                     let (trialSessionId, _) = try await getOrCreateTrialSession()
                     sessionIdToResume = trialSessionId
                 } else {
@@ -1313,8 +1275,6 @@ struct ChatView: View {
                 // Fetch session messages (not actually resuming yet - just loading for browsing)
                 let (fetchedSessionId, sessionMessages) = try await apiService.resumeAgent(
                     sessionId: sessionIdToResume, loadModelAndExtensions: false)
-                print("✅ SESSION MESSAGES FETCHED: \(fetchedSessionId)")
-                print("📝 Loaded \(sessionMessages.count) messages for browsing")
                 
                 // Skip provider/extensions setup for browsing - will be done on first message send
                 // This makes session loading instant (just fetch and display messages)
@@ -1333,28 +1293,17 @@ struct ChatView: View {
                     // Only update messages if switching sessions OR messages are empty OR server has MORE messages
                     // We keep existing messages visible during session activation (when resuming after loading)
                     if isSwitchingSession || messages.isEmpty || sessionMessages.count > messages.count {
-                        print("📊 ═════════════════════════════════════════")
-                        print("📊 CHATVIEW: Updating messages for UI display")
-                        print("📊 ═════════════════════════════════════════")
-                        print("📊 Received \(sessionMessages.count) messages from API")
-                        print("📊 Current messages: \(messages.count)")
-                        print("📊 Reason: switching=\(isSwitchingSession), empty=\(messages.isEmpty), newMessages=\(sessionMessages.count > messages.count)")
                         
                         // Clear and set messages
                         messages.removeAll()
                         messages = sessionMessages
-                        print("📊 Messages array now has \(messages.count) messages")
                     } else {
-                        print("📊 Keeping existing \(messages.count) messages visible (no refresh needed)")
                     }
 
                     // Rebuild tool call state BEFORE checking if we should poll
                     // (since shouldPollForUpdates checks activeToolCalls)
                     rebuildToolCallState(from: sessionMessages)
 
-                    print("📊 Messages after rebuild: \(messages.count)")
-                    print("📊 First message ID: \(messages.first?.id ?? "none")")
-                    print("📊 Last message ID: \(messages.last?.id ?? "none")")
 
                     // Force scroll to bottom after loading
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -1370,7 +1319,6 @@ struct ChatView: View {
                     
                     // Mark as not activated - model/extensions will load on first message
                     isSessionActivated = false
-                    print("📱 Session loaded without model/extensions (will activate on first message)")
                     
                     // Clear loading state
                     isLoadingSession = false
@@ -1406,17 +1354,14 @@ struct ChatView: View {
         isLoading = false
         isSessionActivated = false  // Reset activation flag
 
-        print("🆕 Created new session - cleared all state")
     }
     
     /// Refresh the current session (for pull-to-refresh)
     private func refreshCurrentSession() async {
         guard let sessionId = currentSessionId else {
-            print("🔄 No session to refresh")
             return
         }
         
-        print("🔄 Refreshing session: \(sessionId)")
         
         do {
             let (_, newMessages) = try await apiService.resumeAgent(sessionId: sessionId)

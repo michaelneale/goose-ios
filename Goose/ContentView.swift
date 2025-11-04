@@ -41,11 +41,9 @@ struct ContentView: View {
             // Update the days loaded tracker
             self.currentDaysLoaded = newDaysBack
             
-            print("✅ Loaded \(newCount) more sessions (now showing last \(newDaysBack) days, total: \(sessionsInRange.count))")
             
             if newCount == 0 {
                 self.hasMoreSessions = false
-                print("✅ No more sessions to load")
             }
             
             isLoadingMore = false
@@ -269,7 +267,6 @@ struct ContentView: View {
     
     /// Refresh sessions after returning from chat (to show new sessions)
     private func refreshSessionsAfterChat() async {
-        print("🔄 Refreshing sessions after chat...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
         
         // Filter sessions on background thread
@@ -279,8 +276,6 @@ struct ContentView: View {
             self.cachedSessions = sessionsInRange
             self.hasMoreSessions = fetchedSessions.count > sessionsInRange.count
             
-            print("✅ Refreshed \(self.cachedSessions.count) sessions (last \(self.currentDaysLoaded) days)")
-            print("   - Total sessions available: \(fetchedSessions.count)")
         }
     }
     
@@ -288,7 +283,6 @@ struct ContentView: View {
     // Preload sessions from last 5 days on app launch
     // Preload sessions from last 5 days on app launch
     private func preloadSessions() async {
-        print("📥 Attempting to preload sessions...")
         let fetchedSessions = await GooseAPIService.shared.fetchSessions()
         
         await MainActor.run {
@@ -300,18 +294,12 @@ struct ContentView: View {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime]
             
-            print("📅 DEBUG: Current time (UTC): \(formatter.string(from: now))")
-            print("📅 DEBUG: Cutoff date (5 days ago): \(formatter.string(from: cutoffDate))")
-            print("📅 DEBUG: Total sessions from API: \(fetchedSessions.count)")
             
             // Check for duplicate session IDs
             let sessionIds = fetchedSessions.map { $0.id }
             let uniqueIds = Set(sessionIds)
             if sessionIds.count != uniqueIds.count {
                 print("⚠️ DEBUG: DUPLICATE SESSION IDs DETECTED!")
-                print("   Total sessions: \(sessionIds.count)")
-                print("   Unique IDs: \(uniqueIds.count)")
-                print("   Duplicates: \(sessionIds.count - uniqueIds.count)")
             }
             
             // Show ALL sessions from last 7 days for debugging
@@ -321,7 +309,6 @@ struct ContentView: View {
                 return sessionDate >= sevenDaysAgo
             }
             
-            print("📅 DEBUG: ALL sessions from last 7 days (\(recentForDebug.count) total):")
             let dayFormatter = DateFormatter()
             dayFormatter.dateFormat = "yyyy-MM-dd (EEEE)"
             dayFormatter.timeZone = TimeZone(identifier: "UTC")
@@ -330,7 +317,6 @@ struct ContentView: View {
                 if let date = formatter.date(from: session.updatedAt) {
                     let dayStr = dayFormatter.string(from: date)
                     let desc = session.description.isEmpty ? "[Untitled]" : session.description
-                    print("   \(session.updatedAt) (\(dayStr)) - \(desc) [msgs: \(session.messageCount)]")
                 }
             }
             
@@ -360,16 +346,9 @@ struct ContentView: View {
             self.currentDaysLoaded = initialDaysBack
             self.hasMoreSessions = fetchedSessions.count > recentSessions.count
             
-            print("📅 DEBUG: Filtering results:")
-            print("   - Included (within 5 days): \(includedCount)")
-            print("   - Filtered (older than 5 days): \(filteredCount)")
-            print("   - Parse errors: \(parseErrors)")
-            print("✅ Preloaded \(self.cachedSessions.count) sessions from last \(initialDaysBack) days")
-            print("   - Total sessions available: \(fetchedSessions.count)")
             print("   - Older sessions available: \(fetchedSessions.count - recentSessions.count)")
             
             // Show what we actually loaded
-            print("📅 DEBUG: Loaded sessions by date:")
             let groupedByDate = Dictionary(grouping: recentSessions) { session -> String in
                 guard let date = formatter.date(from: session.updatedAt) else { return "unknown" }
                 return dayFormatter.string(from: date)

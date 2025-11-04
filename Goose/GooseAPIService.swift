@@ -88,7 +88,6 @@ class GooseAPIService: ObservableObject {
 
         // Log the sessionId we're about to use
         let actualSessionId = sessionId ?? ""
-        print("🔍 Creating ChatRequest with sessionId: '\(actualSessionId)' (was: \(sessionId ?? "nil"))")
         
         let request = ChatRequest(
             messages: messages,
@@ -109,12 +108,7 @@ class GooseAPIService: ObservableObject {
             urlRequest.httpBody = requestData
 
             // Debug logging
-            print("🚀 Starting SSE stream to: \(url)")
-            print("🚀 Session ID: \(sessionId ?? "nil")")
-            print("🚀 Number of messages: \(messages.count)")
-            print("🚀 Headers: \(urlRequest.allHTTPHeaderFields ?? [:])")
             if let bodyString = String(data: requestData, encoding: .utf8) {
-                print("🚀 Request body:")
                 if let jsonData = bodyString.data(using: .utf8),
                     let prettyJson = try? JSONSerialization.jsonObject(with: jsonData),
                     let prettyData = try? JSONSerialization.data(
@@ -155,9 +149,6 @@ class GooseAPIService: ObservableObject {
     // MARK: - Connection Test
     func testConnection() async -> Bool {
         let fullURL = "\(baseURL)/status"
-        print("🔍 Testing connection to: '\(fullURL)'")
-        print("   Base URL: '\(baseURL)'")
-        print("   Secret key length: \(secretKey.count)")
 
         guard let url = URL(string: fullURL) else {
             print("❌ Failed to create URL from: '\(fullURL)'")
@@ -221,7 +212,6 @@ class GooseAPIService: ObservableObject {
             // For remote goosed: use "." (current directory where goosed is running)
             // This matches CLI behavior which uses std::env::current_dir()
             let effectiveWorkingDir = workingDir ?? "."
-            print("🏠 Starting agent with working directory: \(effectiveWorkingDir)")
             
             let body: [String: Any] = ["working_dir": effectiveWorkingDir]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -266,10 +256,7 @@ class GooseAPIService: ObservableObject {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
             // Debug logging
-            print("📤 Resuming session: '\(sessionId)' (load_model_and_extensions: \(loadModelAndExtensions))")
-            print("📤 URL: \(url)")
             if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
-                print("📤 Request body: \(bodyString)")
             }
 
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -279,9 +266,7 @@ class GooseAPIService: ObservableObject {
             }
 
             // Log the response for debugging
-            print("📥 Resume response status: \(httpResponse.statusCode)")
             if let responseString = String(data: data, encoding: .utf8) {
-                print("📥 Resume response body (first 500 chars): \(String(responseString.prefix(500)))")
             }
 
             if httpResponse.statusCode != 200 {
@@ -293,22 +278,8 @@ class GooseAPIService: ObservableObject {
             let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
             let messages = agentResponse.conversation ?? []
             
-            print("📊 ═══════════════════════════════════════════════════════")
-            print("📊 RESUME SUMMARY for session: \(sessionId)")
-            print("📊 ═══════════════════════════════════════════════════════")
-            print("📊 Returned message count: \(messages.count)")
             if messages.isEmpty {
-                print("📊 ⚠️⚠️⚠️ WARNING: ZERO messages returned! ⚠️⚠️⚠️")
             } else {
-                print("📊 First message:")
-                print("📊   - ID: \(messages.first!.id)")
-                print("📊   - Role: \(messages.first!.role)")
-                print("📊   - Content items: \(messages.first!.content.count)")
-                print("📊 Last message:")
-                print("📊   - ID: \(messages.last!.id)")
-                print("📊   - Role: \(messages.last!.role)")
-                print("📊   - Content items: \(messages.last!.content.count)")
-                print("📊 All message IDs:")
                 for (idx, msg) in messages.enumerated() {
                     let preview = msg.content.first.map { content -> String in
                         switch content {
@@ -321,10 +292,8 @@ class GooseAPIService: ObservableObject {
                         case .systemNotification(let sn): return "SYS_NOTIF[\(sn.notificationType)]"
                         }
                     } ?? "EMPTY"
-                    print("📊   [\(idx)] \(msg.id.prefix(8))... \(msg.role) - \(preview)")
                 }
             }
-            print("📊 ═══════════════════════════════════════════════════════")
             
             return (agentResponse.id, messages)
         }
@@ -362,7 +331,6 @@ class GooseAPIService: ObservableObject {
             throw APIError.httpError(httpResponse.statusCode, errorBody)
         }
 
-        print("✅ Updated agent from session (applied server-side prompts)")
     }
 
     // MARK: - Config Management
@@ -382,12 +350,10 @@ class GooseAPIService: ObservableObject {
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
             defaults.removeObject(forKey: key)
         }
-        print("💾 Cleared config cache for namespace \(ns)")
     }
     
     func readConfigValue(key: String, isSecret: Bool = false) async -> String? {
         let startTime = Date()
-        print("⏱️ [PERF] readConfigValue(\(key)) started")
         
         // Check cache for non-secret config values
         let ns = cacheNamespace()
@@ -398,8 +364,6 @@ class GooseAPIService: ObservableObject {
             let expiresAt = UserDefaults.standard.double(forKey: expKey)
             if expiresAt > now, let cachedValue = UserDefaults.standard.string(forKey: storeKey) {
                 let elapsed = Date().timeIntervalSince(startTime)
-                print("⏱️ [PERF] readConfigValue(\(key)) from cache in \(String(format: "%.2f", elapsed))s")
-                print("💾 Config '\(key)' = '\(cachedValue)' (from cache)")
                 return cachedValue
             }
         }
@@ -423,7 +387,6 @@ class GooseAPIService: ObservableObject {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             let (data, response) = try await URLSession.shared.data(for: request)
             let elapsed = Date().timeIntervalSince(startTime)
-            print("⏱️ [PERF] readConfigValue(\(key)) completed in \(String(format: "%.2f", elapsed))s")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("⚠️ Invalid response reading config")
@@ -436,14 +399,12 @@ class GooseAPIService: ObservableObject {
                     in: .whitespacesAndNewlines)
                 // Remove quotes if present (JSON string encoding)
                 let cleanValue = value?.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-                print("✅ Config '\(key)' = '\(cleanValue ?? "nil")'")
                 
                 // Cache non-secret values with fixed 1-hour TTL
                 if !isSecret, let cleanValue = cleanValue {
                     let expiresAt = now + Self.configCacheTTL
                     UserDefaults.standard.set(cleanValue, forKey: storeKey)
                     UserDefaults.standard.set(expiresAt, forKey: expKey)
-                    print("💾 Cached '\(key)' for namespace \(ns)")
                 }
                 
                 return cleanValue
@@ -486,7 +447,6 @@ class GooseAPIService: ObservableObject {
             if let bodyData = request.httpBody,
                 let bodyString = String(data: bodyData, encoding: .utf8)
             {
-                print("📤 Updating provider to \(provider), model: \(model ?? "default")")
                 print(bodyString)
             }
 
@@ -502,7 +462,6 @@ class GooseAPIService: ObservableObject {
             throw APIError.httpError(httpResponse.statusCode, errorBody)
         }
 
-            print("✅ Provider updated to \(provider) with model \(model ?? "default")")
             
             // Clear config cache when agent changes
             clearConfigCache()
@@ -591,7 +550,6 @@ class GooseAPIService: ObservableObject {
 
             if httpResponse.statusCode == 200 {
                 if let name = extensionConfig["name"] as? String {
-                    print("✅ Extension '\(name)' loaded")
                 }
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
@@ -607,7 +565,6 @@ class GooseAPIService: ObservableObject {
     // MARK: - Sessions Management
     func fetchInsights() async -> SessionInsights? {
         let startTime = Date()
-        print("⏱️ [PERF] fetchInsights() started")
         
         // In trial mode, return mock insights
         if isTrialMode {
@@ -625,7 +582,6 @@ class GooseAPIService: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let elapsed = Date().timeIntervalSince(startTime)
-            print("⏱️ [PERF] fetchInsights() completed in \(String(format: "%.2f", elapsed))s")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("🚨 Invalid response when fetching insights")
@@ -634,7 +590,6 @@ class GooseAPIService: ObservableObject {
 
             if httpResponse.statusCode == 200 {
                 let insights = try JSONDecoder().decode(SessionInsights.self, from: data)
-                print("✅ Fetched insights: \(insights.totalSessions) sessions, \(insights.totalTokens) tokens")
                 return insights
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
@@ -649,7 +604,6 @@ class GooseAPIService: ObservableObject {
     
     func fetchSessions() async -> [ChatSession] {
         let startTime = Date()
-        print("⏱️ [PERF] fetchSessions() started")
         
         // In trial mode, return mock sessions
         if isTrialMode {
@@ -667,7 +621,6 @@ class GooseAPIService: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let elapsed = Date().timeIntervalSince(startTime)
-            print("⏱️ [PERF] fetchSessions() completed in \(String(format: "%.2f", elapsed))s")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("🚨 Invalid response when fetching sessions")
@@ -676,7 +629,6 @@ class GooseAPIService: ObservableObject {
 
             if httpResponse.statusCode == 200 {
                 let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
-                print("✅ Fetched \(sessionsResponse.sessions.count) sessions")
                 return sessionsResponse.sessions
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
@@ -735,8 +687,6 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
             return
         }
 
-        print("🚀 SSE Response Status: \(httpResponse.statusCode)")
-        print("🚀 SSE Response Headers: \(httpResponse.allHeaderFields)")
 
         guard httpResponse.statusCode == 200 else {
             // Store error status for later - errors are handled by earlier API calls
@@ -806,7 +756,6 @@ class SSEDelegate: NSObject, URLSessionDataDelegate {
 
                         // Minimal logging - only log important events
                         if case .finish = event {
-                            print("✅ SSE Stream completed")
                         } else if case .error = event {
                             print("🚨 SSE Error event received")
                         }
