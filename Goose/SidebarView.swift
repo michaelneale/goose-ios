@@ -23,6 +23,7 @@ struct SidebarView: View {
     @State private var showingRenameDialog = false
     @State private var agentToRename: AgentConfiguration?
     @State private var newAgentName = ""
+    @State private var isAgentSectionExpanded = false  // Collapsed by default
     
     // Favorites management
     @StateObject private var favoritesStorage = FavoriteSessionsStorage.shared
@@ -185,72 +186,114 @@ struct SidebarView: View {
                     GeometryReader { scrollGeometry in
                         ScrollView {
                             LazyVStack(spacing: 0) {
-                            // Agent section header
-                            HStack(spacing: 12) {
-                                Image("ServerIcon")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 13, height: 13)
-                                    .foregroundColor(.primary)
-                                
-                                Text("Agents")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity)
-                            .background(Color(.systemBackground))
-                            
-                            // Agent list
-                            if agentStorage.savedAgents.isEmpty {
-                                // Empty state
-                                VStack(spacing: 8) {
-                                    Text("No saved agents")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.secondary)
-                                    Text("Configure an agent in Settings to save it")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.secondary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 24)
-                                .padding(.horizontal, 16)
-                            } else {
-                                ForEach(agentStorage.savedAgents) { agent in
-                                    AgentRowView(
-                                        agent: agent,
-                                        isCurrent: agentStorage.currentAgentId == agent.id,
-                                        onTap: {
-                                            // Close sidebar first for smooth UX, then switch agent
-                                            withAnimation(.easeInOut(duration: 0.25)) {
-                                                isShowing = false
+                            // Collapsible Agent section
+                            VStack(spacing: 0) {
+                                // Agent section header (clickable to expand/collapse)
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isAgentSectionExpanded.toggle()
+                                    }
+                                }) {
+                                    HStack(spacing: 12) {
+                                        Image("ServerIcon")
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: 13, height: 13)
+                                            .foregroundColor(.primary)
+                                        
+                                        HStack(spacing: 8) {
+                                            Text("Agents")
+                                                .font(.system(size: 15, weight: .medium))
+                                                .foregroundColor(.primary)
+                                            
+                                            // Agent count badge
+                                            if !agentStorage.savedAgents.isEmpty {
+                                                Text("\(agentStorage.savedAgents.count)")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(Color.blue)
+                                                    .cornerRadius(10)
                                             }
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
-                                                ConfigurationHandler.shared.switchToAgent(agent)
-                                            }
-                                        },
-                                        onRename: {
-                                            agentToRename = agent
-                                            newAgentName = agent.name ?? ""
-                                            showingRenameDialog = true
-                                        },
-                                        onDelete: {
-                                            agentStorage.deleteAgent(agent)
                                         }
-                                    )
-                                    Divider()
-                                        .background(Color.gray.opacity(0.2))
-                                        .padding(.leading)
+                                        
+                                        Spacer()
+                                        
+                                        // Show current agent name on the right
+                                        if let currentAgent = agentStorage.savedAgents.first(where: { $0.id == agentStorage.currentAgentId }) {
+                                            Text(currentAgent.displayName)
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(1)
+                                                .truncationMode(.tail)
+                                        }
+                                        
+                                        // Chevron indicator
+                                        Image(systemName: isAgentSectionExpanded ? "chevron.down" : "chevron.right")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .frame(maxWidth: .infinity)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(Color(.systemBackground))
+                                
+                                // Agent list (shown when expanded)
+                                if isAgentSectionExpanded {
+                                    if agentStorage.savedAgents.isEmpty {
+                                        // Empty state
+                                        VStack(spacing: 8) {
+                                            Text("No saved agents")
+                                                .font(.system(size: 14))
+                                                .foregroundColor(.secondary)
+                                            Text("Configure an agent in Settings to save it")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.secondary)
+                                                .multilineTextAlignment(.center)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 24)
+                                        .padding(.horizontal, 16)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                    } else {
+                                        ForEach(agentStorage.savedAgents) { agent in
+                                            AgentRowView(
+                                                agent: agent,
+                                                isCurrent: agentStorage.currentAgentId == agent.id,
+                                                onTap: {
+                                                    // Close sidebar first for smooth UX, then switch agent
+                                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                                        isShowing = false
+                                                    }
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                                                        ConfigurationHandler.shared.switchToAgent(agent)
+                                                    }
+                                                },
+                                                onRename: {
+                                                    agentToRename = agent
+                                                    newAgentName = agent.name ?? ""
+                                                    showingRenameDialog = true
+                                                },
+                                                onDelete: {
+                                                    agentStorage.deleteAgent(agent)
+                                                }
+                                            )
+                                            Divider()
+                                                .background(Color.gray.opacity(0.2))
+                                                .padding(.leading)
+                                        }
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                    }
                                 }
                             }
                             
-                            // Spacer below agent list
+                            // Large spacer below agent section (no divider)
                             Color.clear
-                                .frame(height: 24)
+                                .frame(height: 120)
                             
                             // Favorites section
                             if !cachedFavoriteSessions.isEmpty {
@@ -438,34 +481,40 @@ struct SessionRowView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 0) {
+            // Favorite button on the left - fixed size with consistent spacing
+            Button(action: {
+                favoritesStorage.toggleFavorite(session.id)
+            }) {
+                Image(systemName: isFavorite ? "star.fill" : "star")
+                    .font(.system(size: 13))
+                    .foregroundColor(isFavorite ? .yellow : .secondary)
+                    .frame(width: 20, height: 20, alignment: .center)
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .padding(.trailing, 8)  // Fixed spacing after star
+            
+            // Session name - truncates only, never scales
+            Text(session.description)
+                .font(.system(size: 15, weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundColor(.primary)
+                .layoutPriority(0)  // Lowest priority - truncates first
+                .frame(maxWidth: .infinity, alignment: .leading)  // Left align and fill space
+            
+            // Time and message count container - NEVER wraps or truncates
             HStack(spacing: 8) {
-                // Session name
-                Text(session.description)
-                    .font(.system(size: 15, weight: .medium))
-                    .lineLimit(1)
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                // Favorite button with fixed width for alignment
-                Button(action: {
-                    favoritesStorage.toggleFavorite(session.id)
-                }) {
-                    Image(systemName: isFavorite ? "star.fill" : "star")
-                        .font(.system(size: 13))
-                        .foregroundColor(isFavorite ? .yellow : .secondary)
-                        .frame(width: 20, alignment: .center)
-                }
-                .buttonStyle(.plain)
-                
-                // Time ago with fixed width
+                // Time ago with wider fixed width for AM/PM format
                 Text(formatTime(session.updatedAt))
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
-                    .frame(width: 50, alignment: .trailing)
+                    .frame(width: 65, alignment: .trailing)  // Fits "XX:XX AM"
+                    .lineLimit(1)
+                    .allowsTightening(false)
                 
-                // Message count with icon and fixed width
+                // Message count with icon and wider fixed width for large numbers
                 HStack(spacing: 4) {
                     Image("MessageIcon")
                         .resizable()
@@ -476,13 +525,19 @@ struct SessionRowView: View {
                     Text("\(session.messageCount)")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .allowsTightening(false)
                 }
-                .frame(width: 36, alignment: .trailing)
+                .frame(width: 48, alignment: .trailing)  // Increased from 36 to 48 for numbers like "999"
             }
+            .fixedSize()  // This container never changes size
+            .layoutPriority(100)  // HIGHEST priority - never compresses
+            .padding(.leading, 8)  // Fixed spacing before metadata
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 44)  // Fixed height to prevent expansion
     }
 
     private func formatTime(_ isoDate: String) -> String {
