@@ -581,6 +581,9 @@ struct DayContentView: View {
     // Favorite storage for checking favorite status
     @ObservedObject private var favoritesStorage = FavoriteSessionsStorage.shared
     
+    // Separate pulse animation for favorites (slower)
+    @State private var favoritePulse = false
+    
     init(sessions: [ChatSession],
          selectedSessionId: String?,
          showDraftNode: Bool,
@@ -679,7 +682,7 @@ struct DayContentView: View {
                                 .fill(Color.clear)
                                 .frame(width: currentTapTarget, height: currentTapTarget)
                             
-                            // Favorite indicator - subtle yellow glow with pulse
+                            // Favorite indicator - subtle yellow glow with slow pulse
                             if isFavorite && !isSelected {
                                 ZStack {
                                     // Static ring
@@ -687,12 +690,13 @@ struct DayContentView: View {
                                         .stroke(Color.yellow.opacity(0.6), lineWidth: 1.5)
                                         .frame(width: currentHighlightRing, height: currentHighlightRing)
                                     
-                                    // Pulsing ring
+                                    // Pulsing ring with blur (slower animation)
                                     Circle()
-                                        .stroke(Color.yellow.opacity(0.4), lineWidth: 1.5)
+                                        .stroke(Color.yellow.opacity(0.5), lineWidth: 2.5)
                                         .frame(width: currentHighlightRing, height: currentHighlightRing)
-                                        .scaleEffect(pulseAnimation ? 1.5 : 1.0)
-                                        .opacity(pulseAnimation ? 0.0 : 0.6)
+                                        .blur(radius: 4)
+                                        .scaleEffect(favoritePulse ? 1.6 : 1.0)
+                                        .opacity(favoritePulse ? 0.0 : 0.8)
                                 }
                             }
                             
@@ -763,6 +767,12 @@ struct DayContentView: View {
                         radius: currentDotRadius,
                         dotSize: messageDotSize
                     )
+                }
+            }
+            .onAppear {
+                // Start slower pulse animation for favorites (3 seconds)
+                withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: false)) {
+                    favoritePulse = true
                 }
             }
         }
