@@ -682,18 +682,18 @@ struct DayContentView: View {
                                 .fill(Color.clear)
                                 .frame(width: currentTapTarget, height: currentTapTarget)
                             
-                            // Favorite indicator - subtle yellow glow with slow pulse
+                            // Favorite indicator - subtle yellow glow with slow pulse (very close to node)
                             if isFavorite && !isSelected {
                                 ZStack {
-                                    // Static ring
+                                    // Static ring - much closer to the node
                                     Circle()
                                         .stroke(Color.yellow.opacity(0.6), lineWidth: 1.5)
-                                        .frame(width: currentHighlightRing, height: currentHighlightRing)
+                                        .frame(width: currentNodeSize + 4, height: currentNodeSize + 4)
                                     
                                     // Pulsing ring with blur (slower animation)
                                     Circle()
                                         .stroke(Color.yellow.opacity(0.5), lineWidth: 2.5)
-                                        .frame(width: currentHighlightRing, height: currentHighlightRing)
+                                        .frame(width: currentNodeSize + 4, height: currentNodeSize + 4)
                                         .blur(radius: 4)
                                         .scaleEffect(favoritePulse ? 1.6 : 1.0)
                                         .opacity(favoritePulse ? 0.0 : 0.8)
