@@ -15,6 +15,7 @@ struct NodeMatrix: View {
     @State private var dashPhase: CGFloat = 0
     @State private var containerOffset: CGFloat = 0
     @State private var geometrySize: CGSize = .zero
+    @State private var favoritePulse = false
     
     // MARK: - Shared Date Formatter
     /// Reusable date formatter to avoid expensive recreation
@@ -678,11 +679,21 @@ struct DayContentView: View {
                                 .fill(Color.clear)
                                 .frame(width: currentTapTarget, height: currentTapTarget)
                             
-                            // Favorite indicator - subtle yellow glow
+                            // Favorite indicator - subtle yellow glow with pulse
                             if isFavorite && !isSelected {
-                                Circle()
-                                    .stroke(Color.yellow.opacity(0.6), lineWidth: 1.5)
-                                    .frame(width: currentHighlightRing, height: currentHighlightRing)
+                                ZStack {
+                                    // Static ring
+                                    Circle()
+                                        .stroke(Color.yellow.opacity(0.6), lineWidth: 1.5)
+                                        .frame(width: currentHighlightRing, height: currentHighlightRing)
+                                    
+                                    // Pulsing ring
+                                    Circle()
+                                        .stroke(Color.yellow.opacity(0.4), lineWidth: 1.5)
+                                        .frame(width: currentHighlightRing, height: currentHighlightRing)
+                                        .scaleEffect(pulseAnimation ? 1.5 : 1.0)
+                                        .opacity(pulseAnimation ? 0.0 : 0.6)
+                                }
                             }
                             
                             if isSelected {
