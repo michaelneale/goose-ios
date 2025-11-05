@@ -42,6 +42,20 @@ struct NodeMatrix: View {
     private let messageDotSize: CGFloat = 4
     private let baseMessageDotRadius: CGFloat = 30
     
+    // MARK: - Live Session Detection
+    /// Check if a session is "live" (updated within last 5 minutes)
+    private func isSessionLive(_ session: ChatSession) -> Bool {
+        guard let sessionDate = Self.dateFormatter.date(from: session.updatedAt) else {
+            return false
+        }
+        
+        let now = Date()
+        let secondsAgo = now.timeIntervalSince(sessionDate)
+        
+        // Consider live if updated in last 5 minutes (300 seconds)
+        return secondsAgo < 300
+    }
+    
     // MARK: - Node Size Calculation
     private func nodeSize(for messageCount: Int) -> CGFloat {
         let lowThreshold = 5
@@ -202,10 +216,10 @@ struct NodeMatrix: View {
                             tapTargetSize: tapTargetSize,
                             highlightRingSize: highlightRingSize,
                             messageDotRadius: messageDotRadius,
-                            messageDotSize: messageDotSize
-                        ,
-                        getCachedPosition: self.getCachedPosition
-                    )
+                            messageDotSize: messageDotSize,
+                            getCachedPosition: self.getCachedPosition,
+                            isSessionLive: self.isSessionLive
+                        )
                         .frame(width: nodeGeometry.size.width, height: nodeGeometry.size.height)
                         
                         // Current day
@@ -221,9 +235,11 @@ struct NodeMatrix: View {
                             highlightRingSize: highlightRingSize,
                             messageDotRadius: messageDotRadius,
                             messageDotSize: messageDotSize,
-                            getCachedPosition: self.getCachedPosition, pulseAnimation: $pulseAnimation,
+                            getCachedPosition: self.getCachedPosition,
+                            isSessionLive: self.isSessionLive,
+                            pulseAnimation: $pulseAnimation,
                             dashPhase: $dashPhase
-                    )
+                        )
                         .frame(width: nodeGeometry.size.width, height: nodeGeometry.size.height)
                         
                         // Next day (only if not on today)
@@ -239,10 +255,10 @@ struct NodeMatrix: View {
                                 tapTargetSize: tapTargetSize,
                                 highlightRingSize: highlightRingSize,
                                 messageDotRadius: messageDotRadius,
-                                messageDotSize: messageDotSize
-                            ,
-                            getCachedPosition: self.getCachedPosition
-                        )
+                                messageDotSize: messageDotSize,
+                                getCachedPosition: self.getCachedPosition,
+                                isSessionLive: self.isSessionLive
+                            )
                             .frame(width: nodeGeometry.size.width, height: nodeGeometry.size.height)
                         }
                     }
@@ -575,14 +591,16 @@ struct DayContentView: View {
     let messageDotRadius: (CGFloat) -> CGFloat
     let messageDotSize: CGFloat
     let getCachedPosition: (ChatSession, Int, CGSize, [ChatSession], String) -> CGPoint
+    let isSessionLive: (ChatSession) -> Bool
     @Binding var pulseAnimation: Bool
     @Binding var dashPhase: CGFloat
     
     // Favorite storage for checking favorite status
     @ObservedObject private var favoritesStorage = FavoriteSessionsStorage.shared
     
-    // Separate pulse animation for favorites (slower)
+    // Separate pulse animations
     @State private var favoritePulse = false
+    @State private var livePulse = false  // For live sessions
     
     init(sessions: [ChatSession],
          selectedSessionId: String?,
@@ -596,6 +614,7 @@ struct DayContentView: View {
          messageDotRadius: @escaping (CGFloat) -> CGFloat,
          messageDotSize: CGFloat,
          getCachedPosition: @escaping (ChatSession, Int, CGSize, [ChatSession], String) -> CGPoint,
+         isSessionLive: @escaping (ChatSession) -> Bool = { _ in false },
          pulseAnimation: Binding<Bool> = .constant(false),
          dashPhase: Binding<CGFloat> = .constant(0)) {
         self.sessions = sessions
@@ -610,6 +629,7 @@ struct DayContentView: View {
         self.messageDotRadius = messageDotRadius
         self.messageDotSize = messageDotSize
         self.getCachedPosition = getCachedPosition
+        self.isSessionLive = isSessionLive
         self._pulseAnimation = pulseAnimation
         self._dashPhase = dashPhase
     }
@@ -670,6 +690,7 @@ struct DayContentView: View {
                     let position = getCachedPosition(session, index, geometry.size, sessions, dateLabel)
                     let isSelected = selectedSessionId == session.id
                     let isFavorite = favoritesStorage.isFavorite(session.id)
+                    let isLive = isSessionLive(session)
                     let currentNodeSize = nodeSize(session.messageCount)
                     let currentTapTarget = tapTargetSize(currentNodeSize)
                     let currentHighlightRing = highlightRingSize(currentNodeSize)
@@ -681,6 +702,24 @@ struct DayContentView: View {
                             Circle()
                                 .fill(Color.clear)
                                 .frame(width: currentTapTarget, height: currentTapTarget)
+                            
+                            // Live indicator - cyan/teal pulse (takes precedence when not selected/favorited)
+                            if isLive && !isSelected && !isFavorite {
+                                ZStack {
+                                    // Static ring
+                                    Circle()
+                                        .stroke(Color.cyan.opacity(0.7), lineWidth: 1.5)
+                                        .frame(width: currentNodeSize + 4, height: currentNodeSize + 4)
+                                    
+                                    // Pulsing ring with blur (2.5s animation)
+                                    Circle()
+                                        .stroke(Color.cyan.opacity(0.6), lineWidth: 2)
+                                        .frame(width: currentNodeSize + 4, height: currentNodeSize + 4)
+                                        .blur(radius: 3)
+                                        .scaleEffect(livePulse ? 1.4 : 1.0)
+                                        .opacity(livePulse ? 0.0 : 0.9)
+                                }
+                            }
                             
                             // Favorite indicator - subtle yellow glow with slow pulse (very close to node)
                             if isFavorite && !isSelected {
@@ -712,6 +751,8 @@ struct DayContentView: View {
                                     Color.blue :
                                         isFavorite ?
                                         Color.yellow.opacity(colorScheme == .dark ? 0.7 : 0.5) :
+                                        isLive ?
+                                        Color.cyan.opacity(colorScheme == .dark ? 0.6 : 0.4) :
                                         (colorScheme == .dark ?
                                          Color.white.opacity(0.5) :
                                             Color.black.opacity(0.3))
@@ -770,9 +811,12 @@ struct DayContentView: View {
                 }
             }
             .onAppear {
-                // Start slower pulse animation for favorites (3 seconds)
+                // Start pulse animations
                 withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: false)) {
                     favoritePulse = true
+                }
+                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: false)) {
+                    livePulse = true
                 }
             }
         }

@@ -88,44 +88,36 @@ struct WelcomeView: View {
                         } else {
                             // Node Matrix - fills all available space
                             if showSessionsTitle {
-                                GeometryReader { matrixGeo in
-                                    NodeMatrix(
-                                        sessions: recentSessions,
-                                        selectedSessionId: isInputFocused ? focusedNodeSession?.id : (showSessionCard ? selectedSession?.id : nil),
-                                        onNodeTap: { session, position in
-                                            // Convert position from NodeMatrix local space to global space
-                                            let globalPosition = CGPoint(
-                                                x: matrixGeo.frame(in: .global).minX + position.x,
-                                                y: matrixGeo.frame(in: .global).minY + position.y
-                                            )
-                                            handleNodeTap(session, at: globalPosition)
-                                        },
-                                        onDayChange: { daysOffset in
-                                            currentDaysOffset = daysOffset
+                                NodeMatrix(
+                                    sessions: recentSessions,
+                                    selectedSessionId: isInputFocused ? focusedNodeSession?.id : (showSessionCard ? selectedSession?.id : nil),
+                                    onNodeTap: { session, position in
+                                        handleNodeTap(session, at: position)
+                                    },
+                                    onDayChange: { daysOffset in
+                                        currentDaysOffset = daysOffset
+                                        
+                                        // Smart loading: Only load if we need more sessions
+                                        // 1. Check if we've moved significantly (5+ days from last load)
+                                        // 2. Check if we're within the 90-day boundary
+                                        // 3. Check if we have more sessions to load
+                                        let daysSinceLastLoad = abs(daysOffset - lastLoadTriggeredAtOffset)
+                                        
+                                        if daysOffset > 5 && 
+                                           daysOffset <= maxDaysToLoad &&
+                                           daysSinceLastLoad >= 5 &&
+                                           !cachedSessions.isEmpty {
+                                            // Update the trigger point to prevent immediate re-triggers
+                                            lastLoadTriggeredAtOffset = daysOffset
                                             
-                                            // Smart loading: Only load if we need more sessions
-                                            // 1. Check if we've moved significantly (5+ days from last load)
-                                            // 2. Check if we're within the 90-day boundary
-                                            // 3. Check if we have more sessions to load
-                                            let daysSinceLastLoad = abs(daysOffset - lastLoadTriggeredAtOffset)
-                                            
-                                            if daysOffset > 5 && 
-                                               daysOffset <= maxDaysToLoad &&
-                                               daysSinceLastLoad >= 5 &&
-                                               !cachedSessions.isEmpty {
-                                                // Update the trigger point to prevent immediate re-triggers
-                                                lastLoadTriggeredAtOffset = daysOffset
-                                                
-                                                // Use detached task to avoid blocking UI thread during swipe
-                                                Task.detached {
-                                                    await onLoadMore()
-                                                }
+                                            // Use detached task to avoid blocking UI thread during swipe
+                                            Task.detached {
+                                                await onLoadMore()
                                             }
-                                        },
-                                        showDraftNode: isInputFocused && focusedNodeSession == nil
-                                    )
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                }
+                                        }
+                                    },
+                                    showDraftNode: isInputFocused && focusedNodeSession == nil
+                                )
                                 .transition(.opacity)
                             } else {
                                 // Placeholder to maintain space before animation
