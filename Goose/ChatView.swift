@@ -13,6 +13,7 @@ struct ChatView: View {
     @State private var completedToolCalls: [String: CompletedToolCall] = [:]
     @State private var toolCallMessageMap: [String: String] = [:]
     @State private var currentSessionId: String?
+    @State private var sessionName: String?  // Store session name/description
     @State private var isSettingsPresented = false
 
     @FocusState private var isInputFocused: Bool
@@ -277,8 +278,8 @@ struct ChatView: View {
 
             // Custom navigation bar with background
             VStack(spacing: 0) {
-                // Navigation bar - PR #1 style with back button
-                HStack(spacing: 8) {
+                // Navigation bar - simplified with just back button and session name
+                HStack(spacing: 12) {
                     // Back button (navigates to welcome)
                     Button(action: {
                         onBackToWelcome()
@@ -289,25 +290,13 @@ struct ChatView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Sidebar button
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSidebar.toggle()
-                        }
-                    }) {
-                        Image("SideMenuIcon")
-                            .resizable()
-                            .renderingMode(.template)
+                    // Session name - only show if we have one
+                    if let name = sessionName {
+                        Text(name)
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.primary)
-                            .frame(width: 24, height: 22)
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.plain)
-
-                    // Session name
-                    Text(currentSessionId != nil ? "Session" : "New Session")
-                        .font(.system(size: 16))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
 
                     Spacer()
                 }
@@ -1221,6 +1210,12 @@ struct ChatView: View {
 
     }
 
+    /// Fetch and update session name from the sessions list
+    private func fetchSessionName(for sessionId: String) async -> String? {
+        let sessions = await apiService.fetchSessions()
+        return sessions.first(where: { $0.id == sessionId })?.title
+    }
+    
     func loadSession(_ sessionId: String) {
         // CRITICAL: Cancel any existing stream before switching sessions
         if let currentTask = currentStreamTask {
@@ -1288,6 +1283,9 @@ struct ChatView: View {
                 let (fetchedSessionId, sessionMessages) = try await apiService.resumeAgent(
                     sessionId: sessionIdToResume, loadModelAndExtensions: false)
                 
+                // Fetch session name for display
+                let name = await fetchSessionName(for: fetchedSessionId)
+                
                 // Skip provider/extensions setup for browsing - will be done on first message send
                 // This makes session loading instant (just fetch and display messages)
 
@@ -1301,6 +1299,7 @@ struct ChatView: View {
 
                     // Set new state with forced UI refresh
                     currentSessionId = fetchedSessionId
+                    sessionName = name  // Update session name for nav bar
 
                     // Only update messages if switching sessions OR messages are empty OR server has MORE messages
                     // We keep existing messages visible during session activation (when resuming after loading)
@@ -1363,6 +1362,7 @@ struct ChatView: View {
         completedToolCalls.removeAll()
         toolCallMessageMap.removeAll()
         currentSessionId = nil
+        sessionName = nil  // Clear session name
         isLoading = false
         isSessionActivated = false  // Reset activation flag
 
