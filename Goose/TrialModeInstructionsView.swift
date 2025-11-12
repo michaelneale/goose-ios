@@ -65,7 +65,7 @@ struct TrialModeInstructionsView: View {
                             number: 2,
                             title: "Enable Tunneling",
                             description:
-                                "Open Goose desktop, go to Settings → App, and turn on the Tunneling option. Sign in when prompted.",
+                                "Open Goose desktop, go to Settings → App, and turn on the Tunneling option.",
                             icon: "network"
                         )
 
@@ -73,7 +73,7 @@ struct TrialModeInstructionsView: View {
                             number: 3,
                             title: "Scan QR Code",
                             description:
-                                "A QR code will appear in the desktop app. Use your iPhone's camera to scan it and sign in when prompted.",
+                                "A QR code will appear in the desktop app. Use your iPhone's camera to scan it.",
                             icon: "qrcode.viewfinder"
                         )
                     }
