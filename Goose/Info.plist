@@ -32,5 +32,16 @@
 	<string>Goose needs access to speech recognition to convert your voice to text for chat messages.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Goose needs access to the microphone to enable voice input for chat messages.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UISceneConfigurations</key>
+		<dict/>
+	</dict>
+	<key>UIPrefersStandaloneForMac</key>
+	<true/>
+	<key>UIUserInterfaceStyle</key>
+	<string>Automatic</string>
+	<key>LSUIElement</key>
+	<false/>
 </dict>
 </plist>
