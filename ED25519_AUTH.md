@@ -40,16 +40,101 @@ xcrun simctl spawn booted defaults write com.goose.chat goose_ed25519_private_ke
 
 # Verify it was set
 xcrun simctl spawn booted defaults read com.goose.chat goose_ed25519_private_key
+
+# To remove the key from simulator
+xcrun simctl spawn booted defaults delete com.goose.chat goose_ed25519_private_key
 ```
 
 ### For Production (MDM)
 
-Deploy via MDM with the key:
-```
-com.block.goose.ed25519_private_key
+Deploy via MDM Configuration Profile. Create a `.mobileconfig` file:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.ManagedClient.preferences</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>com.yourcompany.goose.prefs</string>
+            <key>PayloadUUID</key>
+            <string>GENERATE-A-UUID-HERE</string>
+            <key>PayloadDisplayName</key>
+            <string>Goose Configuration</string>
+            <key>PayloadDescription</key>
+            <string>Ed25519 authentication for Goose app</string>
+            <key>PayloadOrganization</key>
+            <string>Your Company</string>
+            
+            <key>PayloadContent</key>
+            <dict>
+                <key>com.goose.chat</key>
+                <dict>
+                    <key>Forced</key>
+                    <array>
+                        <dict>
+                            <key>mcx_preference_settings</key>
+                            <dict>
+                                <key>ed25519_private_key</key>
+                                <string>YOUR_PRIVATE_KEY_HEX_HERE</string>
+                            </dict>
+                        </dict>
+                    </array>
+                </dict>
+            </dict>
+        </dict>
+    </array>
+    <key>PayloadDisplayName</key>
+    <string>Goose Ed25519 Authentication</string>
+    <key>PayloadIdentifier</key>
+    <string>com.yourcompany.goose</string>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>GENERATE-ANOTHER-UUID-HERE</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>
 ```
 
-The app checks MDM first, then falls back to UserDefaults for testing.
+**Key points:**
+- The bundle ID is `com.goose.chat` (must match your app)
+- The preference key is `ed25519_private_key` (no prefix needed)
+- Replace `YOUR_PRIVATE_KEY_HEX_HERE` with your actual hex private key
+- Generate UUIDs with `uuidgen` command
+- Deploy through your MDM system (Jamf, Intune, etc.)
+
+The app checks MDM-managed preferences first, then falls back to UserDefaults for simulator testing.
+
+### Testing MDM on Physical Device
+
+To test the MDM configuration profile on a personal device without a full MDM system:
+
+1. **Save the `.mobileconfig` file** with your test private key
+2. **Email it to yourself** or host it on a web server
+3. **Open the file** on your iOS device (tap the email attachment or visit the URL in Safari)
+4. **Install the profile**: Settings → General → VPN & Device Management → Install
+5. **Verify it's installed**: Settings → General → VPN & Device Management → Configuration Profiles
+
+**To verify the key was set:**
+```swift
+// Add temporary debug code to ConfigurationHandler.swift
+print("🔍 MDM Key check: \(UserDefaults.standard.string(forKey: "ed25519_private_key") ?? "not found")")
+```
+
+**To remove the profile:**
+Settings → General → VPN & Device Management → Select profile → Remove Profile
+
+⚠️ **Note**: For production, deploy via your MDM system (Jamf, Intune, Workspace ONE, etc.). This manual method is for testing only.
 
 ## Server Configuration (Rust)
 
@@ -57,7 +142,7 @@ Set the public key as an environment variable:
 
 ```bash
 # Set the Ed25519 public key (replace YOUR_PUBLIC_KEY_HEX with actual hex string)
-export GOOSE_TUNNEL_ED25519_PUBLIC_KEY="YOUR_PUBLIC_KEY_HEX"
+export GOOSE_TUNNEL_PUBLIC_KEY_AUTH="YOUR_PUBLIC_KEY_HEX"
 ```
 
 When this environment variable is set, the server will:
@@ -109,7 +194,7 @@ echo "Public key (for server): $PUBLIC_KEY"
 xcrun simctl spawn booted defaults write com.goose.chat goose_ed25519_private_key "$PRIVATE_KEY"
 
 # Configure server
-export GOOSE_TUNNEL_ED25519_PUBLIC_KEY="$PUBLIC_KEY"
+export GOOSE_TUNNEL_PUBLIC_KEY_AUTH="$PUBLIC_KEY"
 ```
 
 ## Security Notes
@@ -141,6 +226,6 @@ Check the server logs for:
 
 Simply don't set the keys:
 - iOS: Don't set `goose_ed25519_private_key` - app won't sign requests
-- Server: Don't set `GOOSE_TUNNEL_ED25519_PUBLIC_KEY` - server won't require signatures
+- Server: Don't set `GOOSE_TUNNEL_PUBLIC_KEY_AUTH` - server won't require signatures
 
 The system will work exactly as before.

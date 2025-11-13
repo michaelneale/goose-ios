@@ -264,8 +264,8 @@ class ConfigurationHandler: ObservableObject {
     
     /// Get Ed25519 private key from MDM or UserDefaults (for testing)
     static var ed25519PrivateKey: String? {
-        // First try MDM configuration
-        if let mdmKey = UserDefaults.standard.string(forKey: "com.block.goose.ed25519_private_key") {
+        // First try MDM configuration (scoped to bundle ID)
+        if let mdmKey = UserDefaults.standard.string(forKey: "ed25519_private_key") {
             return mdmKey
         }
         // Fall back to testing key in standard UserDefaults
