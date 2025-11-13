@@ -1212,8 +1212,13 @@ struct ChatView: View {
 
     /// Fetch and update session name from the sessions list
     private func fetchSessionName(for sessionId: String) async -> String? {
-        let sessions = await apiService.fetchSessions()
-        return sessions.first(where: { $0.id == sessionId })?.title
+        let result = await apiService.fetchSessions()
+        switch result {
+        case .success(let sessions):
+            return sessions.first(where: { $0.id == sessionId })?.title
+        case .failure:
+            return nil  // On error, just return nil (session name is optional)
+        }
     }
     
     func loadSession(_ sessionId: String) {

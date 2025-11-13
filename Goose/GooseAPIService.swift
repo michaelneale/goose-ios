@@ -614,17 +614,17 @@ class GooseAPIService: ObservableObject {
     }
 
     // MARK: - Sessions Management
-    func fetchInsights() async -> SessionInsights? {
+    func fetchInsights() async -> Result<SessionInsights, Error> {
         let startTime = Date()
         
         // In trial mode, return mock insights
         if isTrialMode {
-            return SessionInsights(totalSessions: 5, totalTokens: 450_000_000)
+            return .success(SessionInsights(totalSessions: 5, totalTokens: 450_000_000))
         }
 
         guard let url = URL(string: "\(baseURL)/sessions/insights") else {
             print("🚨 Invalid insights URL")
-            return nil
+            return .failure(APIError.invalidURL)
         }
 
         var request = URLRequest(url: url)
@@ -637,34 +637,34 @@ class GooseAPIService: ObservableObject {
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("🚨 Invalid response when fetching insights")
-                return nil
+                return .failure(APIError.invalidResponse)
             }
 
             if httpResponse.statusCode == 200 {
                 let insights = try JSONDecoder().decode(SessionInsights.self, from: data)
-                return insights
+                return .success(insights)
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
                 handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Fetch Insights")
-                return nil
+                return .failure(APIError.httpError(httpResponse.statusCode, errorBody))
             }
         } catch {
             handleAPIError(error, context: "Fetch Insights")
-            return nil
+            return .failure(error)
         }
     }
     
-    func fetchSessions() async -> [ChatSession] {
+    func fetchSessions() async -> Result<[ChatSession], Error> {
         let startTime = Date()
         
         // In trial mode, return mock sessions
         if isTrialMode {
-            return TrialMode.shared.getMockSessions()
+            return .success(TrialMode.shared.getMockSessions())
         }
 
         guard let url = URL(string: "\(baseURL)/sessions") else {
             print("🚨 Invalid sessions URL")
-            return []
+            return .failure(APIError.invalidURL)
         }
 
         var request = URLRequest(url: url)
@@ -677,20 +677,20 @@ class GooseAPIService: ObservableObject {
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("🚨 Invalid response when fetching sessions")
-                return []
+                return .failure(APIError.invalidResponse)
             }
 
             if httpResponse.statusCode == 200 {
                 let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
-                return sessionsResponse.sessions
+                return .success(sessionsResponse.sessions)
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
                 handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Fetch Sessions")
-                return []
+                return .failure(APIError.httpError(httpResponse.statusCode, errorBody))
             }
         } catch {
             handleAPIError(error, context: "Fetch Sessions")
-            return []
+            return .failure(error)
         }
     }
 }

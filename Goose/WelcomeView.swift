@@ -414,6 +414,7 @@ struct WelcomeView: View {
             // This is non-blocking and updates ContentView's cache
             Task.detached(priority: .background) {
                 _ = await GooseAPIService.shared.fetchSessions()
+                // Errors are logged in fetchSessions, no need to handle here
             }
         } else {
             // No cache - fetch in background without blocking UI
@@ -424,16 +425,23 @@ struct WelcomeView: View {
             
             // Fetch sessions in background, update when ready
             Task.detached(priority: .userInitiated) {
-                let sessions = await GooseAPIService.shared.fetchSessions()
+                let result = await GooseAPIService.shared.fetchSessions()
                 
-                await MainActor.run {
-                    self.recentSessions = sessions
+                switch result {
+                case .success(let sessions):
+                    await MainActor.run {
+                        self.recentSessions = sessions
+                    }
+                case .failure:
+                    // Keep empty list, errors are logged in fetchSessions
+                    break
                 }
             }
             
             // Also fetch insights but don't wait for it
             Task.detached(priority: .background) {
                 _ = await GooseAPIService.shared.fetchInsights()
+                // Errors are logged in fetchInsights, no need to handle here
             }
         }
     }
