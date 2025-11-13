@@ -154,6 +154,10 @@ struct ContentView: View {
                                 onLoadMore: {  // Pass load more callback for NodeMatrix
                                     await loadMoreSessions()
                                 },
+                                onCacheUpdate: { newSessions in
+                                    // Update cache from background fetches
+                                    await updateCacheQuietly(newSessions)
+                                },
                                 voiceManager: sharedVoiceManager,
                                 continuousVoiceManager: sharedContinuousVoiceManager
                             )
@@ -275,6 +279,18 @@ struct ContentView: View {
     }
     
     // MARK: - Session Management
+    
+    /// Update cache quietly from background fetches (no UI loading indicators)
+    private func updateCacheQuietly(_ newSessions: [ChatSession]) async {
+        // Filter to current days loaded range
+        let sessionsInRange = await filterSessionsByDate(newSessions, daysBack: currentDaysLoaded)
+        
+        await MainActor.run {
+            self.cachedSessions = sessionsInRange
+            self.hasMoreSessions = newSessions.count > sessionsInRange.count
+            print("✅ Cache updated from background fetch: \(sessionsInRange.count) sessions")
+        }
+    }
     
     /// Refresh sessions after returning from chat (to show new sessions)
     private func refreshSessionsAfterChat() async {

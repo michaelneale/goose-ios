@@ -70,6 +70,49 @@ class GooseAPIService: ObservableObject {
     
     // MARK: - Centralized Error Handling
     
+    /// Check if an error is a transient network error worth retrying
+    private func isTransientError(_ error: Error) -> Bool {
+        guard let urlError = error as? URLError else { return false }
+        
+        // Only retry these specific transient network errors
+        switch urlError.code {
+        case .timedOut, .networkConnectionLost, .notConnectedToInternet:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    /// Retry wrapper for network requests - handles transient errors gracefully
+    private func fetchWithRetry<T>(
+        maxAttempts: Int = 2,
+        operation: () async throws -> T
+    ) async -> Result<T, Error> {
+        var lastError: Error?
+        
+        for attempt in 1...maxAttempts {
+            do {
+                let result = try await operation()
+                return .success(result)
+            } catch {
+                lastError = error
+                
+                // Only retry on transient network errors
+                if isTransientError(error) && attempt < maxAttempts {
+                    // Quick retry once (1 second delay)
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    print("🔄 Retrying request (attempt \(attempt + 1)/\(maxAttempts))...")
+                    continue
+                }
+                
+                // Other errors or max attempts reached = fail immediately
+                break
+            }
+        }
+        
+        return .failure(lastError ?? APIError.unknown)
+    }
+    
     /// Handle API errors and set appropriate notices
     private func handleAPIError(_ error: Error, context: String = "") {
         if isTrialMode { return }
@@ -615,82 +658,68 @@ class GooseAPIService: ObservableObject {
 
     // MARK: - Sessions Management
     func fetchInsights() async -> Result<SessionInsights, Error> {
-        let startTime = Date()
-        
         // In trial mode, return mock insights
         if isTrialMode {
             return .success(SessionInsights(totalSessions: 5, totalTokens: 450_000_000))
         }
 
-        guard let url = URL(string: "\(baseURL)/sessions/insights") else {
-            print("🚨 Invalid insights URL")
-            return .failure(APIError.invalidURL)
-        }
+        // Use retry wrapper for network resilience
+        return await fetchWithRetry {
+            guard let url = URL(string: "\(baseURL)/sessions/insights") else {
+                throw APIError.invalidURL
+            }
 
-        var request = URLRequest(url: url)
-        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+            var request = URLRequest(url: url)
+            request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
 
-        do {
             signRequest(&request)
             let (data, response) = try await URLSession.shared.data(for: request)
-            let elapsed = Date().timeIntervalSince(startTime)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("🚨 Invalid response when fetching insights")
-                return .failure(APIError.invalidResponse)
+                throw APIError.invalidResponse
             }
 
             if httpResponse.statusCode == 200 {
                 let insights = try JSONDecoder().decode(SessionInsights.self, from: data)
-                return .success(insights)
+                return insights
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
                 handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Fetch Insights")
-                return .failure(APIError.httpError(httpResponse.statusCode, errorBody))
+                throw APIError.httpError(httpResponse.statusCode, errorBody)
             }
-        } catch {
-            handleAPIError(error, context: "Fetch Insights")
-            return .failure(error)
         }
     }
     
     func fetchSessions() async -> Result<[ChatSession], Error> {
-        let startTime = Date()
-        
         // In trial mode, return mock sessions
         if isTrialMode {
             return .success(TrialMode.shared.getMockSessions())
         }
 
-        guard let url = URL(string: "\(baseURL)/sessions") else {
-            print("🚨 Invalid sessions URL")
-            return .failure(APIError.invalidURL)
-        }
+        // Use retry wrapper for network resilience
+        return await fetchWithRetry {
+            guard let url = URL(string: "\(baseURL)/sessions") else {
+                throw APIError.invalidURL
+            }
 
-        var request = URLRequest(url: url)
-        request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
+            var request = URLRequest(url: url)
+            request.setValue(secretKey, forHTTPHeaderField: "X-Secret-Key")
 
-        do {
             signRequest(&request)
             let (data, response) = try await URLSession.shared.data(for: request)
-            let elapsed = Date().timeIntervalSince(startTime)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("🚨 Invalid response when fetching sessions")
-                return .failure(APIError.invalidResponse)
+                throw APIError.invalidResponse
             }
 
             if httpResponse.statusCode == 200 {
                 let sessionsResponse = try JSONDecoder().decode(SessionsResponse.self, from: data)
-                return .success(sessionsResponse.sessions)
+                return sessionsResponse.sessions
             } else {
                 let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
                 handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Fetch Sessions")
-                return .failure(APIError.httpError(httpResponse.statusCode, errorBody))
+                throw APIError.httpError(httpResponse.statusCode, errorBody)
             }
-        } catch {
-            handleAPIError(error, context: "Fetch Sessions")
-            return .failure(error)
         }
     }
 }
@@ -844,6 +873,7 @@ enum APIError: Error, LocalizedError {
     case httpError(Int, String)
     case noData
     case decodingError(Error)
+    case unknown
 
     var errorDescription: String? {
         switch self {
@@ -857,6 +887,8 @@ enum APIError: Error, LocalizedError {
             return "No data received"
         case .decodingError(let error):
             return "Decoding error: \(error.localizedDescription)"
+        case .unknown:
+            return "Unknown error"
         }
     }
 }
