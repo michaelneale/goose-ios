@@ -285,10 +285,11 @@ struct WelcomeCard: View {
     
     // Fetch token count from API - silent failure
     private func fetchTokenCount() async {
-        let insights = await GooseAPIService.shared.fetchInsights()
+        let result = await GooseAPIService.shared.fetchInsights()
         
         await MainActor.run {
-            if let insights = insights {
+            switch result {
+            case .success(let insights):
                 tokenCount = insights.totalTokens
                 print("✅ WelcomeCard: Fetched token count: \(tokenCount)")
                 
@@ -301,7 +302,7 @@ struct WelcomeCard: View {
                         progressValue = CGFloat(min(percentage, 1.0))
                     }
                 }
-            } else {
+            case .failure:
                 // Silent failure - show 0
                 print("⚠️ WelcomeCard: Failed to fetch token count - showing 0")
                 tokenCount = 0

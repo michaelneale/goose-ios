@@ -1212,8 +1212,13 @@ struct ChatView: View {
 
     /// Fetch and update session name from the sessions list
     private func fetchSessionName(for sessionId: String) async -> String? {
-        let sessions = await apiService.fetchSessions()
-        return sessions.first(where: { $0.id == sessionId })?.title
+        let result = await apiService.fetchSessions()
+        switch result {
+        case .success(let sessions):
+            return sessions.first(where: { $0.id == sessionId })?.title
+        case .failure:
+            return nil  // On error, just return nil (session name is optional)
+        }
     }
     
     func loadSession(_ sessionId: String) {
@@ -1227,13 +1232,18 @@ struct ChatView: View {
             // Only clear messages if we're switching to a different session
             let isSwitchingSession = currentSessionId != sessionId
             
-            // Show loading indicator
+            // Delay showing loading indicator to prevent flash on fast loads
+            let loadingTask = Task {
+                try? await Task.sleep(nanoseconds: 200_000_000) // 200ms delay
+                await MainActor.run {
+                    isLoadingSession = true
+                }
+            }
+            
+            // Clear messages immediately if switching sessions
             await MainActor.run {
-                isLoadingSession = true
-                // Only clear messages when switching to a different session
                 if isSwitchingSession {
                     messages.removeAll()  // Clear messages while loading different session
-                } else {
                 }
             }
             
@@ -1331,12 +1341,14 @@ struct ChatView: View {
                     // Mark as not activated - model/extensions will load on first message
                     isSessionActivated = false
                     
-                    // Clear loading state
+                    // Clear loading state and cancel delayed loading indicator
+                    loadingTask.cancel()
                     isLoadingSession = false
                 }
             } catch {
                 print("🚨 Failed to load session: \(error)")
                 await MainActor.run {
+                    loadingTask.cancel()
                     isLoadingSession = false
                     let errorMessage = Message(
                         role: .assistant,

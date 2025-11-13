@@ -9,9 +9,9 @@ enum AppNotice: Equatable {
     var title: String {
         switch self {
         case .tunnelDisabled:
-            return "Tunnel Not Available"
+            return "Unable to reach goose"
         case .tunnelUnreachable:
-            return "Cannot Connect"
+            return "Unable to reach goose"
         case .appNeedsUpdate:
             return "Update Required"
         }
@@ -21,13 +21,13 @@ enum AppNotice: Equatable {
         switch self {
         case .tunnelDisabled:
             return
-                "Unable to reach your agent. Please try again shortly, otherwise enable tunneling in the goose desktop app."
+                "Temporarily unable to reach your agent, please try again later"
         case .tunnelUnreachable:
             return
-                "Cannot reach your agent. Make sure the Goose desktop app is running with tunneling enabled."
+                "Temporarily unable to reach your agent, please try again later"
         case .appNeedsUpdate:
             return
-                "The desktop app needs to be updated to work with this version of the mobile app."
+                "The desktop app may need to be updated to work with this version of the mobile app."
         }
     }
 

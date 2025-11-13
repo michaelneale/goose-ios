@@ -9,6 +9,7 @@ struct WelcomeView: View {
     var onSessionSelect: (String) -> Void
     var cachedSessions: [ChatSession] = []  // Pass in cached sessions from ContentView
     var onLoadMore: () async -> Void = {}  // Callback to load more sessions
+    var onCacheUpdate: (([ChatSession]) async -> Void)? = nil  // Callback to update ContentView cache
     
     // Voice features - shared with ChatView
     @ObservedObject var voiceManager: EnhancedVoiceManager
@@ -410,10 +411,18 @@ struct WelcomeView: View {
                 isLoadingSessions = false
             }
             
-            // Optionally fetch fresh data in background for next time
-            // This is non-blocking and updates ContentView's cache
-            Task.detached(priority: .background) {
-                _ = await GooseAPIService.shared.fetchSessions()
+            // Fetch fresh data in background and update ContentView's cache
+            // This is non-blocking but now actually updates the cache!
+            if let cacheUpdate = onCacheUpdate {
+                Task.detached(priority: .background) {
+                    let result = await GooseAPIService.shared.fetchSessions()
+                    
+                    if case .success(let sessions) = result {
+                        // Update ContentView's cache with fresh data
+                        await cacheUpdate(sessions)
+                    }
+                    // Failures are silent - offline = no update, keep existing cache
+                }
             }
         } else {
             // No cache - fetch in background without blocking UI
@@ -424,16 +433,23 @@ struct WelcomeView: View {
             
             // Fetch sessions in background, update when ready
             Task.detached(priority: .userInitiated) {
-                let sessions = await GooseAPIService.shared.fetchSessions()
+                let result = await GooseAPIService.shared.fetchSessions()
                 
-                await MainActor.run {
-                    self.recentSessions = sessions
+                switch result {
+                case .success(let sessions):
+                    await MainActor.run {
+                        self.recentSessions = sessions
+                    }
+                case .failure:
+                    // Keep empty list, errors are logged in fetchSessions
+                    break
                 }
             }
             
             // Also fetch insights but don't wait for it
             Task.detached(priority: .background) {
                 _ = await GooseAPIService.shared.fetchInsights()
+                // Errors are logged in fetchInsights, no need to handle here
             }
         }
     }
