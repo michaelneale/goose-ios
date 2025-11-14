@@ -47,7 +47,22 @@ xcrun simctl spawn booted defaults delete com.goose.chat goose_ed25519_private_k
 
 ### For Production (MDM)
 
-Deploy via MDM Configuration Profile. Create a `.mobileconfig` file:
+**How it works:** The iOS app reads the private key from **managed UserDefaults** via an MDM Configuration Profile. When the MDM system pushes the profile to a device, iOS automatically makes the key available to the app - no user interaction required.
+
+**Key reading priority (see `ConfigurationHandler.swift`):**
+1. **MDM-managed**: `ed25519_private_key` (production - deployed via MDM)
+2. **Fallback**: `goose_ed25519_private_key` (simulator testing only)
+
+#### MDM Deployment Steps
+
+1. **Create** a `.mobileconfig` Configuration Profile
+2. **Upload** to your MDM system (Jamf, Intune, Workspace ONE, etc.)
+3. **Push** to target iOS devices
+4. **Done** - the app automatically reads the key and signs requests
+
+#### Configuration Profile Template
+
+Create a `.mobileconfig` file with this structure:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -106,14 +121,29 @@ Deploy via MDM Configuration Profile. Create a `.mobileconfig` file:
 </plist>
 ```
 
-**Key points:**
-- The bundle ID is `com.goose.chat` (must match your app)
-- The preference key is `ed25519_private_key` (no prefix needed)
-- Replace `YOUR_PRIVATE_KEY_HEX_HERE` with your actual hex private key
-- Generate UUIDs with `uuidgen` command
-- Deploy through your MDM system (Jamf, Intune, etc.)
+#### Critical Configuration Values
 
-The app checks MDM-managed preferences first, then falls back to UserDefaults for simulator testing.
+| Field | Value | Notes |
+|-------|-------|-------|
+| **Bundle ID** | `com.goose.chat` | Must match the app's bundle identifier |
+| **Preference Key** | `ed25519_private_key` | Exact key name (no prefix) |
+| **Key Format** | 64-character hex string | 32 bytes represented as hex |
+| **PayloadType** | `com.apple.ManagedClient.preferences` | Required for managed preferences |
+| **UUIDs** | Generate with `uuidgen` | Two unique UUIDs needed |
+
+#### What Happens on the Device
+
+```
+MDM System → iOS Device → Managed UserDefaults → Goose App
+                          (com.goose.chat domain)   (reads automatically)
+```
+
+When the profile is installed:
+1. iOS stores the key in the app's **managed** UserDefaults domain
+2. The Goose app reads it from `UserDefaults.standard.string(forKey: "ed25519_private_key")`
+3. On every API request, the app signs: `METHOD|PATH|TIMESTAMP|BODY_HASH`
+4. Signature sent in `X-Corp-Signature` header
+5. Server validates with the corresponding public key
 
 ### Testing MDM on Physical Device
 
