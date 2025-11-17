@@ -1,6 +1,6 @@
 # Ed25519 Signature Authentication
 
-This document describes the Ed25519 signature-based authentication system for securing communication between the iOS app and goose server through the tunnel.
+A signature can be configure to provide an additional layer of assurance when mobile devices are connecting over a tunnel to a goose desktop app. This can be used in MDM scenarios where you want to lock down org wide access.
 
 ## Overview
 
@@ -8,42 +8,35 @@ This document describes the Ed25519 signature-based authentication system for se
 - **Server**: Validates signatures with Ed25519 public key (when configured)
 - **Backward compatible**: Works with or without keys configured
 
-## Key Generation
-
-Generate an Ed25519 keypair using OpenSSL:
-
-```bash
-# Generate private key
-openssl genpkey -algorithm ed25519 -out ed25519_private.pem
-
-# Extract private key as hex (32 bytes = 64 hex characters)
-openssl pkey -in ed25519_private.pem -text -noout | grep "priv:" -A 3 | tail -n 3 | tr -d ' :\n'
-
-# Extract public key as hex (32 bytes = 64 hex characters)  
-openssl pkey -in ed25519_private.pem -pubout -text -noout | grep "pub:" -A 3 | tail -n 3 | tr -d ' :\n'
-```
-
-**Important**: Save both hex strings (private and public keys). The private key goes to iOS, the public key goes to the server.
-
 ## iOS Configuration
 
-### For Simulator Testing
+## Creating key and testing it
 
-Set the private key in the simulator's UserDefaults:
+Generate and configure a keypair:
 
 ```bash
-# Boot simulator (if not running)
-xcrun simctl boot "iPhone 16 Pro"
+# Generate keys
+openssl genpkey -algorithm ed25519 -out ed25519_private.pem
+PRIVATE_KEY=$(openssl pkey -in ed25519_private.pem -text -noout | grep "priv:" -A 3 | tail -n 3 | tr -d ' :\n')
+PUBLIC_KEY=$(openssl pkey -in ed25519_private.pem -pubout -text -noout | grep "pub:" -A 3 | tail -n 3 | tr -d ' :\n')
 
-# Set the Ed25519 private key (replace YOUR_PRIVATE_KEY_HEX with actual hex string)
-xcrun simctl spawn booted defaults write com.goose.chat goose_ed25519_private_key "YOUR_PRIVATE_KEY_HEX"
+echo "Private key (for iOS): $PRIVATE_KEY"
+echo "Public key (for server): $PUBLIC_KEY"
+
+# Configure iOS simulator
+xcrun simctl spawn booted defaults write com.goose.chat goose_ed25519_private_key "$PRIVATE_KEY"
 
 # Verify it was set
 xcrun simctl spawn booted defaults read com.goose.chat goose_ed25519_private_key
 
 # To remove the key from simulator
 xcrun simctl spawn booted defaults delete com.goose.chat goose_ed25519_private_key
+
+
+# Configure server with public key 
+export GOOSE_TUNNEL_PUBLIC_KEY_AUTH="$PUBLIC_KEY"
 ```
+
 
 ### For Production (MDM)
 
@@ -206,56 +199,3 @@ The server:
 2. Reconstructs the message using request data
 3. Verifies the signature using the Ed25519 public key
 4. Accepts request if signature is valid, rejects with 401 if invalid
-
-## Example
-
-Generate and configure a keypair:
-
-```bash
-# Generate keys
-openssl genpkey -algorithm ed25519 -out ed25519_private.pem
-PRIVATE_KEY=$(openssl pkey -in ed25519_private.pem -text -noout | grep "priv:" -A 3 | tail -n 3 | tr -d ' :\n')
-PUBLIC_KEY=$(openssl pkey -in ed25519_private.pem -pubout -text -noout | grep "pub:" -A 3 | tail -n 3 | tr -d ' :\n')
-
-echo "Private key (for iOS): $PRIVATE_KEY"
-echo "Public key (for server): $PUBLIC_KEY"
-
-# Configure iOS simulator
-xcrun simctl spawn booted defaults write com.goose.chat goose_ed25519_private_key "$PRIVATE_KEY"
-
-# Configure server
-export GOOSE_TUNNEL_PUBLIC_KEY_AUTH="$PUBLIC_KEY"
-```
-
-## Security Notes
-
-- Private keys must be kept secure and never transmitted
-- Public keys can be safely distributed
-- Each deployment should use unique keypairs
-- Keys can be rotated by generating new pairs and updating configurations
-- The system provides replay protection via timestamp validation
-- All tunnel traffic is already encrypted via HTTPS/WSS
-
-## Troubleshooting
-
-### iOS app not signing requests
-
-Check the Xcode console for:
-- `✓ Ed25519 signer initialized successfully` - Signing is enabled
-- `⚠️ No Ed25519 private key found` - No key configured (signatures won't be added)
-- `❌ Ed25519 signer failed to initialize` - Invalid key format
-
-### Server rejecting signatures
-
-Check the server logs for:
-- `✓ Signature valid for METHOD /path` - Signature validated successfully  
-- `✗ Authentication error: Missing X-Corp-Signature header` - iOS not sending signature
-- `✗ Authentication error: Invalid signature` - Signature verification failed
-
-### Testing without signatures
-
-Simply don't set the keys:
-- iOS: Don't set `goose_ed25519_private_key` - app won't sign requests
-- Server: Don't set `GOOSE_TUNNEL_PUBLIC_KEY_AUTH` - server won't require signatures
-
-The system will work exactly as before.
