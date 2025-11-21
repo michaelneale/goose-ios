@@ -319,6 +319,15 @@ struct ContentView: View {
         switch result {
         case .success(let fetchedSessions):
             await MainActor.run {
+                // In trial mode, show all sessions without filtering
+                if GooseAPIService.shared.isTrialMode {
+                    self.cachedSessions = fetchedSessions
+                    self.currentDaysLoaded = initialDaysBack
+                    self.hasMoreSessions = false  // No pagination in trial mode
+                    print("✅ Loaded \(fetchedSessions.count) trial mode sessions")
+                    return
+                }
+                
                 // Use UTC calendar for date comparison to match session timestamps
                 let calendar = Calendar.current  // Use local timezone
                 let now = Date()

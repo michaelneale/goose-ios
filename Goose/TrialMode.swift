@@ -53,22 +53,22 @@ class TrialMode {
         let formatter = ISO8601DateFormatter()
 
         return [
-            // TODAY - Many sessions for interesting graph visualization
+            // Demo sessions - read-only examples
 
             DemoSessionData(
                 id: "trial-demo-1",
-                description: "Example: Planning weekend trip (read-only)",
+                description: "Example: Debug network issue (read-only)",
                 messages: [
                     Message(
                         role: .user,
                         text: "Can you help me work out why my script can't reach google.com"),
                     Message(
                         role: .assistant,
-                        text: "I'd be happy to help you debug this... (this is just an example)"),
+                        text: "I'd be happy to help you debug this! Let's start by checking a few things:\n\n1. Can you ping google.com?\n2. Are you behind a proxy or firewall?\n3. What error message are you seeing?\n\nCan you run `ping google.com` and share the output?"),
                 ],
                 createdAt: formatter.string(from: now.addingTimeInterval(-3600 * 1)),
                 updatedAt: formatter.string(from: now.addingTimeInterval(-3600 * 0.5)),
-                displayMessageCount: 8
+                displayMessageCount: 2
             ),
 
             DemoSessionData(

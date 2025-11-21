@@ -20,9 +20,15 @@ struct WelcomeCard: View {
     // Token data - managed internally
     @State private var tokenCount: Int64 = 0
     
-    // Dynamic max tokens - doubles to 2B once we pass 1B
+    // Dynamic max tokens - rounds up to nearest billion
     private var maxTokens: Int64 {
-        tokenCount > 1_000_000_000 ? 2_000_000_000 : 1_000_000_000
+        let billion: Int64 = 1_000_000_000
+        if tokenCount == 0 {
+            return billion
+        }
+        // Calculate how many billions we need (rounded up)
+        let billionsNeeded = (tokenCount + billion - 1) / billion
+        return billionsNeeded * billion
     }
     
     // Callbacks for animation completion
@@ -53,11 +59,8 @@ struct WelcomeCard: View {
     
     // Dynamic label for progress bar
     private var progressLabel: String {
-        if tokenCount > 1_000_000_000 {
-            return "\(formatTokenCount(tokenCount)) of 2B"
-        } else {
-            return "\(formatTokenCount(tokenCount)) of 1B"
-        }
+        let billions = maxTokens / 1_000_000_000
+        return "\(formatTokenCount(tokenCount)) of \(billions)B"
     }
     
     // Session density levels
@@ -295,9 +298,8 @@ struct WelcomeCard: View {
                 
                 // Update progress bar if it's already visible
                 if showProgressSection {
-                    let max = tokenCount > 1_000_000_000 ? 2_000_000_000 : 1_000_000_000
-                    let percentage = Double(tokenCount) / Double(max)
-                    print("📊 Progress update: tokenCount=\(tokenCount), max=\(max), percentage=\(percentage)")
+                    let percentage = Double(tokenCount) / Double(maxTokens)
+                    print("📊 Progress update: tokenCount=\(tokenCount), max=\(maxTokens), percentage=\(percentage)")
                     withAnimation(.easeOut(duration: 0.8)) {
                         progressValue = CGFloat(min(percentage, 1.0))
                     }
@@ -354,9 +356,8 @@ struct WelcomeCard: View {
                             
                             // Animate progress bar with current token count
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                let max = tokenCount > 1_000_000_000 ? 2_000_000_000 : 1_000_000_000
-                                let percentage = Double(tokenCount) / Double(max)
-                                print("📊 Initial progress: tokenCount=\(tokenCount), max=\(max), percentage=\(percentage)")
+                                let percentage = Double(tokenCount) / Double(maxTokens)
+                                print("📊 Initial progress: tokenCount=\(tokenCount), max=\(maxTokens), percentage=\(percentage)")
                                 withAnimation(.easeOut(duration: 0.8)) {
                                     progressValue = CGFloat(min(percentage, 1.0))
                                 }
