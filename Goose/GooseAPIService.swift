@@ -328,6 +328,37 @@ class GooseAPIService: ObservableObject {
     // MARK: - Session Resume
     func resumeAgent(sessionId: String, loadModelAndExtensions: Bool = false) async throws -> (sessionId: String, messages: [Message]) {
         do {
+            // If loadModelAndExtensions=false, fetch session directly to get messages
+            // /agent/resume no longer returns messages when loadModelAndExtensions=false
+            if !loadModelAndExtensions {
+                guard let url = URL(string: "\(self.baseURL)/sessions/\(sessionId)") else {
+                    throw APIError.invalidURL
+                }
+                
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
+                
+                signRequest(&request)
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+                
+                if httpResponse.statusCode != 200 {
+                    let errorBody = String(data: data, encoding: .utf8) ?? "No error details"
+                    handleHTTPStatus(httpResponse.statusCode, body: errorBody, context: "Fetch Session")
+                    throw APIError.httpError(httpResponse.statusCode, errorBody)
+                }
+                
+                let session = try JSONDecoder().decode(SessionResponse.self, from: data)
+                let messages = session.conversation ?? []
+                
+                return (session.id, messages)
+            }
+            
+            // When loadModelAndExtensions=true, use /agent/resume
             guard let url = URL(string: "\(self.baseURL)/agent/resume") else {
                 throw APIError.invalidURL
             }
@@ -343,19 +374,11 @@ class GooseAPIService: ObservableObject {
             ]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            // Debug logging
-            if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
-            }
-
             signRequest(&request)
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
-            }
-
-            // Log the response for debugging
-            if let responseString = String(data: data, encoding: .utf8) {
             }
 
             if httpResponse.statusCode != 200 {
@@ -364,27 +387,11 @@ class GooseAPIService: ObservableObject {
                 throw APIError.httpError(httpResponse.statusCode, errorBody)
             }
 
-            let agentResponse = try JSONDecoder().decode(AgentResponse.self, from: data)
-            let messages = agentResponse.conversation ?? []
+            // /agent/resume returns Session but with conversation=null when not loading messages
+            // We don't need messages here anyway since we're just activating the agent
+            let session = try JSONDecoder().decode(SessionResponse.self, from: data)
             
-            if messages.isEmpty {
-            } else {
-                for (idx, msg) in messages.enumerated() {
-                    let preview = msg.content.first.map { content -> String in
-                        switch content {
-                        case .text(let tc): return String(tc.text.prefix(50))
-                        case .toolRequest(let tr): return "TOOL_REQ[\(tr.toolCall.name)]"
-                        case .toolResponse(let tr): return "TOOL_RESP[\(tr.toolResult.status)]"
-                        case .summarizationRequested: return "SUMMARIZATION"
-                        case .toolConfirmationRequest: return "TOOL_CONFIRM"
-                        case .conversationCompacted: return "COMPACTED"
-                        case .systemNotification(let sn): return "SYS_NOTIF[\(sn.notificationType)]"
-                        }
-                    } ?? "EMPTY"
-                }
-            }
-            
-            return (agentResponse.id, messages)
+            return (session.id, [])
         }
         catch let error as DecodingError {
             handleAPIError(APIError.decodingError(error), context: "Resume Agent")
@@ -728,6 +735,11 @@ class GooseAPIService: ObservableObject {
 struct AgentResponse: Codable {
     let id: String
     let conversation: [Message]?  // conversation is directly an array of messages
+}
+
+struct SessionResponse: Codable {
+    let id: String
+    let conversation: [Message]?
 }
 
 struct SessionsResponse: Codable {
