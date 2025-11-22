@@ -917,6 +917,7 @@ struct ChatView: View {
                 case .toolConfirmationRequest(let tcr): return "tconf:\(tcr.id)"
                 case .conversationCompacted(let cc): return "compact:\(cc.msg)"
                 case .systemNotification(let sn): return "sysnotif:\(sn.notificationType):\(sn.msg)"
+                case .thinking(let th): return "think:\(th.thinking.prefix(50))"
                 }
             }.joined(separator: "|")
             return "\(msg.id):\(msg.role):\(contentStr)"
