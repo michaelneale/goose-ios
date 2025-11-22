@@ -121,7 +121,6 @@ struct TrialModeInstructionsView: View {
 
                         VStack(alignment: .leading, spacing: 8) {
                             FeatureRow(text: "Ask questions and get answers", isIncluded: true)
-                            FeatureRow(text: "View example sessions", isIncluded: true)
                             FeatureRow(text: "Explore the app interface", isIncluded: true)
                             FeatureRow(text: "Access your file system", isIncluded: false)
                             FeatureRow(text: "Run commands and scripts", isIncluded: false)
