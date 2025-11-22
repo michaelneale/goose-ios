@@ -698,9 +698,24 @@ class GooseAPIService: ObservableObject {
     }
     
     func fetchSessions() async -> Result<[ChatSession], Error> {
-        // In trial mode, return mock sessions
+        // In trial mode, return only the current trial session if it exists
         if isTrialMode {
-            return .success(TrialMode.shared.getMockSessions())
+            // Try to get the current trial session from storage
+            if let sessionId = UserDefaults.standard.string(forKey: "trial_session_id"), !sessionId.isEmpty {
+                let now = Date()
+                let formatter = ISO8601DateFormatter()
+                let session = ChatSession(
+                    id: sessionId,
+                    description: "Current Session",
+                    messageCount: 0,  // Will be updated when loaded
+                    createdAt: formatter.string(from: now),
+                    updatedAt: formatter.string(from: now),
+                    workingDir: nil
+                )
+                return .success([session])
+            }
+            // No trial session yet - return empty array
+            return .success([])
         }
 
         // Use retry wrapper for network resilience

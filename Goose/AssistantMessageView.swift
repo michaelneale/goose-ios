@@ -225,6 +225,11 @@ struct MessageContentView: View {
             MarkdownText(text: "ℹ️ \(content.msg)")
                 .textSelection(.enabled)
                 .foregroundColor(.secondary)
+        
+        case .thinking(let content):
+            // Display thinking content with distinct styling
+            ThinkingContentView(text: content.thinking)
+                .textSelection(.enabled)
         }
     }
 }
@@ -246,6 +251,41 @@ struct MessageContentView: View {
                 )
             }
             .padding()
+        }
+    }
+}
+
+/// View for displaying thinking content
+struct ThinkingContentView: View {
+    let text: String
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: {
+                withAnimation {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "brain")
+                        .font(.system(size: 12))
+                    Text("Thinking Process")
+                        .font(.system(size: 12, weight: .medium))
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10))
+                }
+                .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            
+            if isExpanded {
+                MarkdownText(text: text)
+                    .padding(.leading, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGray6).opacity(0.5))
+                    .cornerRadius(8)
+            }
         }
     }
 }

@@ -121,6 +121,7 @@ enum MessageContent: Codable {
     case summarizationRequested(SummarizationRequestedContent)
     case conversationCompacted(ConversationCompactedContent)
     case systemNotification(SystemNotificationContent)
+    case thinking(ThinkingContent)
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -145,6 +146,8 @@ enum MessageContent: Codable {
             self = .conversationCompacted(try ConversationCompactedContent(from: decoder))
         case "systemNotification":
             self = .systemNotification(try SystemNotificationContent(from: decoder))
+        case "thinking":
+            self = .thinking(try ThinkingContent(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message content type: \(type)")
         }
@@ -166,6 +169,8 @@ enum MessageContent: Codable {
             try content.encode(to: encoder)
         case .systemNotification(let content):
             try content.encode(to: encoder)
+        case .thinking(let content):
+            try content.encode(to: encoder)
         }
     }
 }
@@ -173,6 +178,12 @@ enum MessageContent: Codable {
 struct TextContent: Codable {
     let type = "text"
     let text: String
+}
+
+struct ThinkingContent: Codable {
+    let type = "thinking"
+    let thinking: String
+    let signature: String
 }
 
 struct ToolRequestContent: Codable {

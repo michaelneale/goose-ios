@@ -403,6 +403,7 @@ struct WelcomeView: View {
             showSessionCard = false
         }
     }
+
     private func loadRecentSessions() async {
         // Use cached sessions immediately if available
         if !cachedSessions.isEmpty {

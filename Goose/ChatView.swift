@@ -445,12 +445,6 @@ struct ChatView: View {
             voiceManager.setMode(.normal)
         }
 
-        // Check if we're in a demo session - if so, start fresh
-        if let sessionId = currentSessionId, TrialMode.shared.isDemoSession(sessionId) {
-            // Clear the demo session state
-            currentSessionId = nil
-        }
-
         let userMessage = Message(role: .user, text: trimmedText)
         messages.append(userMessage)
         inputText = ""
@@ -923,6 +917,7 @@ struct ChatView: View {
                 case .toolConfirmationRequest(let tcr): return "tconf:\(tcr.id)"
                 case .conversationCompacted(let cc): return "compact:\(cc.msg)"
                 case .systemNotification(let sn): return "sysnotif:\(sn.notificationType):\(sn.msg)"
+                case .thinking(let th): return "think:\(th.thinking.prefix(50))"
                 }
             }.joined(separator: "|")
             return "\(msg.id):\(msg.role):\(contentStr)"
@@ -1248,40 +1243,9 @@ struct ChatView: View {
             }
             
             do {
-                // Check if this is a demo session in trial mode
-                let isDemoSession = apiService.isTrialMode && TrialMode.shared.isDemoSession(sessionId)
-                
-                if isDemoSession {
-                    // Show demo messages for this session
-                    let demoMessages = TrialMode.shared.getMockMessages(for: sessionId)
-                    
-                    await MainActor.run {
-                        // Clear state
-                        self.stopStreaming()
-                        activeToolCalls.removeAll()
-                        completedToolCalls.removeAll()
-                        toolCallMessageMap.removeAll()
-                        
-                        // Set demo session ID (so we know to start fresh on message send)
-                        currentSessionId = sessionId
-                        
-                        // Load demo messages
-                        messages = demoMessages
-                        isLoadingSession = false
-                        
-                        
-                        // Scroll to bottom
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            shouldAutoScroll = true
-                            scrollRefreshTrigger = UUID()
-                        }
-                    }
-                    return
-                }
-                
-                // For real trial session or normal sessions, resume as usual
+                // In trial mode, always use the current trial session
                 let sessionIdToResume: String
-                if apiService.isTrialMode && !isDemoSession {
+                if apiService.isTrialMode {
                     // This is the real trial session - load it
                     let (trialSessionId, _) = try await getOrCreateTrialSession()
                     sessionIdToResume = trialSessionId
