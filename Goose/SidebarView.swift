@@ -32,6 +32,37 @@ struct SidebarView: View {
     @State private var cachedGroupedByDate: [(String, [ChatSession])] = []
     @State private var cachedFavoriteSessions: [ChatSession] = []
     
+    // Fake sessions for trial mode - always add 2 fake sessions in trial mode
+    private var fakeSessions: [ChatSession] {
+        guard GooseAPIService.shared.isTrialMode else {
+            return []
+        }
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let now = Date()
+        
+        // Always add 2 fake sessions in trial mode
+        return [
+            ChatSession(
+                id: "fake-sidebar-1",
+                description: "Chat Session 1",
+                messageCount: 15,
+                createdAt: formatter.string(from: Calendar.current.date(byAdding: .hour, value: -3, to: now)!),
+                updatedAt: formatter.string(from: Calendar.current.date(byAdding: .hour, value: -3, to: now)!),
+                workingDir: nil
+            ),
+            ChatSession(
+                id: "fake-sidebar-2",
+                description: "Chat Session 2",
+                messageCount: 8,
+                createdAt: formatter.string(from: Calendar.current.date(byAdding: .hour, value: -5, to: now)!),
+                updatedAt: formatter.string(from: Calendar.current.date(byAdding: .hour, value: -5, to: now)!),
+                workingDir: nil
+            )
+        ]
+    }
+    
     // Static ISO8601 formatter to avoid recreating
     private static let iso8601Formatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -341,6 +372,21 @@ struct SidebarView: View {
                                         .background(Color.gray.opacity(0.2))
                                         .padding(.leading)
                                 }
+                            }
+                            
+                            // Fake sessions for trial mode
+                            ForEach(fakeSessions) { session in
+                                SessionRowView(session: session)
+                                    .opacity(0.6)  // Make them slightly faded
+                                    .onTapGesture {
+                                        // Fake sessions just close sidebar
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            isShowing = false
+                                        }
+                                    }
+                                Divider()
+                                    .background(Color.gray.opacity(0.2))
+                                    .padding(.leading)
                             }
                             
                             // Load more indicator at the bottom

@@ -602,6 +602,32 @@ struct DayContentView: View {
     @State private var favoritePulse = false
     @State private var livePulse = false  // For live sessions
     
+    // Computed property for sessions with fake nodes in trial mode
+    private var displaySessions: [ChatSession] {
+        // In trial mode, always add fake sessions to populate the matrix
+        if GooseAPIService.shared.isTrialMode {
+            var fakeSessions = sessions
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            // Add 3 fake nodes with different sizes
+            let now = Date()
+            for i in 1...3 {
+                let fakeDate = Calendar.current.date(byAdding: .hour, value: -(i * 3), to: now)!
+                fakeSessions.append(ChatSession(
+                    id: "fake-\(i)",
+                    description: "Sample Session \(i)",
+                    messageCount: [8, 14, 10][i-1],
+                    createdAt: formatter.string(from: fakeDate),
+                    updatedAt: formatter.string(from: fakeDate),
+                    workingDir: nil
+                ))
+            }
+            return fakeSessions
+        }
+        return sessions
+    }
+    
     init(sessions: [ChatSession],
          selectedSessionId: String?,
          showDraftNode: Bool,
@@ -637,7 +663,7 @@ struct DayContentView: View {
         GeometryReader { geometry in
             ZStack {
                 // Empty state
-                if sessions.isEmpty && !showDraftNode {
+                if displaySessions.isEmpty && !showDraftNode {
                     VStack(spacing: 8) {
                         Image(systemName: "calendar.badge.clock")
                             .font(.system(size: 32))
@@ -651,11 +677,11 @@ struct DayContentView: View {
                 }
                 
                 // Draw connections
-                if sessions.count > 1 {
+                if displaySessions.count > 1 {
                     Path { path in
-                        for i in 0..<(sessions.count - 1) {
-                            let startPoint = getCachedPosition(sessions[i], i, geometry.size, sessions, dateLabel)
-                            let endPoint = getCachedPosition(sessions[i + 1], i + 1, geometry.size, sessions, dateLabel)
+                        for i in 0..<(displaySessions.count - 1) {
+                            let startPoint = getCachedPosition(displaySessions[i], i, geometry.size, displaySessions, dateLabel)
+                            let endPoint = getCachedPosition(displaySessions[i + 1], i + 1, geometry.size, displaySessions, dateLabel)
                             
                             path.move(to: startPoint)
                             path.addLine(to: endPoint)
@@ -670,11 +696,11 @@ struct DayContentView: View {
                 }
                 
                 // Draft connection line
-                if showDraftNode && !sessions.isEmpty {
+                if showDraftNode && !displaySessions.isEmpty {
                     Path { path in
-                        let lastSession = sessions[sessions.count - 1]
-                        let lastPosition = getCachedPosition(lastSession, sessions.count - 1, geometry.size, sessions, dateLabel)
-                        let draftPos = draftNodePosition(in: geometry.size, sessions: sessions)
+                        let lastSession = displaySessions[displaySessions.count - 1]
+                        let lastPosition = getCachedPosition(lastSession, displaySessions.count - 1, geometry.size, displaySessions, dateLabel)
+                        let draftPos = draftNodePosition(in: geometry.size, sessions: displaySessions)
                         
                         path.move(to: lastPosition)
                         path.addLine(to: draftPos)
@@ -686,17 +712,21 @@ struct DayContentView: View {
                 }
                 
                 // Session nodes
-                ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
-                    let position = getCachedPosition(session, index, geometry.size, sessions, dateLabel)
+                ForEach(Array(displaySessions.enumerated()), id: \.element.id) { index, session in
+                    let position = getCachedPosition(session, index, geometry.size, displaySessions, dateLabel)
                     let isSelected = selectedSessionId == session.id
                     let isFavorite = favoritesStorage.isFavorite(session.id)
                     let isLive = isSessionLive(session)
+                    let isFakeNode = session.id.hasPrefix("fake-")
                     let currentNodeSize = nodeSize(session.messageCount)
                     let currentTapTarget = tapTargetSize(currentNodeSize)
                     let currentHighlightRing = highlightRingSize(currentNodeSize)
                     
                     Button(action: {
-                        onNodeTap(session, position)
+                        // Fake nodes do nothing when tapped
+                        if !isFakeNode {
+                            onNodeTap(session, position)
+                        }
                     }) {
                         ZStack {
                             Circle()
@@ -754,8 +784,8 @@ struct DayContentView: View {
                                         isLive ?
                                         Color.cyan.opacity(colorScheme == .dark ? 0.6 : 0.4) :
                                         (colorScheme == .dark ?
-                                         Color.white.opacity(0.5) :
-                                            Color.black.opacity(0.3))
+                                         Color.white.opacity(isFakeNode ? 0.25 : 0.5) :
+                                            Color.black.opacity(isFakeNode ? 0.15 : 0.3))
                                 )
                                 .frame(width: currentNodeSize, height: currentNodeSize)
                         }
