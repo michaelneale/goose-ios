@@ -381,6 +381,10 @@ struct WelcomeView: View {
     
     // Handle node tap
     private func handleNodeTap(_ session: ChatSession, at position: CGPoint) {
+        // Ignore fake sessions in trial mode
+        if session.id.hasPrefix("fake-") {
+            return
+        }
         if isInputFocused {
             // In focus mode - show NodeFocus popover
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -403,11 +407,16 @@ struct WelcomeView: View {
             showSessionCard = false
         }
     }
+
     private func loadRecentSessions() async {
         // Use cached sessions immediately if available
         if !cachedSessions.isEmpty {
             await MainActor.run {
-                recentSessions = cachedSessions
+                if apiService.isTrialMode {
+                    recentSessions = cachedSessions + generateFakeSessions()
+                } else {
+                    recentSessions = cachedSessions
+                }
                 isLoadingSessions = false
             }
             
@@ -438,7 +447,11 @@ struct WelcomeView: View {
                 switch result {
                 case .success(let sessions):
                     await MainActor.run {
-                        self.recentSessions = sessions
+                        if self.apiService.isTrialMode {
+                            self.recentSessions = sessions + self.generateFakeSessions()
+                        } else {
+                            self.recentSessions = sessions
+                        }
                     }
                 case .failure:
                     // Keep empty list, errors are logged in fetchSessions
@@ -452,6 +465,47 @@ struct WelcomeView: View {
                 // Errors are logged in fetchInsights, no need to handle here
             }
         }
+    }
+
+    /// Generate fake sessions for trial mode background
+    private func generateFakeSessions() -> [ChatSession] {
+        var fakes: [ChatSession] = []
+        let now = Date()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        // Helper to create a fake session
+        func makeFake(offsetDays: Int, hour: Int, msgCount: Int) -> ChatSession {
+            let date = Calendar.current.date(byAdding: .day, value: -offsetDays, to: now) ?? now
+            let timeDate = Calendar.current.date(bySettingHour: hour, minute: Int.random(in: 0...59), second: 0, of: date) ?? date
+            let dateStr = formatter.string(from: timeDate)
+            
+            return ChatSession(
+                id: "fake-\(UUID().uuidString)",
+                description: "Demo Session",
+                messageCount: msgCount,
+                createdAt: dateStr,
+                updatedAt: dateStr,
+                workingDir: nil
+            )
+        }
+        
+        // Add some fake sessions for visual density
+        // Today
+        fakes.append(makeFake(offsetDays: 0, hour: 9, msgCount: 5))
+        fakes.append(makeFake(offsetDays: 0, hour: 14, msgCount: 12))
+        fakes.append(makeFake(offsetDays: 0, hour: 16, msgCount: 8))
+        
+        // Yesterday
+        fakes.append(makeFake(offsetDays: 1, hour: 10, msgCount: 25))
+        fakes.append(makeFake(offsetDays: 1, hour: 15, msgCount: 4))
+        fakes.append(makeFake(offsetDays: 1, hour: 19, msgCount: 18))
+        
+        // 2 Days ago
+        fakes.append(makeFake(offsetDays: 2, hour: 11, msgCount: 40))
+        fakes.append(makeFake(offsetDays: 2, hour: 16, msgCount: 7))
+        
+        return fakes
     }
 }
 
